@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef __AMPLICON
 #define __AMPLICON
 
@@ -129,28 +95,27 @@ extern "C"{
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		VERSION_MAJOR			"2"
-#define		VERSION_MINOR			"1"
+#define		TNTBLAST_VERSION		"2.1 (April 13, 2020)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
 
 // MPI message tags
 #define		SIGNATURE			102
-#define		SIGNATURE_COMPLETE		103
-#define		SIGNATURE_RESULTS		104
-#define		STATUS_UPDATE			105
+#define		SIGNATURE_COMPLETE	103
+#define		SIGNATURE_RESULTS	104
+#define		STATUS_UPDATE		105
 #define		SEQ_REQUEST			106
-#define		SEARCH_QUERY			107
-#define		SEARCH_COMPLETE			108
-#define		PROFILE_INFO			109
+#define		SEARCH_QUERY		107
+#define		SEARCH_COMPLETE		108
+#define		PROFILE_INFO		109
 
 // The size of the SEARCH_QUERY message buffer
 #define		SEARCH_QUERY_BUFFER_SIZE	6
 
 // Sequence masking options
 #define		NO_MASK			0
-#define		MASK_PRIMERS		1	// lower-case primer binding sites
+#define		MASK_PRIMERS	1	// lower-case primer binding sites
 #define		MASK_PROBE		2	// lower-case probe binding sites
 #define		REPLACE_PRIMERS	4	// primer sequence replaces primer binding sites
 
