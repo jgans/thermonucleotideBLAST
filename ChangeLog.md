@@ -55,3 +55,6 @@
 	 intended to assist in interpreting the significance of 3' mismatches (ala the TaqMAMA method of Li et al 2004).
 	- Returned to the simple Makefile format
 	- Changed the alignment output from "5' " -> "5'-" and " 3'" -> "-3'"
+	- Added support for database sequences with degenerate nucleotides. While non-degenerate bases are still needed 
+	  to initiate an alignment, we now align query assay oligos with degnerate base target sequences by making
+	  the optimistic assumption of complementary base-pairing (when possible).
