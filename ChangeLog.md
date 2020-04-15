@@ -58,3 +58,6 @@
 	- Added support for database sequences with degenerate nucleotides. While non-degenerate bases are still needed 
 	  to initiate an alignment, we now align query assay oligos with degnerate base target sequences by making
 	  the optimistic assumption of complementary base-pairing (when possible).
+- Version 2.11 (April 15, 2020)
+	- When seeding alignments between assay oligos and target sequences, only include the "real" bases (A, T, G, and C).
+	- Don't accept alignments between assay oligos and target sequences that include more than 50% degenerate bases.
