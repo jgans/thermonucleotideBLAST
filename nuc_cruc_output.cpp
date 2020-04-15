@@ -8,7 +8,7 @@ using namespace std;
 ostream& operator << (ostream &s, const NucCruc &m_melt)
 {
 	// Order given by enum {A = 0, C, G, T, I, E}
-	const char* base_map = "ACGTI$-";
+	const char* base_map = "ACGTI$-MRSVWYHKDBN";
 	
 	if( m_melt.curr_align.query_align.size() != m_melt.curr_align.target_align.size() ){
 		throw __FILE__ ":operator <<: alignment size mismatch!";
@@ -37,30 +37,17 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 
 			unsigned int match = NO_MATCH;
 
-			switch(*q_iter){
-				case BASE::A:
-					match = (*t_iter == BASE::T) ? MATCH : NO_MATCH;
-					break;
-				case BASE::T:
-					match = (*t_iter == BASE::A) ? MATCH : NO_MATCH;
-					break;
-				case BASE::G:
-					match = (*t_iter == BASE::C) ? MATCH : NO_MATCH;
-					break;
-				case BASE::C:
-					match = (*t_iter == BASE::G) ? MATCH : NO_MATCH;
-					break;
-				case BASE::I:
-					match = (*t_iter == BASE::GAP) ? NO_MATCH : INOSINE_MATCH;
-					break;
-				case BASE::E:
-				case BASE::GAP:
-					match = NO_MATCH;
-					break;
-			};
+			if( is_complemetary_base(*q_iter, *t_iter) ){
 
-			if( (*t_iter == BASE::I) && (*q_iter != BASE::GAP) ){
-				match = INOSINE_MATCH;
+				if( (*q_iter == BASE::I) || (*t_iter == BASE::I) ){
+					match = INOSINE_MATCH;
+				}
+				else{
+					match = MATCH;
+				}
+			}
+			else{
+				match = NO_MATCH;
 			}
 
 			switch(match){
@@ -71,7 +58,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 					s << '|';
 					break;
 				case INOSINE_MATCH:
-					s << '*';
+					s << '!';
 					break;
 			};
 		}
@@ -113,7 +100,6 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 		}
 
 		for(q_iter = m_melt.curr_align.query_align.begin();q_iter != m_melt.curr_align.query_align.end();q_iter++){
-
 			s << base_map[*q_iter];
 		}
 
@@ -123,8 +109,6 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 
 		s << "-3'" << endl;
 
-		q_iter = m_melt.curr_align.query_align.begin();
-
 		s << "   ";
 
 		// The the prefix is unaligned (and gets a ' ', not a '|')
@@ -132,36 +116,30 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 			s << ' ';
 		}
 
+		q_iter = m_melt.curr_align.query_align.begin();
+		
 		for(t_iter = m_melt.curr_align.target_align.begin();t_iter != m_melt.curr_align.target_align.end();t_iter++,q_iter++){
 
-			enum {NO_MATCH, MATCH, INOSINE_MATCH};
+			enum {NO_MATCH, MATCH, INOSINE_MATCH, DEGENERATE_MATCH};
 
 			unsigned int match = NO_MATCH;
 
-			switch(*t_iter){
-				case BASE::A:
-					match = (*q_iter == BASE::T) ? MATCH : NO_MATCH;
-					break;
-				case BASE::T:
-					match = (*q_iter == BASE::A) ? MATCH : NO_MATCH;
-					break;
-				case BASE::G:
-					match = (*q_iter == BASE::C) ? MATCH : NO_MATCH;
-					break;
-				case BASE::C:
-					match = (*q_iter == BASE::G) ? MATCH : NO_MATCH;
-					break;
-				case BASE::I:
-					match = (*q_iter == BASE::GAP) ? NO_MATCH : INOSINE_MATCH;
-					break;
-				case BASE::E:
-				case BASE::GAP:
-					match = NO_MATCH;
-					break;
-			};
+			if( is_complemetary_base(*t_iter, *q_iter) ){
 
-			if( (*q_iter == BASE::I) && (*t_iter != BASE::GAP) ){
-				match = INOSINE_MATCH;
+				if( (*t_iter == BASE::I) || (*q_iter == BASE::I) ){
+					match = INOSINE_MATCH;
+				}
+				else{
+					if( IS_DEGENERATE_BASE(*t_iter) | IS_DEGENERATE_BASE(*q_iter) ){
+						match = DEGENERATE_MATCH;
+					}
+					else{
+						match = MATCH;
+					}
+				}
+			}
+			else{
+				match = NO_MATCH;
 			}
 
 			switch(match){
@@ -172,6 +150,9 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 					s << '|';
 					break;
 				case INOSINE_MATCH:
+					s << '!';
+					break;
+				case DEGENERATE_MATCH:
 					s << '*';
 					break;
 			};
@@ -207,7 +188,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 string NucCruc::query_seq() const
 {
 	// Order given by enum {A = 0, C, G, T, I, E}
-	const char* base_map = "ACGTI$";
+	const char* base_map = "ACGTI$-MRSVWYHKDBN";
 	CircleBuffer<BASE::nucleic_acid, MAX_SEQUENCE_LENGTH>::const_iterator iter;
 	
 	stringstream sout;
@@ -223,7 +204,7 @@ string NucCruc::target_seq() const
 {
 
 	// Order given by enum {A = 0, C, G, T, I, E}
-	const char* base_map = "ACGTI$";
+	const char* base_map = "ACGTI$-MRSVWYHKDBN";
 	CircleBuffer<BASE::nucleic_acid, MAX_SEQUENCE_LENGTH>::const_iterator iter;
 	
 	stringstream sout;
@@ -235,84 +216,4 @@ string NucCruc::target_seq() const
 	return sout.str();
 }
 
-string print_alignment(const deque<BASE::nucleic_acid> &m_query, const deque<BASE::nucleic_acid> &m_target)
-{
-        stringstream s;
-        const char* base_map = "ACGTI$-";
 
-        s << "5' ";
-
-        deque<BASE::nucleic_acid>::const_iterator q_iter, t_iter;
-
-        for(q_iter = m_query.begin();q_iter != m_query.end();q_iter++){
-
-                s << base_map[*q_iter];
-        }
-
-        s << " 3'" << endl;
-
-        q_iter = m_query.begin();
-
-        s << "   ";
-
-        for(t_iter = m_target.begin();t_iter != m_target.end();t_iter++,q_iter++){
-
-                enum {NO_MATCH, MATCH, INOSINE_MATCH};
-
-                unsigned int match = NO_MATCH;
-
-                switch(*t_iter){
-                        case BASE::A:
-                                match = (*q_iter == BASE::T) ? MATCH : NO_MATCH;
-                                break;
-                        case BASE::T:
-                                match = (*q_iter == BASE::A) ? MATCH : NO_MATCH;
-                                break;
-                        case BASE::G:
-                                match = (*q_iter == BASE::C) ? MATCH : NO_MATCH;
-                                break;
-                        case BASE::C:
-                                match = (*q_iter == BASE::G) ? MATCH : NO_MATCH;
-                                break;
-                        case BASE::I:
-                                match = (*q_iter == BASE::GAP) ? NO_MATCH : INOSINE_MATCH;
-                                break;
-                        case BASE::E:
-                                match = (*q_iter == BASE::E) ? NO_MATCH : MATCH;
-                                break;
-                        case BASE::GAP:
-                                // Do nothing
-                                break;
-                };
-
-                if( (*q_iter == BASE::I) && (*t_iter != BASE::GAP) ){
-                        match = INOSINE_MATCH;
-                }
-
-                switch(match){
-                        case NO_MATCH:
-                                s << ' ';
-                                break;
-                        case MATCH:
-                                s << '|';
-                                break;
-                        case INOSINE_MATCH:
-                                s << '*';
-                                break;
-                };
-        }
-
-        s << endl;
-
-        s << "3' " ;
-
-        for(t_iter = m_target.begin();t_iter != m_target.end();t_iter++){
-                s << base_map[*t_iter];
-        }
-
-        s << " 5'" << endl;
-
-        s << " alignment size = " << m_query.size();
-
-        return s.str();
-}

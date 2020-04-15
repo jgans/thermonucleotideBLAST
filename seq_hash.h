@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2008, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 // DNA Sequence hashing code (for fast sequence searching)
 // J. D. Gans
 // Los Alamos National Laboratory
@@ -43,8 +9,8 @@
 //
 // Version 1.1 (10/25/06)
 //	- Almost a complete rewrite. Functionality has been moved into a class (DNAHash) which
-//	is accessed via an iterator. In addition to the double word hashing that was initially
-//	used, I have added single word hashing (from words of length 2 to 12).
+//	  is accessed via an iterator. In addition to the double word hashing that was initially
+//	  used, I have added single word hashing (from words of length 2 to 12).
 //
 // Version 1.2 (2/7/07)
 //	- Use a bitmask to track memory access for faster performance
@@ -52,6 +18,10 @@
 // Version 2.0 (8/20/08)
 // 	- A complete rewrite! "Better, faster, stronger, we can rebuild it ..."
 //	- This version employs a repacking scheme to allow efficient access (and avoid cache thrashing).
+//
+// Version 2.1 (4/15/20)
+//	- Don't include kmers that contain non-ATGC bases. The previous scheme matched these bases 
+//	  to 'A', which can lead to spurious matches.
 
 #ifndef __HASH_DBASE
 #define __HASH_DBASE
@@ -273,7 +243,7 @@ class DNAHash_iterator
 			}
 			
 			do{
-				word_index ++;
+				++word_index;
 
 				if( word_index >= word_list.size() ){
 
@@ -313,7 +283,6 @@ class DNAHash_iterator
 			#endif // _DEBUG
 
 			unsigned short int word = 0;
-			size_t j = 1;
 			
 			word_list.clear();
 						
@@ -326,66 +295,66 @@ class DNAHash_iterator
 			
 			if(m_complement == true){
 				
-				for(long int i = (long int)(m_len) - 1;i >= 0;i--, j++){
+				size_t curr_len = 0;
+
+				for(long int i = (long int)(m_len) - 1;i >= 0;--i){
+
+					++curr_len;
 
 					switch(m_seq[i]){
-						case 'A':
-						case 'a':
+						case 'A': case 'a':
 							word = (word << 2) | DB_T;
 							break;
-						case 'T':
-						case 't':
+						case 'T': case 't':
 							word = (word << 2) | DB_A;
 							break;
-						case 'C':
-						case 'c':
+						case 'C': case 'c':
 							word = (word << 2) | DB_G;
 							break;
-						case 'G':
-						case 'g':
+						case 'G': case 'g':
 							word = (word << 2) | DB_C;
 							break;
 						default:
-							// By default, treat non-ATGC bases as an 'A'
-							word = (word << 2) | DB_A;
+							// Don't hash non-ATGC bases
+							curr_len = 0;
 							break;
 					};
 					
 					// Is this a valid word?
-					if( j >= word_length ){
+					if( curr_len >= word_length ){
 						word_list.push_back( word & word_mask_lookup[word_length] );
 					}
 				}
 			}
 			else{ // m_complement == false
 				
-				for(size_t i = 0;i < m_len;i++, j++){
+				size_t curr_len = 0;
+
+				for(size_t i = 0;i < m_len;++i){
+
+					++curr_len;
 
 					switch(m_seq[i]){
-						case 'A':
-						case 'a':
+						case 'A': case 'a':
 							word = (word << 2) | DB_A;
 							break;
-						case 'T':
-						case 't':
+						case 'T': case 't':
 							word = (word << 2) | DB_T;
 							break;
-						case 'C':
-						case 'c':
+						case 'C': case 'c':
 							word = (word << 2) | DB_C;
 							break;
-						case 'G':
-						case 'g':
+						case 'G': case 'g':
 							word = (word << 2) | DB_G;
 							break;
 						default:
-							// By default, treat non-ATGC bases as an 'A'
-							word = (word << 2) | DB_A;
+							// Don't hash non-ATGC bases
+							curr_len = 0;
 							break;
 					};
 					
 					// Is this a valid word?
-					if( j >= word_length ){
+					if( curr_len >= word_length ){
 						word_list.push_back( word & word_mask_lookup[word_length] );
 					}
 				}
@@ -439,39 +408,31 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 	unsigned short int word = 0;
 	size_t word_index = 0;
 		
-	for(size_t i = m_start;i < m_stop;i++){
+	for(size_t i = m_start;i < m_stop;++i){
 		
+		++word_index;
+
 		switch(m_seq[i]){
-			case 'A':
-			case 'a':
+			case 'A': case 'a':
 				word = (word << 2) | DB_A;
-				word_index ++;
 				break;
-			case 'T':
-			case 't':
+			case 'T': case 't':
 				word = (word << 2) | DB_T;
-				word_index ++;
 				break;
-			case 'C':
-			case 'c':
+			case 'C': case 'c':
 				word = (word << 2) | DB_C;
-				word_index ++;
 				break;
-			case 'G':
-			case 'g':
+			case 'G': case 'g':
 				word = (word << 2) | DB_G;
-				word_index ++;
 				break;
 			default:
-				// By default, treat non-ATGC bases as an 'A'
-				word = (word << 2) | DB_A;
-				word_index ++;
+				// Don't hash non-ATGC bases
+				word_index = 0;
 				break;
 		};
 				
 		// Is this a valid word?
 		if(word_index >= word_length){
-			
 			hash_table[ word & word_mask() ].first++;
 		}
 	}
@@ -479,7 +440,7 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 	// Partition the index_table into separate, continguous hash element lists
 	size_t hash_start = 0;
 	
-	for(size_t i = 0;i < table_size;i++){
+	for(size_t i = 0;i < table_size;++i){
 		
 		const size_t tmp = hash_table[i].first;
 		
@@ -511,33 +472,26 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 	// will be repacked to allow sequential memory access. This step is crucial for efficient iteration
 	// through the hash table (a factor of 5 speed up was observed on an Intel Xeon CPU due to a reduction
 	// in cache misses).
-	for(size_t i = m_start;i < m_stop;i++){
+	for(size_t i = m_start;i < m_stop;++i){
 		
+		++word_index;
+
 		switch(m_seq[i]){
-			case 'A':
-			case 'a':
+			case 'A': case 'a':
 				word = (word << 2) | DB_A;
-				word_index ++;
 				break;
-			case 'T':
-			case 't':
+			case 'T': case 't':
 				word = (word << 2) | DB_T;
-				word_index ++;
 				break;
-			case 'C':
-			case 'c':
+			case 'C': case 'c':
 				word = (word << 2) | DB_C;
-				word_index ++;
 				break;
-			case 'G':
-			case 'g':
+			case 'G': case 'g':
 				word = (word << 2) | DB_G;
-				word_index ++;
 				break;
 			default:
-				// By default, treat non-ATGC bases as an 'A'
-				word = (word << 2) | DB_A;
-				word_index ++;
+				// Don't hash non-ATGC bases
+				word_index = 0;
 		};
 				
 		// Is this a valid word?
@@ -579,7 +533,6 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 		if(hash_table == NULL){
 			throw __FILE__ ":DNAHash::hash: Unable to allocate hash_table";
 		}
-		
 	}
 	
 	memset( hash_table, 0, table_size*sizeof(std::pair<size_t, size_t>) );
@@ -600,14 +553,18 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 	
 	SEQPTR ptr = SEQ_START(m_seq) + m_start;
 	
-	for(size_t i = m_start;i < m_stop;i++, ptr++){
-		
-		word = (word << 2) | (*ptr & DB_MASK);
-		word_index ++;
+	for(size_t i = m_start;i < m_stop;++i, ++ptr){
+
+		const SEQBASE b = *ptr & DB_MASK;
+
+		word = (word << 2) | b;
+
+		// If we have a valid base, increment the word index (current length), otherwise
+		// set the word index to 0
+		word_index = (b <= DB_MAX_ATGC) ? (word_index + 1) : 0;
 				
 		// Is this a valid word?
 		if(word_index >= word_length){
-			
 			hash_table[ word & word_mask() ].first++;
 		}
 	}
@@ -615,7 +572,7 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 	// Partition the index_table into separate, continguous hash element lists
 	size_t hash_start = 0;
 	
-	for(size_t i = 0;i < table_size;i++){
+	for(size_t i = 0;i < table_size;++i){
 		
 		const size_t tmp = hash_table[i].first;
 		
@@ -649,10 +606,15 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 	// will be repacked to allow sequential memory access. This step is crucial for efficient iteration
 	// through the hash table (a factor of 5 speed up was observed on an Intel Xeon CPU due to a reduction
 	// in cache misses).
-	for(size_t i = m_start;i < m_stop;i++, ptr++){
-		
-		word = (word << 2) | (*ptr & DB_MASK);
-		word_index ++;
+	for(size_t i = m_start;i < m_stop;++i, ++ptr){
+
+		const SEQBASE b = *ptr & DB_MASK;
+
+		word = (word << 2) | b;
+
+		// If we have a valid base, increment the word index (current length), otherwise
+		// set the word index to 0
+		word_index = (b <= DB_MAX_ATGC) ? (word_index + 1) : 0;
 				
 		// Is this a valid word?
 		if(word_index >= word_length){
@@ -677,7 +639,6 @@ inline void DNAHash_iterator::build_word_list(const SEQPTR &m_seq, const size_t 
 	#endif // _DEBUG
 
 	unsigned short int word = 0;
-	size_t j = 1;
 
 	word_list.clear();
 
@@ -692,10 +653,19 @@ inline void DNAHash_iterator::build_word_list(const SEQPTR &m_seq, const size_t 
 	
 	if(m_complement == true){
 
-		for(long int i = (long int)(m_len) - 1;i >= 0;i--, j++){
+		size_t j = 0;
 
-			word = (word << 2) | (DB_T - ( *ptr & DB_MASK) );
+		for(long int i = (long int)(m_len) - 1;i >= 0;--i){
+
+			const SEQBASE b = *ptr & DB_MASK;
+
+			// DB_T - b is the complement
+			word = (word << 2) | (DB_T - b);
 			
+			// If we have a valid base, increment the word index (current length), otherwise
+			// set the word index to 0
+			j = (b <= DB_MAX_ATGC) ? j + 1 : 0;
+
 			// Is this a valid word?
 			if( j >= word_length ){
 				word_list.push_back( word & word_mask_lookup[word_length] );
@@ -704,9 +674,17 @@ inline void DNAHash_iterator::build_word_list(const SEQPTR &m_seq, const size_t 
 	}
 	else{ // m_complement == false
 
-		for(size_t i = 0;i < m_len;i++, j++){
+		size_t j = 0;
 
-			word = (word << 2) | (*ptr & DB_MASK);
+		for(size_t i = 0;i < m_len;++i){
+
+			const SEQBASE b = *ptr & DB_MASK;
+
+			word = (word << 2) | b;
+
+			// If we have a valid base, increment the word index (current length), otherwise
+			// set the word index to 0
+			j = (b <= DB_MAX_ATGC) ? (j + 1) : 0;
 
 			// Is this a valid word?
 			if( j >= word_length ){

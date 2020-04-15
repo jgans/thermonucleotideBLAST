@@ -1,4 +1,4 @@
-// Nucleic Crucible version
+// Nucleic Crucible
 // J. D. Gans
 // Los Alamos National Laboratory
 // 6/9/2006
@@ -74,8 +74,20 @@
 //   Jacobson-Stockmayer extrapolation implementation.
 // - Added additional steps to the hairpin evaluation code to test a larger number of potential structures. This adds
 //   computational complexity, but improves the agreement with unafold.
+//
+// version 5.4 (April 13, 2020)
+//	- Added the ability to match target sequences that have degenerate nucleotides (finally)! We assume the most
+//	  optimistic base pairing (i.e. that, when possible, the degenerate nucleotide is perfect match to the assay
+//	  nucleotide).
+//		-- Please note that we still require short, perfect, non-degenerate matches to "seed" longer alignments.
+//		   If degenerate nucleotides are spaced close-enough together (i.e a long run of poly-N), then we will
+//		   *not* initiate an alignment due to the absence of a perfect match seed k-mer to anchor an alignment.
+//	- Removed some legacy code.
+//	- Cleaned-up and stream-lined several parts of the code, including:
+//		-- Handling conversions from different nucleotide encoding schemes.
+//		-- Display of pairwise sequence alignments (alignments are no longer trimmed to remove dangling mismatches).
+//	- Added an explicit version string in the NUC_CRUC_VERSION macro
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 #ifndef __NUC_CRUC
 #define __NUC_CRUC
@@ -88,6 +100,8 @@
 #include <deque>
 
 #include "circle_buffer.h"
+
+#define	NUC_CRUC_VERSION	"5.4"
 
 // Define ENUMERATE_PATH to enable enumeration of multiple, equally high scoring
 //  paths through the dynamic programming matrix
@@ -107,11 +121,14 @@
 #define	ENTROPY(DG, DH)		( ( (DH) - (DG) )/(310.15f) )
 
 #define	BASE_PAIR(X, Y)		( (X)*NUM_BASE + (Y) )
-#define	NON_VIRTUAL_BASE_PAIR(X)	( ( (X)%NUM_BASE < E ) && ( (X)/NUM_BASE < E ) )
-#define	VIRTUAL_BASE_PAIR(X)	( ( (X)%NUM_BASE >= E ) || ( (X)/NUM_BASE >= E ) )
-#define	HAS_GAP(X)			( ( (X)%NUM_BASE == GAP ) || ( (X)/NUM_BASE >= GAP ) )
+#define	NON_VIRTUAL_BASE_PAIR(X)	( ( (X)%NUM_BASE < BASE::E ) && ( (X)/NUM_BASE < BASE::E ) )
+#define	VIRTUAL_BASE_PAIR(X)	( ( (X)%NUM_BASE >= BASE::E ) || ( (X)/NUM_BASE >= BASE::E ) )
+#define	HAS_GAP(X)			( ( (X)%NUM_BASE == BASE::GAP ) || ( (X)/NUM_BASE >= BASE::GAP ) )
 #define	QUERY_BASE(X)			( (X)/NUM_BASE )
 #define	TARGET_BASE(X)			( (X)%NUM_BASE )
+#define	IS_REAL_BASE(X)			( (X) <= BASE::I )
+#define	IS_DEGENERATE_BASE(X)	( (X) >= NUM_BASE )
+#define	IS_VIRTUAL_BASE(X)	( ( (X) == BASE::E ) || ( (X) == BASE::GAP) )
 
 // Trace back locations:
 // 
@@ -145,13 +162,13 @@
 
 // old version NUM_BASE_PAIR = |{A, C, G, T, E, GAP}|*|{A, C, G, T, E, GAP}| = 36
 // NUM_BASE_PAIR = |{A, C, G, T, I, E, GAP}|*|{A, C, G, T, I, E, GAP}| = 49
-#define	NUM_BASE				7
+#define	NUM_BASE				7 // The number of real (5) and virtual (2) bases
 #define	NUM_BASE_PAIR			(NUM_BASE*NUM_BASE)
 
 // The orginial maximum loop, buldge and hairpin lengths were 30.
 // The new lengths are set from the MAX_SEQUENCE_LENGTH but must
 // always be >= 30.
-#define 	MAX_LOOP_LENGTH		(MAX_SEQUENCE_LENGTH/2)
+#define MAX_LOOP_LENGTH		(MAX_SEQUENCE_LENGTH/2)
 #define	MAX_BULGE_LENGTH		(MAX_SEQUENCE_LENGTH/2)
 #define	MAX_HAIRPIN_LENGTH		(MAX_SEQUENCE_LENGTH/2)
 
@@ -245,7 +262,103 @@ inline A max(const A &m_a, const A &m_b)
 //	E = dangling end virtual base
 //	GAP = no base
 namespace BASE {
-	typedef enum {A = 0, C, G, T, I, E, GAP} nucleic_acid;
+
+	typedef enum {
+		// Real bases
+		A, C, G, T, I, 
+		// "Virtual bases"
+		E, GAP,
+		// IUPAC degenerate bases
+		M, R, S, V, W, Y, H, K, D, B, N
+		} nucleic_acid;
+
+	inline nucleic_acid char_to_nucleic_acid(char m_base)
+	{
+		switch(m_base){
+			case 'A': case 'a':
+				return BASE::A;
+			case 'T': case 't':
+				return BASE::T;
+			case 'G': case 'g':
+				return BASE::G;
+			case 'C': case 'c':
+				return BASE::C;
+			case 'I': case 'i':
+				return BASE::I;
+			// IUPAC degenerate bases
+			case 'M': case 'm':// A or C
+				return BASE::M;
+			case 'R': case 'r': // G or A
+				return BASE::R;
+			case 'S': case 's': // G or C
+				return BASE::S;
+			case 'V': case 'v': // G or C or A
+				return BASE::V;
+			case 'W': case 'w': // A or T
+				return BASE::W;
+			case 'Y': case 'y': // T or C
+				return BASE::Y;
+			case 'H': case 'h': // A or C or T
+				return BASE::H;
+			case 'K': case 'k': // G or T
+				return BASE::K;
+			case 'D': case 'd': // G or A or T
+				return BASE::D;
+			case 'B': case 'b': // G or T or C
+				return BASE::B;
+			case 'N': case 'n': // A or T or G or C
+				return BASE::N;
+			default:
+				throw __FILE__ ":char_to_nucleic_acid: Illegal base";
+		};
+
+		return BASE::N; // We should never get here!
+	}
+
+	inline nucleic_acid char_to_complement_nucleic_acid(char m_base)
+	{
+		switch(m_base){
+			case 'A': case 'a':
+				return BASE::T;
+			case 'T': case 't':
+				return BASE::A;
+			case 'G': case 'g':
+				return BASE::C;
+			case 'C': case 'c':
+				return BASE::G;
+			case 'I': case 'i': // Inosine is defined to be it's own complement
+				return BASE::I;
+			// IUPAC degenerate bases
+			case 'M': case 'm':// A or C
+				return BASE::K;
+			case 'R': case 'r': // G or A
+				return BASE::Y;
+			case 'S': case 's':// G or C
+				return BASE::S;
+			case 'V': case 'v': // G or C or A
+				return BASE::B;
+			case 'W': case 'w': // A or T
+				return BASE::W;
+			case 'Y': case 'y': // T or C
+				return BASE::R;
+			case 'H': case 'h': // A or C or T
+				return BASE::D;
+			case 'K': case 'k': // G or T
+				return BASE::M;
+			case 'D': case 'd': // G or A or T
+				return BASE::H;
+			case 'B': case 'b': // G or T or C
+				return BASE::V;
+			case 'N': case 'n': // A or T or G or C
+				return BASE::N;
+			default:
+				throw __FILE__ ":char_to_complement_nucleic_acid: Illegal base";
+		};
+
+		return BASE::N; // We should never get here!
+	}
+
+	bool is_complemetary_base(const nucleic_acid &m_query, const nucleic_acid &m_target);
 }
 
 class trace_branch{
@@ -388,15 +501,18 @@ struct alignment {
 		unsigned int num_aligned_query_bases = 0;
 		
 		while( q != query_align.end() ){
-			
-			if( ( *q != (BASE::T - *t) ) && (*q < BASE::I) && (*t < BASE::I) ){
-				mismatch_count++;
+
+			if( !IS_VIRTUAL_BASE(*q) ){
+
+				if( !IS_VIRTUAL_BASE(*t) && !is_complemetary_base(*q, *t) ){
+					++mismatch_count;
+				}
+				
+				++num_aligned_query_bases;
 			}
-			
-			num_aligned_query_bases += (*q < BASE::E) ? 1 : 0;
-			
-			q++;
-			t++;
+
+			++q;
+			++t;
 		}
 		
 		if(m_query_len < num_aligned_query_bases){
@@ -406,6 +522,27 @@ struct alignment {
 		mismatch_count += m_query_len - num_aligned_query_bases;
 		
 		return mismatch_count;
+	};
+
+	// Count the number of real bases in the alignment
+	inline unsigned int num_real_base() const
+	{
+		std::deque<BASE::nucleic_acid>::const_iterator q = query_align.begin();
+		std::deque<BASE::nucleic_acid>::const_iterator t = target_align.begin();
+		
+		unsigned int num_real = 0;
+		
+		while( q != query_align.end() ){
+
+			if( IS_REAL_BASE(*q) && IS_REAL_BASE(*t) ){
+				++num_real;
+			}
+
+			++q;
+			++t;
+		}
+		
+		return num_real;
 	};
 };
 
@@ -881,32 +1018,7 @@ class NucCruc{
 			query.clear();
 			
 			for(unsigned int i = 0;i < query_len;i++){
-			
-				switch(m_query[i]){
-					case 'A':
-					case 'a':
-						query.push_back(BASE::A);
-						break;
-					case 'T':
-					case 't':
-						query.push_back(BASE::T);
-						break;
-					case 'G':
-					case 'g':
-						query.push_back(BASE::G);
-						break;
-					case 'C':
-					case 'c':
-						query.push_back(BASE::C);
-						break;
-					case 'I':
-					case 'i':
-						query.push_back(BASE::I);
-						break;
-					default:
-						throw __FILE__ ":set_query: Illegal base";
-						break;
-				};
+				query.push_back( BASE::char_to_nucleic_acid( m_query[i]) );
 			}
 		};
 		
@@ -921,33 +1033,7 @@ class NucCruc{
 			query.clear();
 			
 			for(unsigned int i = 0;i < query_len;i++){
-			
-				switch(m_query[i]){
-					case 'A':
-					case 'a':
-						query.push_front(BASE::T);
-						break;
-					case 'T':
-					case 't':
-						query.push_front(BASE::A);
-						break;
-					case 'G':
-					case 'g':
-						query.push_front(BASE::C);
-						break;
-					case 'C':
-					case 'c':
-						query.push_front(BASE::G);
-						break;
-					case 'I':
-					case 'i':
-						// Inosine does not has a complement
-						query.push_front(BASE::I);
-						break;
-					default:
-						throw __FILE__ ":set_query_reverse_complement: Illegal base";
-						break;
-				};
+				query.push_front( BASE::char_to_complement_nucleic_acid(m_query[i]) );
 			}
 		};
 		
@@ -962,32 +1048,7 @@ class NucCruc{
 			target.clear();
 			
 			for(unsigned int i = 0;i < target_len;i++){
-			
-				switch(m_target[i]){
-					case 'A':
-					case 'a':
-						target.push_back(BASE::A);
-						break;
-					case 'T':
-					case 't':
-						target.push_back(BASE::T);
-						break;
-					case 'G':
-					case 'g':
-						target.push_back(BASE::G);
-						break;
-					case 'C':
-					case 'c':
-						target.push_back(BASE::C);
-						break;
-					case 'I':
-					case 'i':
-						target.push_back(BASE::I);
-						break;
-					default:
-						throw __FILE__ ":set_target: Illegal base";
-						break;
-				};
+				target.push_back( BASE::char_to_nucleic_acid(m_target[i]) );
 			}
 		};
 		
@@ -1002,34 +1063,7 @@ class NucCruc{
 			target.clear();
 			
 			for(unsigned int i = 0;i < target_len;i++){
-			
-				switch(m_target[i]){
-					case 'A':
-					case 'a':
-						target.push_front(BASE::T);
-						break;
-					case 'T':
-					case 't':
-						target.push_front(BASE::A);
-						break;
-					case 'G':
-					case 'g':
-						target.push_front(BASE::C);
-						break;
-					case 'C':
-					case 'c':
-						target.push_front(BASE::G);
-						break;
-					case 'I':
-					case 'i':
-						// Inosine does not has a complement
-						// throw __FILE__ ":set_target_reverse_complement: Inosine does not has a complement";
-						target.push_front(BASE::I);
-						break;
-					default:
-						throw __FILE__ ":set_target_reverse_complement: Illegal base";
-						break;
-				};
+				target.push_front( BASE::char_to_complement_nucleic_acid(m_target[i]) );
 			}
 		};
 		
@@ -1048,37 +1082,8 @@ class NucCruc{
 						
 			for(unsigned int i = 0;i < seq_len;i++){
 			
-				switch(m_seq[i]){
-					case 'A':
-					case 'a':
-						query.push_back(BASE::A);
-						target.push_front(BASE::T);
-						break;
-					case 'T':
-					case 't':
-						query.push_back(BASE::T);
-						target.push_front(BASE::A);
-						break;
-					case 'G':
-					case 'g':
-						query.push_back(BASE::G);
-						target.push_front(BASE::C);
-						break;
-					case 'C':
-					case 'c':
-						query.push_back(BASE::C);
-						target.push_front(BASE::G);
-						break;
-					case 'I':
-					case 'i':
-						// Let inosine be it's own complement
-						query.push_back(BASE::I);
-						target.push_front(BASE::I);
-						break;
-					default:
-						throw __FILE__ ":set_duplex: Illegal base";
-						break;
-				};
+				query.push_back( BASE::char_to_nucleic_acid(m_seq[i]) );
+				target.push_front( BASE::char_to_complement_nucleic_acid(m_seq[i]) );
 			}
 		};
 		
@@ -1096,34 +1101,7 @@ class NucCruc{
 		
 		inline void push_back_query(const char &m_base)
 		{
-			switch(m_base){
-				case 'A':
-				case 'a':
-					query.push_back(BASE::A);
-					break;
-				case 'T':
-				case 't':
-					query.push_back(BASE::T);
-					break;
-				case 'G':
-				case 'g':
-					query.push_back(BASE::G);
-					break;
-				case 'C':
-				case 'c':
-					query.push_back(BASE::C);
-					break;
-				case 'I':
-				case 'i':
-					query.push_back(BASE::I);
-					break;
-				case '$':
-					// Since we changed the method from adding dangling bases
-					// test for any illegal attempts to add a dangling base here
-					// (this check can be removed after all dependent code has been corrected)
-					throw __FILE__ ":push_back_query: Illegal push of '$'";
-					break;
-			};
+			query.push_back( BASE::char_to_nucleic_acid(m_base) );
 		};
 		
 		inline void pop_back_query()
@@ -1145,34 +1123,7 @@ class NucCruc{
 		
 		inline void push_front_query(const char &m_base)
 		{
-			switch(m_base){
-				case 'A':
-				case 'a':
-					query.push_front(BASE::A);
-					break;
-				case 'T':
-				case 't':
-					query.push_front(BASE::T);
-					break;
-				case 'G':
-				case 'g':
-					query.push_front(BASE::G);
-					break;
-				case 'C':
-				case 'c':
-					query.push_front(BASE::C);
-					break;
-				case 'I':
-				case 'i':
-					query.push_front(BASE::I);
-					break;
-				case '$':
-					// Since we changed the method from adding dangling bases
-					// test for any illegal attempts to add a dangling base here
-					// (this check can be removed after all dependent code has been corrected)
-					throw __FILE__ ":push_front_query: Illegal push of '$'";
-					break;
-			};
+			query.push_front( BASE::char_to_nucleic_acid(m_base) );
 		};
 		
 		inline void pop_front_query()
@@ -1194,34 +1145,7 @@ class NucCruc{
 		
 		inline void push_back_target(const char &m_base)
 		{
-			switch(m_base){
-				case 'A':
-				case 'a':
-					target.push_back(BASE::A);
-					break;
-				case 'T':
-				case 't':
-					target.push_back(BASE::T);
-					break;
-				case 'G':
-				case 'g':
-					target.push_back(BASE::G);
-					break;
-				case 'C':
-				case 'c':
-					target.push_back(BASE::C);
-					break;
-				case 'I':
-				case 'i':
-					target.push_back(BASE::I);
-					break;
-				case '$':
-					// Since we changed the method from adding dangling bases
-					// test for any illegal attempts to add a dangling base here
-					// (this check can be removed after all dependent code has been corrected)
-					throw __FILE__ ":push_back_target: Illegal push of '$'";
-					break;
-			};
+			target.push_back( BASE::char_to_nucleic_acid(m_base) );
 		};
 		
 		inline void pop_back_target()
@@ -1243,34 +1167,7 @@ class NucCruc{
 		
 		inline void push_front_target(const char &m_base)
 		{
-			switch(m_base){
-				case 'A':
-				case 'a':
-					target.push_front(BASE::A);
-					break;
-				case 'T':
-				case 't':
-					target.push_front(BASE::T);
-					break;
-				case 'G':
-				case 'g':
-					target.push_front(BASE::G);
-					break;
-				case 'C':
-				case 'c':
-					target.push_front(BASE::C);
-					break;
-				case 'I':
-				case 'i':
-					target.push_front(BASE::I);
-					break;
-				case '$':
-					// Since we changed the method from adding dangling bases
-					// test for any illegal attempts to add a dangling base here
-					// (this check can be removed after all dependent code has been corrected)
-					throw __FILE__ ":push_front_target: Illegal push of '$'";
-					break;
-			};
+			target.push_front( BASE::char_to_nucleic_acid(m_base) );
 		};
 		
 		inline void pop_front_target()
@@ -1337,6 +1234,11 @@ class NucCruc{
 			return curr_align.num_mismatch_by_query( query.size() );
 		};
 		
+		inline unsigned int num_real_base() const
+		{
+			return curr_align.num_real_base();
+		};
+
 		inline void dangle(const bool &m_dangle_5, const bool &m_dangle_3)
 		{
 			enable_dangle = std::make_pair(m_dangle_5, m_dangle_3);
@@ -1401,46 +1303,6 @@ class NucCruc{
 		// parameters
 		void set_supp_param(double m_param[NUM_SUPP_PARAM]);
 		void set_supp_salt_param(double m_param[NUM_SALT_PARAM]);
-				
-		////////////////////////////////////////////////////////////////////////
-		// <backwards compatibility/>
-		inline void push_back(const BASE::nucleic_acid &m_base)
-		{
-			query.push_back(m_base);
-			
-			// The complement base of E is E and the complement of I is I
-			target.push_front( BASE::nucleic_acid( (m_base >= BASE::I) ? m_base : BASE::T - m_base) );
-		};
-		
-		inline void pop_back()
-		{
-			query.pop_back();
-			target.pop_front();
-		};
-		
-		inline void push_front(const BASE::nucleic_acid &m_base)
-		{
-			query.push_front(m_base);
-			
-			// The complement base of E is E and the complement of I is I
-			target.push_back( BASE::nucleic_acid( (m_base >= BASE::I) ? m_base : BASE::T - m_base) );
-		};
-		
-		inline void pop_front()
-		{
-			query.pop_front();
-			target.pop_back();
-		};
-		
-		inline unsigned int size() const
-		{
-			return query.size();
-		};
-		
-		// Compute the fractional GC content of the query buffer
-		float gc_content() const;
-	
-		// </backwards compatibility>
 		
 		#ifdef __DEBUG
 		void dump_tables();

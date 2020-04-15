@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifdef USE_MPI
 #include <mpi.h>
 #endif // USE_MPI
@@ -219,9 +185,41 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				case DB_I:
 					m_melt.push_front_target(BASE::I);
 					break;
+				// IUPAC degenerate bases
+				case DB_M: // A or C
+					m_melt.push_front_target(BASE::K);
+					break;
+				case DB_R: // G or A
+					m_melt.push_front_target(BASE::Y);
+					break;
+				case DB_S: // G or C
+					m_melt.push_front_target(BASE::S);
+					break;
+				case DB_V: // G or C or A
+					m_melt.push_front_target(BASE::B);
+					break;
+				case DB_W: // A or T
+					m_melt.push_front_target(BASE::W);
+					break;
+				case DB_Y: // T or C
+					m_melt.push_front_target(BASE::R);
+					break;
+				case DB_H: // A or C or T
+					m_melt.push_front_target(BASE::D);
+					break;
+				case DB_K: // G or T
+					m_melt.push_front_target(BASE::M);
+					break;
+				case DB_D: // G or A or T
+					m_melt.push_front_target(BASE::H);
+					break;
+				case DB_B: // G or T or C
+					m_melt.push_front_target(BASE::V);
+					break;
+				case DB_N: // A or T or G or C
+					m_melt.push_front_target(BASE::N);
+					break;
 				default:
-					// We've encountered an invalid base. Treat an invalid base as an 'A' for now
-					//m_melt.push_front_target(BASE::A);
 					
 					// Are we closer to the start or the end?
 					if( (i - target_start) > (target_stop - (i + 1) ) ){
@@ -238,7 +236,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 					break;
 			};
 		}
-		
+
 		#ifdef PROFILE
 		num_minus_tm_eval ++;
 		#endif // PROFILE
@@ -248,7 +246,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
 			continue;
 		}
-		
+
 		const float dg = m_melt.delta_G();
 		
 		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
@@ -279,6 +277,14 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			continue;
 		}
 		
+		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+		// Since degenerate bases get turned into 'N' by the hash function, we can
+		// end up with spurious matches to poly-N sequences. Require that at least
+		// half of the query can be aligned to real (ATGCI) bases
+		if(m_melt.num_real_base() < window/2){
+			continue;
+		}
+
 		pair<unsigned int, unsigned int> query_range;
 		pair<unsigned int, unsigned int> target_range;
 		
@@ -295,7 +301,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		target_5 -= (int)query_range.first;
 
 		target_3 += (int)(window - 1) - (int)query_range.second;
-		
+
 		// Save the alignment
 		stringstream ss_align;
 		ss_align << m_melt;
@@ -363,10 +369,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			++info_iter;
 			continue;
 		}
-		
-		// DEBUG
-		//cout << "MELTING -" << endl;
-		
+				
 		// Add this element to the curr_oligo list and erase it from the info list 
 		list<oligo_info>::iterator tmp_iter = info_iter;
 		++info_iter;
@@ -408,9 +411,41 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				case DB_I:
 					m_melt.push_front_target(BASE::I);
 					break;
+				// IUPAC degenerate bases
+				case DB_M: // A or C
+					m_melt.push_front_target(BASE::K);
+					break;
+				case DB_R: // G or A
+					m_melt.push_front_target(BASE::Y);
+					break;
+				case DB_S: // G or C
+					m_melt.push_front_target(BASE::S);
+					break;
+				case DB_V: // G or C or A
+					m_melt.push_front_target(BASE::B);
+					break;
+				case DB_W: // A or T
+					m_melt.push_front_target(BASE::W);
+					break;
+				case DB_Y: // T or C
+					m_melt.push_front_target(BASE::R);
+					break;
+				case DB_H: // A or C or T
+					m_melt.push_front_target(BASE::D);
+					break;
+				case DB_K: // G or T
+					m_melt.push_front_target(BASE::M);
+					break;
+				case DB_D: // G or A or T
+					m_melt.push_front_target(BASE::H);
+					break;
+				case DB_B: // G or T or C
+					m_melt.push_front_target(BASE::V);
+					break;
+				case DB_N: // A or T or G or C
+					m_melt.push_front_target(BASE::N);
+					break;
 				default:
-					// We've encountered an invalid base. Treat an invalid base as an 'A' for now
-					//m_melt.push_front_target(BASE::A);
 					
 					// Are we closer to the start or the end?
 					if( (i - target_start) > (target_stop - (i + 1) ) ){
@@ -435,6 +470,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const float tm = m_melt.approximate_tm_heterodimer();
 		
 		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -442,6 +478,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const float dg = m_melt.delta_G();
 		
 		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -449,6 +486,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int anchor_5 = m_melt.anchor5_query();
 		
 		if(anchor_5 < m_clamp_5){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -456,6 +494,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int anchor_3 = m_melt.anchor3_query();
 		
 		if(anchor_3 < m_clamp_3){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -463,6 +502,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int num_mismatch = m_melt.num_mismatch();
 		
 		if(num_mismatch > m_max_mismatch){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -470,10 +510,21 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int num_gap = m_melt.num_gap();
 		
 		if(num_gap > m_max_gap){
+
 			curr_oligo.pop_front();
 			continue;
 		}
 		
+		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+		// Since degenerate bases get turned into 'N' by the hash function, we can
+		// end up with spurious matches to poly-N sequences. Require that at least
+		// half of the query can be aligned to real (ATGCI) bases
+		if(m_melt.num_real_base() < window/2){
+
+			curr_oligo.pop_front();
+			continue;
+		}
+
 		pair<unsigned int, unsigned int> query_range;
 		pair<unsigned int, unsigned int> target_range;
 		
@@ -585,7 +636,6 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
 			
 			// Bind to the plus strand
-			
 			switch(*seq_ptr){
 				case DB_A:
 					m_melt.push_back_target(BASE::A);
@@ -602,9 +652,41 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				case DB_I:
 					m_melt.push_back_target(BASE::I);
 					break;
+				// IUPAC degenerate bases
+				case DB_M: // A or C
+					m_melt.push_back_target(BASE::M);
+					break;
+				case DB_R: // G or A
+					m_melt.push_back_target(BASE::R);
+					break;
+				case DB_S: // G or C
+					m_melt.push_back_target(BASE::S);
+					break;
+				case DB_V: // G or C or A
+					m_melt.push_back_target(BASE::V);
+					break;
+				case DB_W: // A or T
+					m_melt.push_back_target(BASE::W);
+					break;
+				case DB_Y: // T or C
+					m_melt.push_back_target(BASE::Y);
+					break;
+				case DB_H: // A or C or T
+					m_melt.push_back_target(BASE::H);
+					break;
+				case DB_K: // G or T
+					m_melt.push_back_target(BASE::K);
+					break;
+				case DB_D: // G or A or T
+					m_melt.push_back_target(BASE::D);
+					break;
+				case DB_B: // G or T or C
+					m_melt.push_back_target(BASE::B);
+					break;
+				case DB_N: // A or T or G or C
+					m_melt.push_back_target(BASE::N);
+					break;
 				default:
-					// We've encountered an invalid base. Treat an invalid base as an 'A' for now
-					// m_melt.push_back_target(BASE::A);
 					
 					// Are we closer to the start or the end?
 					if( (i - target_start) > (target_stop - (i + 1) ) ){
@@ -621,7 +703,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 					break;
 			};
 		}
-		
+
 		#ifdef PROFILE
 		num_plus_tm_eval ++;
 		#endif // PROFILE
@@ -662,6 +744,14 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			continue;
 		}
 		
+		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+		// Since degenerate bases get turned into 'N' by the hash function, we can
+		// end up with spurious matches to poly-N sequences. Require that at least
+		// half of the query can be aligned to real (ATGCI) bases
+		if(m_melt.num_real_base() < window/2){
+			continue;
+		}
+
 		pair<unsigned int, unsigned int> query_range;
 		pair<unsigned int, unsigned int> target_range;
 		
@@ -746,10 +836,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			++info_iter;
 			continue;
 		}
-		
-		// DEBUG
-		//cout << "MELTING +" << endl;
-		
+				
 		// Add this element to the curr_oligo list and erase it from the info list 
 		list<oligo_info>::iterator tmp_iter = info_iter;
 		++info_iter;
@@ -791,11 +878,42 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				case DB_I:
 					m_melt.push_back_target(BASE::I);
 					break;
+				// IUPAC degenerate bases
+				case DB_M: // A or C
+					m_melt.push_back_target(BASE::M);
+					break;
+				case DB_R: // G or A
+					m_melt.push_back_target(BASE::R);
+					break;
+				case DB_S: // G or C
+					m_melt.push_back_target(BASE::S);
+					break;
+				case DB_V: // G or C or A
+					m_melt.push_back_target(BASE::V);
+					break;
+				case DB_W: // A or T
+					m_melt.push_back_target(BASE::W);
+					break;
+				case DB_Y: // T or C
+					m_melt.push_back_target(BASE::Y);
+					break;
+				case DB_H: // A or C or T
+					m_melt.push_back_target(BASE::H);
+					break;
+				case DB_K: // G or T
+					m_melt.push_back_target(BASE::K);
+					break;
+				case DB_D: // G or A or T
+					m_melt.push_back_target(BASE::D);
+					break;
+				case DB_B: // G or T or C
+					m_melt.push_back_target(BASE::B);
+					break;
+				case DB_N: // A or T or G or C
+					m_melt.push_back_target(BASE::N);
+					break;
 				default:
-				
-					// We've encountered an invalid base. Treat an invalid base as an 'A' for now
-					// m_melt.push_back_target(BASE::A);
-					
+									
 					// Are we closer to the start or the end?
 					if( (i - target_start) > (target_stop - (i + 1) ) ){
 					
@@ -807,11 +925,11 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 						m_melt.clear_target();
 						target_start = i + 1;
 					}
-					
+
 					break;
 			};
 		}
-		
+
 		#ifdef PROFILE
 		num_plus_tm_eval ++;
 		#endif // PROFILE
@@ -819,6 +937,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const float tm = m_melt.approximate_tm_heterodimer();
 		
 		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -826,6 +945,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const float dg = m_melt.delta_G();
 		
 		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -833,6 +953,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const unsigned int anchor_5 = m_melt.anchor5_query();
 		
 		if(anchor_5 < m_clamp_5){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -840,6 +961,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const unsigned int anchor_3 = m_melt.anchor3_query();
 		
 		if(anchor_3 < m_clamp_3){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -847,6 +969,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const unsigned int num_mismatch = m_melt.num_mismatch();
 		
 		if(num_mismatch > m_max_mismatch){
+
 			curr_oligo.pop_front();
 			continue;
 		}
@@ -854,10 +977,21 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		const unsigned int num_gap = m_melt.num_gap();
 		
 		if(num_gap > m_max_gap){
+
 			curr_oligo.pop_front();
 			continue;
 		}
 		
+		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+		// Since degenerate bases get turned into 'N' by the hash function, we can
+		// end up with spurious matches to poly-N sequences. Require that at least
+		// half of the query can be aligned to real (ATGCI) bases
+		if(m_melt.num_real_base() < window/2){
+
+			curr_oligo.pop_front();
+			continue;
+		}
+
 		pair<unsigned int, unsigned int> query_range;
 		pair<unsigned int, unsigned int> target_range;
 		
@@ -874,7 +1008,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		target_3 += (int)query_range.first;
 
 		target_5 -= (int)(window - 1) - (int)query_range.second;
-		
+
 		// Save the alignment
 		stringstream ss_align;
 		ss_align << m_melt;

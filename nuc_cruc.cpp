@@ -10,6 +10,207 @@ using namespace BASE;
 int find_loop_index(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH> &m_q,
 	const unsigned int &m_start, const unsigned int &m_len);
 
+inline nucleic_acid resolve_degenerate(const nucleic_acid &m_target_base, const nucleic_acid &m_query_base)
+{
+	nucleic_acid best_target = m_target_base;
+
+	// When a degenerate target is not complementary to the query, 
+	// choose a "real" base to represent the target in the following, arbitrary, order:
+	//		A, T, G, C
+	switch(m_target_base){
+		// Real bases
+		case A: case C: case G: case T: case I: 
+		// "Virtual bases"
+		case E: case GAP:
+			break;
+		// IUPAC degenerate bases
+		case M: // A or C
+			switch(m_query_base){
+				case T:
+					best_target = A;
+					break;
+				case G:
+					best_target = C;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case R: // G or A
+			switch(m_query_base){
+				case T:
+					best_target = A;
+					break;
+				case C:
+					best_target = G;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case S: // G or C
+			switch(m_query_base){
+				case G:
+					best_target = C;
+					break;
+				case C:
+					best_target = G;
+					break;
+				default:
+					best_target = G;
+					break;
+			};
+
+			break;
+		case V: // G or C or A
+			switch(m_query_base){
+				case G:
+					best_target = C;
+					break;
+				case C:
+					best_target = G;
+					break;
+				case T:
+					best_target = A;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case W: // A or T
+			switch(m_query_base){
+				case A:
+					best_target = T;
+					break;
+				case T:
+					best_target = A;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case Y: // T or C
+			switch(m_query_base){
+				case G:
+					best_target = C;
+					break;
+				case A:
+					best_target = T;
+					break;
+				default:
+					best_target = T;
+					break;
+			};
+
+			break;
+		case H: // A or C or T
+			switch(m_query_base){
+				case T:
+					best_target = A;
+					break;
+				case G:
+					best_target = C;
+					break;
+				case A:
+					best_target = T;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case K: // G or T
+			switch(m_query_base){
+				case C:
+					best_target = G;
+					break;
+				case A:
+					best_target = T;
+					break;
+				default:
+					best_target = T;
+					break;
+			};
+
+			break;
+		case D: // G or A or T
+			switch(m_query_base){
+				case C:
+					best_target = G;
+					break;
+				case T:
+					best_target = A;
+					break;
+				case A:
+					best_target = T;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+
+			break;
+		case B: // G or T or C
+			switch(m_query_base){
+				case C:
+					best_target = G;
+					break;
+				case A:
+					best_target = T;
+					break;
+				case G:
+					best_target = C;
+					break;
+				default:
+					best_target = T;
+					break;
+			};
+		case N: // A or T or G or C
+
+			switch(m_query_base){
+				case A:
+					best_target = T;
+					break;
+				case T:
+					best_target = A;
+					break;
+				case G:
+					best_target = C;
+					break;
+				case C:
+					best_target = G;
+					break;
+				default:
+					best_target = A;
+					break;
+			};
+			break;
+	};
+
+	return best_target;
+}
+
+inline int best_base_pair(const nucleic_acid &m_target_base, const nucleic_acid &m_query_base)
+{	
+	// Currently, degenerate bases are only allowed in either the target base or
+	// the query base, but not both. When we have a degenerate nucleotide in either the
+	// target or query position, return the most optimistic base pair -- that is, pick the
+	// complementary pair if allowed by the degeneracy.
+	return BASE_PAIR(
+		resolve_degenerate(m_target_base, m_query_base),
+		resolve_degenerate(m_query_base, m_target_base) 
+		);
+}
+
 #ifdef __DEBUG
 const char *bp[] = {
 			"AA", "AC", "AG", "AT", "AI", "AE", "A_", 
@@ -381,22 +582,22 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 			const nucleic_acid target_base = target_buffer[j - 1];
 			const nucleic_acid prev_target_base = ( (j == 1) ? GAP : target_buffer[j - 2] );
 			
-			int cur_base_pair = BASE_PAIR(target_base, query_base);
+			int cur_base_pair = best_base_pair(target_base, query_base);
 			
 			// Match or mismatch
-			int prev_base_pair = BASE_PAIR(prev_target_base, prev_query_base);
+			int prev_base_pair = best_base_pair(prev_target_base, prev_query_base);
 			
 			const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
 			// gap the query
-			prev_base_pair = BASE_PAIR(prev_target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
 			const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
 			// gap the target
-			prev_base_pair = BASE_PAIR(GAP, prev_query_base);
+			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
 			const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -448,13 +649,13 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 				}
 			}
 			
-			cur_base_pair = BASE_PAIR(target_base, GAP);
-			prev_base_pair = BASE_PAIR(prev_target_base, query_base);
+			cur_base_pair = best_base_pair(target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, query_base);
 			
 			NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
-			prev_base_pair = BASE_PAIR(prev_target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
 			NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -479,13 +680,13 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 				X_ptr->I_query_trace = i_jm1;
 			}
 			
-			cur_base_pair = BASE_PAIR(GAP, query_base);
-			prev_base_pair = BASE_PAIR(target_base, prev_query_base);
+			cur_base_pair = best_base_pair(GAP, query_base);
+			prev_base_pair = best_base_pair(target_base, prev_query_base);
 			
 			insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
-			prev_base_pair = BASE_PAIR(GAP, prev_query_base);
+			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
 			extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -566,7 +767,7 @@ NC_Score NucCruc::align_dimer_diagonal(const CircleBuffer<nucleic_acid, MAX_SEQU
 	NC_Elem *X_ptr = dp_matrix + (MAX_SEQUENCE_LENGTH + 2);
 	
 	int cur_base_pair;
-	int prev_base_pair = BASE_PAIR(GAP, GAP);
+	int prev_base_pair = best_base_pair(GAP, GAP);
 	
 	for(unsigned int i = 1;i <= len;i++, 
 		A_ptr += (MAX_SEQUENCE_LENGTH + 2), X_ptr += (MAX_SEQUENCE_LENGTH + 2),
@@ -574,7 +775,7 @@ NC_Score NucCruc::align_dimer_diagonal(const CircleBuffer<nucleic_acid, MAX_SEQU
 
 		// A B
 		// C X <-- dp[i][j]
-		cur_base_pair = BASE_PAIR(target_buffer[i - 1], m_q[query_len - i]);
+		cur_base_pair = best_base_pair(target_buffer[i - 1], m_q[query_len - i]);
 			
 		// Match or mismatch
 		X_ptr->M = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
@@ -611,7 +812,7 @@ NC_Score NucCruc::align_dimer_diagonal(const CircleBuffer<nucleic_acid, MAX_SEQU
 	return max_score;
 }
 
-/// Compute the Smith-Waterman local alignment between a query sequence and itself to
+// Compute the Smith-Waterman local alignment between a query sequence and itself to
 // check for hairpin secondary structure
 NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH> &m_q)
 {	
@@ -658,22 +859,22 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 			const nucleic_acid target_base = m_q[j];
 			const nucleic_acid prev_target_base = ( (j == 0) ? GAP : m_q[j - 1] );
 			
-			int cur_base_pair = BASE_PAIR(target_base, query_base);
+			int cur_base_pair = best_base_pair(target_base, query_base);
 			
 			// Match or mismatch
-			int prev_base_pair = BASE_PAIR(prev_target_base, prev_query_base);
+			int prev_base_pair = best_base_pair(prev_target_base, prev_query_base);
 			
 			const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
 			// gap the query
-			prev_base_pair = BASE_PAIR(prev_target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
 			const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
 			// gap the target
-			prev_base_pair = BASE_PAIR(GAP, prev_query_base);
+			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
 			const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -726,13 +927,13 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 				}
 			}
 			
-			cur_base_pair = BASE_PAIR(target_base, GAP);
-			prev_base_pair = BASE_PAIR(prev_target_base, query_base);
+			cur_base_pair = best_base_pair(target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, query_base);
 			
 			NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
-			prev_base_pair = BASE_PAIR(prev_target_base, GAP);
+			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
 			NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -755,13 +956,13 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 				X_ptr->I_query_trace = i_jm1;
 			}
 			
-			cur_base_pair = BASE_PAIR(GAP, query_base);
-			prev_base_pair = BASE_PAIR(target_base, prev_query_base);
+			cur_base_pair = best_base_pair(GAP, query_base);
+			prev_base_pair = best_base_pair(target_base, prev_query_base);
 			
 			insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
 			
-			prev_base_pair = BASE_PAIR(GAP, prev_query_base);
+			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
 			extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
 				- delta_g[prev_base_pair][cur_base_pair];
@@ -848,7 +1049,6 @@ void NucCruc::enumerate_dimer_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_pt
 		// Stop searching once we've exceeded the maximum numnber
 		// of paths through the DP matrix
 		if( (max_dp_path_enum != 0) && (max_dp_path_enum < trace_count) ){
-		
 			break;
 		}
 		
@@ -866,17 +1066,16 @@ void NucCruc::enumerate_dimer_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_pt
 		//
 		// Trim the back of the alignment
 		while( (local_align.query_align.empty() == false) &&
-			!watson_and_crick[BASE_PAIR( local_align.query_align.back(), local_align.target_align.back() )] ){
+			!watson_and_crick[best_base_pair( local_align.query_align.back(), local_align.target_align.back() )] ){
 			
 			// If this pair does not include a gap, we need to adjust the last match as well
-			if(local_align.query_align.back() < E){
-				
-				local_align.last_match.first --;
+			if( !IS_VIRTUAL_BASE(local_align.query_align.back() ) ){
+				--local_align.last_match.first;
 			}
 			
-			if(local_align.target_align.back() < E){
+			if( !IS_VIRTUAL_BASE(local_align.target_align.back() ) ){
 
-				local_align.last_match.second ++;
+				++local_align.last_match.second;
 			}
 						
 			local_align.query_align.pop_back();
@@ -885,17 +1084,15 @@ void NucCruc::enumerate_dimer_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_pt
 				
 		// Trim the front of the alignment
 		while( (local_align.query_align.empty() == false) &&
-			!watson_and_crick[BASE_PAIR(local_align.query_align.front(), local_align.target_align.front())] ){
+			!watson_and_crick[best_base_pair(local_align.query_align.front(), local_align.target_align.front())] ){
 			
 			// If this pair does not include a gap, we need to adjust the first match as well
-			if(local_align.query_align.front() < E){
-				
-				local_align.first_match.first ++;
+			if( !IS_VIRTUAL_BASE(local_align.query_align.front() ) ){
+				++local_align.first_match.first;
 			}
 			
-			if(local_align.target_align.front() < E){
-
-				local_align.first_match.second --;
+			if( !IS_VIRTUAL_BASE(local_align.target_align.front() ) ){
+				--local_align.first_match.second;
 			}
 			
 			local_align.query_align.pop_front();
@@ -1066,16 +1263,14 @@ void NucCruc::enumerate_hairpin_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_
 		//
 		// Trim the back of the alignment
 		while( (local_align.query_align.empty() == false) &&
-			!watson_and_crick[BASE_PAIR( local_align.query_align.back(), local_align.target_align.back() )] ){
+			!watson_and_crick[best_base_pair( local_align.query_align.back(), local_align.target_align.back() )] ){
 			
 			// If this pair does not include a gap, we need to adjust the last match as well
-			if(local_align.query_align.back() < E){
-				
+			if( !IS_VIRTUAL_BASE(local_align.query_align.back() ) ){
 				local_align.last_match.first --;
 			}
 			
-			if(local_align.target_align.back() < E){
-
+			if( !IS_VIRTUAL_BASE(local_align.target_align.back() ) ){
 				local_align.last_match.second ++;
 			}
 						
@@ -1085,16 +1280,14 @@ void NucCruc::enumerate_hairpin_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_
 				
 		// Trim the front of the alignment
 		while( (local_align.query_align.empty() == false) &&
-			!watson_and_crick[BASE_PAIR(local_align.query_align.front(), local_align.target_align.front())] ){
+			!watson_and_crick[best_base_pair(local_align.query_align.front(), local_align.target_align.front())] ){
 			
 			// If this pair does not include a gap, we need to adjust the first match as well
-			if(local_align.query_align.front() < E){
-				
+			if( !IS_VIRTUAL_BASE( local_align.query_align.front() ) ){
 				local_align.first_match.first ++;
 			}
 			
-			if(local_align.target_align.front() < E){
-
+			if( !IS_VIRTUAL_BASE( local_align.target_align.front() ) ){
 				local_align.first_match.second --;
 			}
 			
@@ -1216,7 +1409,7 @@ void NucCruc::enumerate_hairpin_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_
 		
 		const int last_3 = local_align.first_match.first;
 		const int last_5 = local_align.first_match.second;
-		const int last_base_pair = BASE_PAIR(query[last_5], query[last_3]);
+		const int last_base_pair = best_base_pair(query[last_5], query[last_3]);
 		
 		if( (last_base_pair == GC) || (last_base_pair == CG) ){
 			continue;
@@ -1514,7 +1707,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 	deque<nucleic_acid>::const_iterator q_iter = local_align.query_align.begin();
 	deque<nucleic_acid>::const_iterator t_iter = local_align.target_align.begin();
 
-	cur_base_pair = BASE_PAIR(*q_iter, *t_iter);
+	cur_base_pair = best_base_pair(*q_iter, *t_iter);
 
 	if(watson_and_crick[cur_base_pair] == true){
 
@@ -1528,11 +1721,11 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 	}
 
 	// Count the number of bases in the alignment (for the salt correction)
-	num_base += (*q_iter < E) ? 1 : 0;
-	num_base += (*t_iter < E) ? 1 : 0;
+	num_base += IS_VIRTUAL_BASE(*q_iter) ? 0 : 1;
+	num_base += IS_VIRTUAL_BASE(*t_iter) ? 0 : 1;
 
-	q_iter++;
-	t_iter++;
+	++q_iter;
+	++t_iter;
 
 	// The alignment index is used to test for dangling ends at the begining and end of an
 	// alignment
@@ -1540,7 +1733,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 	
 	const unsigned int align_size = local_align.query_align.size();
 	
-	for(;q_iter != local_align.query_align.end();q_iter++, t_iter++, alignment_index++){
+	for(;q_iter != local_align.query_align.end();++q_iter, ++t_iter, ++alignment_index){
 		
 		#ifdef TRACK_ENERGY
 		float last_dH = local_align.dH;
@@ -1549,7 +1742,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 	
 		last_last_base_pair = last_base_pair;
 		last_base_pair = cur_base_pair;
-		cur_base_pair = BASE_PAIR(*q_iter, *t_iter);
+		cur_base_pair = best_base_pair(*q_iter, *t_iter);
 		
 		#ifdef TRACK_ENERGY			
 		cout << "--------------------------------------------------" << endl;
@@ -1582,12 +1775,12 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 				const nucleic_acid tmp_q = nucleic_acid( QUERY_BASE(last_base_pair) );
 				const nucleic_acid tmp_t = nucleic_acid( TARGET_BASE(last_base_pair) );
 				
-				int tmp_pair = BASE_PAIR(tmp_q, E);
+				int tmp_pair = best_base_pair(tmp_q, E);
 				
 				local_align.dH += param_H[tmp_pair][cur_base_pair];
 				local_align.dS += param_S[tmp_pair][cur_base_pair];
 				
-				tmp_pair = BASE_PAIR(E, tmp_t);
+				tmp_pair = best_base_pair(E, tmp_t);
 				
 				local_align.dH += param_H[tmp_pair][cur_base_pair];
 				local_align.dS += param_S[tmp_pair][cur_base_pair];
@@ -1600,12 +1793,12 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 				if(align_stop && !watson_and_crick[cur_base_pair] && NON_VIRTUAL_BASE_PAIR(cur_base_pair) ){
 				
 					// Frayed-end at the end of the alignment
-					int tmp_pair = BASE_PAIR(*q_iter, E);
+					int tmp_pair = best_base_pair(*q_iter, E);
 				
 					local_align.dH += param_H[last_base_pair][tmp_pair];
 					local_align.dS += param_S[last_base_pair][tmp_pair];
 
-					tmp_pair = BASE_PAIR(E, *t_iter);
+					tmp_pair = best_base_pair(E, *t_iter);
 
 					local_align.dH += param_H[last_base_pair][tmp_pair];
 					local_align.dS += param_S[last_base_pair][tmp_pair];
@@ -1636,8 +1829,8 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 			// (Equation 3), whereas the stability of the remainder of 
 			// the internal loop nucleotides are assumed to be salt
 			// independent.
-			num_base += (*q_iter < E) ? 1 : 0;
-			num_base += (*t_iter < E) ? 1 : 0;			
+			num_base += IS_VIRTUAL_BASE(*q_iter) ? 0 : 1;
+			num_base += IS_VIRTUAL_BASE(*t_iter) ? 0 : 1;			
 		}
 
 		// If these bases are an exact watson and crick match,
@@ -1797,9 +1990,9 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 							// query strand until we find a non-gap base
 							while(true){
 
-								if(*rhs_q_iter < E){
+								if( !IS_VIRTUAL_BASE(*rhs_q_iter) ){
 
-									mm_base_pair = BASE_PAIR( *rhs_q_iter, TARGET_BASE(last_base_pair) );
+									mm_base_pair = best_base_pair( *rhs_q_iter, nucleic_acid( TARGET_BASE(last_base_pair) ) );
 									break;
 								}
 
@@ -1817,9 +2010,9 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 							// target strand until we find a non-gap base
 							while(true){
 
-								if(*rhs_t_iter < E){
+								if( !IS_VIRTUAL_BASE(*rhs_t_iter) ){
 
-									mm_base_pair = BASE_PAIR(QUERY_BASE(last_base_pair), *rhs_t_iter);
+									mm_base_pair = best_base_pair(nucleic_acid( QUERY_BASE(last_base_pair) ), *rhs_t_iter);
 									break;
 								}
 
@@ -1858,7 +2051,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 
 					while(true){
 
-						const int pm_base_pair = BASE_PAIR(*lhs_q_iter, *lhs_t_iter);
+						const int pm_base_pair = best_base_pair(*lhs_q_iter, *lhs_t_iter);
 
 						// If we've found a perfect match, stop back tracking and
 						// start reading ahead (into the loop)
@@ -1874,7 +2067,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 								
 								// Since we previously added a contribution for this base, remove that
 								// contribution now
-								const int mm_base_pair = BASE_PAIR(*lhs_q_iter, *lhs_t_iter);
+								const int mm_base_pair = best_base_pair(*lhs_q_iter, *lhs_t_iter);
 								
 								local_align.dH -= param_H[pm_base_pair][mm_base_pair];
 								local_align.dS -= param_S[pm_base_pair][mm_base_pair];
@@ -1902,7 +2095,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 								}
 							}
 							
-							const int mm_base_pair = BASE_PAIR(*lhs_q_iter, *lhs_t_iter);
+							const int mm_base_pair = best_base_pair(*lhs_q_iter, *lhs_t_iter);
 
 							local_align.dH += param_loop_terminal_H[pm_base_pair][mm_base_pair];
 							local_align.dS += param_loop_terminal_S[pm_base_pair][mm_base_pair];
@@ -2046,7 +2239,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 		}
 		else{
 			// If either base is a GAP or $, then this is *not* a mismatch
-			num_mismatch += ( (*q_iter < E) && (*t_iter < E) ) ? 1 : 0;
+			num_mismatch += ( !IS_VIRTUAL_BASE(*q_iter) && !IS_VIRTUAL_BASE(*t_iter) ) ? 1 : 0;
 		}
 
 		num_query_gap += (*q_iter == GAP) ? 1 : 0;
@@ -2180,7 +2373,7 @@ bool NucCruc::evaluate_hairpin_alignment(alignment &local_align)
 	//////////////////////////////////////////////////////////////////
 	
 	// The closing bases for the hairpin loop are requried for loops of all sizes
-	const int last_base_pair = BASE_PAIR(query[last_5], query[last_3]);
+	const int last_base_pair = best_base_pair(query[last_5], query[last_3]);
 	int cur_base_pair = __;
 	
 	switch(hairpin_loop_len){
@@ -2224,7 +2417,7 @@ bool NucCruc::evaluate_hairpin_alignment(alignment &local_align)
 		default:
 			// Add terminal mismatch
 			// last_base_pair is computed before the switch statement
-			cur_base_pair = BASE_PAIR(query[last_5 + 1], query[last_3 - 1]);
+			cur_base_pair = best_base_pair(query[last_5 + 1], query[last_3 - 1]);
 			
 			//local_align.dH += param_H[last_base_pair][cur_base_pair];
 			//local_align.dS += param_S[last_base_pair][cur_base_pair];
@@ -2247,7 +2440,6 @@ bool NucCruc::evaluate_hairpin_alignment(alignment &local_align)
 }
 
 // Given a query and target sequence, compute the melting temperature
-
 float NucCruc::approximate_tm_heterodimer()
 {
 	if(use_dinkelbach){
@@ -2468,26 +2660,6 @@ float NucCruc::approximate_tm_hairpin()
 		return curr_align.tm;
 	}
 }
-
-// Compute the fractional GC content of the internal query buffer
-float NucCruc::gc_content() const
-{
-	if( query.empty() ){
-		return 0.0f;
-	}
-
-	float gc = 0.0f;
-
-	CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH>::const_iterator iter;
-
-	for(iter = query.begin();iter != query.end();iter++){
-	
-		gc += ( (*iter == C) || (*iter == G) ) ? 1.0f : 0.0f;
-	}
-
-	// Return the *fractional* GC content
-	return ( gc/query.size() );
-};
 
 // m_len must be either 5 or 6
 int NucCruc::find_loop_index(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH> &m_q,
@@ -2756,7 +2928,7 @@ bool NucCruc::is_internal_to_loop( deque<nucleic_acid>::const_iterator m_q,
 		return false;
 	}
 
-	return (watson_and_crick[BASE_PAIR(*m_q, *m_t)] == false);
+	return (watson_and_crick[best_base_pair(*m_q, *m_t)] == false);
 }
 
 bool NucCruc::has_AT_initiation( deque<nucleic_acid>::const_iterator m_q, 
@@ -2773,7 +2945,7 @@ bool NucCruc::has_AT_initiation( deque<nucleic_acid>::const_iterator m_q,
 	}
 	while( (m_q != m_query_begin) && (m_t != m_target_begin) && ( (*m_q == GAP) || (*m_t == GAP) ) );
 	
-	int bp = BASE_PAIR(*m_q, *m_t);
+	int bp = best_base_pair(*m_q, *m_t);
 	
 	return ( (bp == AT) || (bp == TA) );
 }
@@ -2973,7 +3145,9 @@ void NucCruc::dump_tables()
 string print_alignment(deque<nucleic_acid> &m_query, deque<nucleic_acid> &m_target)
 {
 	stringstream s;
-	const char* base_map = "ACGTI$-";
+
+	// This base map must match the order of the enumerated base values
+	const char* base_map = "ACGTI$-MRSVWYHKDBN";
 	
 	s << "5' ";
 	
@@ -2992,7 +3166,7 @@ string print_alignment(deque<nucleic_acid> &m_query, deque<nucleic_acid> &m_targ
 	
 	for(t_iter = m_target.begin();t_iter != m_target.end();t_iter++,q_iter++){
 	
-		enum {NO_MATCH, MATCH, INOSINE_MATCH};
+		enum {NO_MATCH, MATCH, INOSINE_MATCH, DEGENERATE_MATCH};
 		
 		unsigned int match = NO_MATCH;
 		
@@ -3015,6 +3189,40 @@ string print_alignment(deque<nucleic_acid> &m_query, deque<nucleic_acid> &m_targ
 			case E:
 				match = (*q_iter == E) ? NO_MATCH : MATCH;
 				break;
+			case M:
+				match = ( (*q_iter == A) || (*q_iter == C) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case R:
+				match = ( (*q_iter == G) || (*q_iter == A) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case S:
+				match = ( (*q_iter == G) || (*q_iter == C) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case V:
+				match = ( (*q_iter == G) || (*q_iter == C) || (*q_iter == A) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case W:
+				match = ( (*q_iter == A) || (*q_iter == T) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case Y:
+				match = ( (*q_iter == T) || (*q_iter == C) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case H:
+				match = ( (*q_iter == A) || (*q_iter == C) || (*q_iter == T) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case K:
+				match = ( (*q_iter == G) || (*q_iter == T) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case D:
+				match = ( (*q_iter == G) || (*q_iter == A) || (*q_iter == T) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case B:
+				match = ( (*q_iter == G) || (*q_iter == T) || (*q_iter == C) ) ? DEGENERATE_MATCH : NO_MATCH;
+				break;
+			case N:
+				// N matches everything!
+				match = DEGENERATE_MATCH;
+				break;
 			case GAP:
 				// Do nothing
 				break;
@@ -3032,6 +3240,9 @@ string print_alignment(deque<nucleic_acid> &m_query, deque<nucleic_acid> &m_targ
 				s << '|';
 				break;
 			case INOSINE_MATCH:
+				s << '!';
+				break;
+			case DEGENERATE_MATCH:
 				s << '*';
 				break;
 		};
@@ -3042,6 +3253,10 @@ string print_alignment(deque<nucleic_acid> &m_query, deque<nucleic_acid> &m_targ
 	s << "3' " ;
 	
 	for(t_iter = m_target.begin();t_iter != m_target.end();t_iter++){
+
+		// dEBUG
+		cerr << int(*t_iter) << '\t' << base_map[*t_iter] << endl;
+
 		s << base_map[*t_iter];
 	}
 	

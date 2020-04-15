@@ -46,10 +46,10 @@ extern "C"{
 #define	DEFAULT_MIN_PROBE_DG					-9999.0f
 #define	DEFAULT_MAX_PROBE_DG					0.0f
 
-#define	DEFAULT_MELT_PARAM 					NucCruc::SANTA_LUCIA
-#define	DEFAULT_SALT						50.0e-3f	// Moles
+#define	DEFAULT_MELT_PARAM 						NucCruc::SANTA_LUCIA
+#define	DEFAULT_SALT							50.0e-3f	// Moles
 #define	DEFAULT_PRIMER_STRAND					900.0e-9f // Moles
-#define	DEFAULT_TARGET_T					310.15f	// Kelvin
+#define	DEFAULT_TARGET_T						310.15f	// Kelvin
 
 #define	DEFAULT_ASSAY_FORMAT					ASSAY_PCR
 
@@ -57,26 +57,26 @@ extern "C"{
 
 // Should dangling bases be allowed on the 5' and/or 3' query side of an alignment?
 // (Note that the hairpin calculation always uses a dangling end)
-#define	DEFAULT_DANGLE_5					false
-#define	DEFAULT_DANGLE_3					false
+#define	DEFAULT_DANGLE_5						false
+#define	DEFAULT_DANGLE_3						false
 
 // The largest sequence size (in bases) that will be searched
 // without fragmentation (i.e. spliting up into overlapping sub-sequences
 // that are all smaller than or equal to DEFAULT_FRAGMENT_TARGET_LENGTH).
-#define	DEFAULT_FRAGMENT_TARGET_LENGTH				500000
+#define	DEFAULT_FRAGMENT_TARGET_LENGTH			500000
 
 // The maximum number of gaps allowed in DNA duplex
-#define	DEFAULT_MAX_GAP						999
+#define	DEFAULT_MAX_GAP							999
 
 // The maximum number of mismatched allowed in DNA duplex
 #define	DEFAULT_MAX_MISMATCH					999
 
 // By default, rescale the strand concentration to reflect the use of degenerate bases
-#define	DEFAULT_RESCALE_CT					true
+#define	DEFAULT_RESCALE_CT						true
 
 // The number of additional flanking target bases to include on the 5' and 3'
 // of the target when computing the target-query alignment
-#define	NUM_FLANK_BASE						4
+#define	NUM_FLANK_BASE							4
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +95,7 @@ extern "C"{
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.1 (April 13, 2020)"
+#define		TNTBLAST_VERSION		"2.11 (April 15, 2020)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
