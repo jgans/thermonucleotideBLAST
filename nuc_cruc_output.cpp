@@ -111,9 +111,17 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 
 		s << "   ";
 
-		// The the prefix is unaligned (and gets a ' ', not a '|')
+		// The prefix is formally unaligned. However, there may be complementary
+		// bases between the query and target (that were not thermodynamically favorable, and hence
+		// not aligned). Indicate complementary, but unaigned, bases with a ':'.
 		for(int i = 0;i < prefix_len;++i){
-			s << ' ';
+
+			if( is_complemetary_base(m_melt.query[i], m_melt.target[m_melt.curr_align.first_match.second + prefix_len - i]) ){
+				s << ':';
+			}
+			else{
+				s << ' ';
+			}
 		}
 
 		q_iter = m_melt.curr_align.query_align.begin();
@@ -156,6 +164,21 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 					s << '*';
 					break;
 			};
+		}
+
+		// The suffix is formally unaligned. However, there may be complementary
+		// bases between the query and target (that were not thermodynamically favorable, and hence
+		// not aligned). Indicate complementary, but unaigned, bases with a ':'.
+		for(int i = 0;i < suffix_len;++i){
+
+			if( is_complemetary_base(m_melt.query[m_melt.curr_align.last_match.first + 1 + i], 
+				m_melt.target[m_melt.curr_align.last_match.second - i - 1]) ){
+
+				s << ':';
+			}
+			else{
+				s << ' ';
+			}
 		}
 
 		s << endl;
