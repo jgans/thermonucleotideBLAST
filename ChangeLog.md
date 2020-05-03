@@ -61,3 +61,5 @@
 - Version 2.11 (April 15, 2020)
 	- When seeding alignments between assay oligos and target sequences, only include the "real" bases (A, T, G, and C).
 	- Don't accept alignments between assay oligos and target sequences that include more than 50% degenerate bases.
+- Version 2.12 (May 3, 2020)
+	- Modified the alignment style (again!) to indicate complementary, but unaligned, base pairs with a ':' symbol (thanks 		 to Paul Li for suggesting this). The complementary (but unaligned) base pairs are usually found at the ends of oligos 		 and occur when the thermodynamic penatly of incorporating a mismatch is larger than the benefit of incorporating 	    terminal matching bases.
