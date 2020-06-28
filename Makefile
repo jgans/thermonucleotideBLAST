@@ -15,13 +15,21 @@ OPENMP = #-Xpreprocessor -fopenmp
 # Define USE_BLAST_DB to enable the reading of Blast-formatted databases
 FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI -DUSE_BLAST_DB
 
-# These variables only need to be defined if USE_BLAST_DB is defined
+# The BLAST_DIR variable should only be defined if USE_BLAST_DB is defined
+# If the USE_BLAST_DB is *not* defined, comment out the BLAST_DIR variable
+# with the '#' symbol.
 BLAST_DIR = ncbi-blast-2.10.0+-src
+
+ifdef BLAST_DIR
 BLAST_INC = $(BLAST_DIR)/include/ncbi-tools++
 BLAST_LIBS = -L $(BLAST_DIR)/lib \
 	-ldl -lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
 	-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio
-	
+else
+BLAST_INC =
+BLAST_LIBS =
+endif
+
 INC = -I. -I$(BLAST_INC)
 
 LIBS = -lm $(BLAST_LIBS)
