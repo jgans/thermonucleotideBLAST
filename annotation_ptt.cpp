@@ -38,11 +38,9 @@
 
 using namespace std;
 
-
 // Local functions
 bool parse_ptt(GeneAnnotation &m_gene, const string &m_line);
 bool is_annotation(const string &m_line);
-SeqIdPtr write_gi_PTT(SeqIdPtr &m_sip, const unsigned int &m_gi);
 
 bool DNAMol::loadPTT(const string &m_filename)
 {
@@ -155,8 +153,6 @@ bool parse_ptt(GeneAnnotation &m_gene, const string &m_line)
 {
 	// Clear any existing annotations
 	m_gene.clear();
-	
-	SeqIdPtr sip = NULL;
 	
 	const unsigned int len = m_line.size();
 	
@@ -346,8 +342,8 @@ bool parse_ptt(GeneAnnotation &m_gene, const string &m_line)
 	}
 	
 	if(m_line[start] != '-'){
-		sip = write_gi_PTT(sip, 
-			atoi( m_line.substr(start, pos - start).c_str() ) );
+
+		m_gene.add_seqid( m_line.substr(start, pos - start).c_str() ); 
 		
 		// Promote this annotation to a CDS
 		annot_type = GeneAnnotation::CDS;
@@ -485,47 +481,6 @@ bool parse_ptt(GeneAnnotation &m_gene, const string &m_line)
 	// Set the annotation type
 	m_gene.type(annot_type);
 	
-	// Set the SeqId
-	if(sip){
-		m_gene.seqid(sip);
-
-		sip = SeqIdSetFree(sip);
-	}
-	
 	return true;
 }
 
-// Write a gi to the given SeqIdPtr. If a gi entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_gi_PTT(SeqIdPtr &m_sip, const unsigned int &m_gi)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	sip = ValNodeNew(NULL);
-	sip->choice = SEQID_GI;
-	sip->data.intvalue = m_gi;
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-		if(tmp_old->choice != SEQID_GI){
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
-}

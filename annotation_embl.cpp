@@ -43,15 +43,11 @@ using namespace std;
 // Local functions
 int read_EMBL_key(ifstream &fin);
 bool read_locus_EMBL(ifstream &fin);
-void read_accession_EMBL(ifstream &fin, SeqIdPtr &sip);
-void read_version_EMBL(ifstream &fin, SeqIdPtr &sip);
+void read_accession_EMBL(ifstream &fin, string &m_str);
 string read_source_EMBL(ifstream &fin);
 SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len);
 
 int next_key_EMBL(ifstream &m_fin, const bool &m_clear_line = true);
-
-SeqIdPtr write_accession_EMBL(SeqIdPtr &m_sip, const string &m_accession);
-SeqIdPtr write_accession_SWISS_PROT(SeqIdPtr &m_sip, const string &m_accession);
 
 int parse_gene_EMBL(ifstream &m_fin, GeneAnnotation &m_gene);
 int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna);
@@ -128,11 +124,10 @@ bool DNAMol::loadEMBL(const std::string &m_filename, streampos &m_pos)
 				break;
 			case EMBL_ACCESSION:
 				// Load the NCBI accesion as a SeqIdPtr
-				read_accession_EMBL(fin, sip);
+				read_accession_EMBL(fin, accession);
 				break;
 			case EMBL_VERSION:
-				// Load the NCBI accesion as a SeqIdPtr
-				read_version_EMBL(fin, sip);
+				// The version is not currently stored
 				break;
 			case EMBL_SOURCE:
 				info_map[TAXA_NAME] = read_source_EMBL(fin);
@@ -289,8 +284,6 @@ void DNAMol::loadEMBLFeatures(ifstream &m_fin)
 
 int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds)
 {
-	SeqIdPtr sip = NULL;
-
 	// Clear any existing info
 	m_cds.clear();
 
@@ -333,18 +326,15 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds)
 			m_cds.info(GeneAnnotation::EC, field.second);
 		} else if(field.first == "protein_id"){
 			// Set the accession
-			sip = write_accession_EMBL(sip, field.second);
+			m_cds.add_seqid(field.second);
 		} else if(field.first == "db_xref"){
 			
 			string::size_type pos = field.second.find(':');
 
 			if(pos != string::npos){
-				pos ++;
 
-				// This is most likely a SWISS-PROT or trEMBL id -- double check to
-				// make sure!
-				sip = write_accession_SWISS_PROT(sip, 
-					field.second.substr(pos, field.second.size() - pos));
+				pos ++;
+				m_cds.add_seqid( field.second.substr(pos, field.second.size() - pos) );
 			}
 		} else if(field.first == "pseudo"){
 			// Change this CDS into a pseduo-gene
@@ -352,20 +342,11 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds)
 		}
 	}
 
-	// Set the SeqId
-	if(sip){
-		m_cds.seqid(sip);
-
-		sip = SeqIdSetFree(sip);
-	}
-
 	return annot_key;
 }
 
 int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
 {
-	SeqIdPtr sip = NULL;
-
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
 	list< pair<unsigned int, unsigned int> > seg_list;
@@ -417,18 +398,15 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gen
 			gene_ref.info(GeneAnnotation::EC, field.second);
 		} else if(field.first == "protein_id"){
 			// Set the accession
-			sip = write_accession_EMBL(sip, field.second);
+			gene_ref.add_seqid(field.second);
 		} else if(field.first == "db_xref"){
 			
 			string::size_type pos = field.second.find(':');
 
 			if(pos != string::npos){
-				pos ++;
 
-				// This is most likely a SWISS-PROT or trEMBL id -- double check to
-				// make sure!
-				sip = write_accession_SWISS_PROT(sip, 
-						field.second.substr(pos, field.second.size() - pos) );
+				pos ++;
+				gene_ref.add_seqid( field.second.substr(pos, field.second.size() - pos) );
 			}
 		} else if(field.first == "pseudo"){
 			// Change this CDS into a pseduo-gene
@@ -436,16 +414,8 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gen
 		}
 	}
 
-	// Set the SeqId
-	if(sip){
-		gene_ref.seqid(sip);
-
-		sip = SeqIdSetFree(sip);
-	}
-
 	return annot_key;
 }
-
 
 int parse_gene_EMBL(ifstream &m_fin, GeneAnnotation &m_gene)
 {
@@ -1108,135 +1078,9 @@ bool read_locus_EMBL(ifstream &fin)
 	return (string::npos != line.find("circular"));
 }
 
-void read_accession_EMBL(ifstream &fin, SeqIdPtr &sip)
+void read_accession_EMBL(ifstream &fin, string &m_accession)
 {
-	string accession;
-
-	fin >> accession;
-
-	// Convert this string into a valid SeqIdPtr.
-	// Overwrite any existing accession entries.
-	sip = write_accession_EMBL(sip, accession);
-}
-
-// Write an accession to the given SeqIdPtr. If an accession entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_accession_EMBL(SeqIdPtr &m_sip, const string &m_accession)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	// Is this a properly formatted accession?
-	if(m_accession.find('|') != string::npos){
-		// Yes
-		sip = SeqIdParse ((char*)m_accession.c_str());
-	}
-	else{
-		// No -- Assume that this is an EMBL accession.
-		// The "emb|xxxx" form for the SeqIdPtr is
-		// from sequtil.c
-		sip = SeqIdParse( (char*)string("emb|" + m_accession).c_str() );
-	}
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	if(sip == NULL){
-		throw ":write_accession_EMBL: Unable to parse SeqId";
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-		if(tmp_old->choice != SEQID_EMBL){
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
-}
-
-// Write an accession to the given SeqIdPtr. If an accession entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_accession_SWISS_PROT(SeqIdPtr &m_sip, const string &m_accession)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	// Is this a properly formatted accession?
-	if(m_accession.find('|') != string::npos){
-		// Yes
-		sip = SeqIdParse ((char*)m_accession.c_str());
-	}
-	else{
-		// No -- Assume that this is an SWISS_PROT accession.
-		// The SeqIdParse function does not like sp|xxxxx, so read
-		// the SeqId as "SEQID_EMBL" and change the choice to SEQID_SWISSPROT.
-		sip = SeqIdParse( (char*)string("emb|" + m_accession).c_str() );
-
-		if(sip){
-			sip->choice = SEQID_SWISSPROT;
-		}
-	}
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	if(sip == NULL){
-		throw ":write_accession_SWISS_PROT: Unable to parse SeqId";
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-		if(tmp_old->choice != SEQID_SWISSPROT){
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
-}
-
-void read_version_EMBL(ifstream &fin, SeqIdPtr &sip)
-{
-	string buffer;
-
-	getline(fin, buffer);
-
-	stringstream ss(buffer);
-
-	buffer = "";
-
-	ss >> buffer;
-
-	if(buffer.empty()){
-		// No version info to read
-		return;
-	}
-
-	// For EMBL files, this entry can ONLY be an accession
-	// (i.e. no GI's).
-	sip = write_accession_EMBL(sip, buffer);
+	fin >> m_accession;
 }
 
 string read_source_EMBL(ifstream &fin)

@@ -1048,8 +1048,8 @@ int master(int argc, char *argv[])
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
-						(*ptr_out) << fp << " = 5'-" << iter->forward_oligo << "-3'" << endl;
-						(*ptr_out) << rp << " = 5'-" << iter->reverse_oligo << "-3'" << endl;
+						(*ptr_out) << fp << " = 5' " << iter->forward_oligo << " 3'" << endl;
+						(*ptr_out) << rp << " = 5' " << iter->reverse_oligo << " 3'" << endl;
 					}
 
 					// Track Tm and delta G bounds for final summary to the user
@@ -1226,7 +1226,7 @@ int master(int argc, char *argv[])
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
-						(*ptr_out) << "probe = 5'-" << iter->probe_oligo << "-3'" << endl;
+						(*ptr_out) << "probe = 5' " << iter->probe_oligo << " 3'" << endl;
 						(*ptr_out) << "probe tm = " << iter->probe_tm << endl;
 
 						(*ptr_out) << "probe hairpin tm = " << iter->probe_hairpin_tm << endl;

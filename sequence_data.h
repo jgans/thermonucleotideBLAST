@@ -59,12 +59,9 @@
 
 #include "annotation.h"
 
-#ifdef USE_NCBI
-extern "C"{
-	#include <objseq.h>
-	#include <readdb.h>
-}
-#endif // USE_NCBI
+#ifdef USE_BLAST_DB
+#include <objtools/blast/seqdb_reader/seqdb.hpp>
+#endif // USE_BLAST_DB
 
 // Use a 512 kb buffer for reading fasta files from disk
 // (only applies when we're not memory mapping files). Note that
@@ -80,14 +77,16 @@ class sequence_data
 	
 	// Note that PTT must be the last annotation type in the enumeration
 	enum {FASTA_MMAP = 0, FASTA_SLOW, FASTQ_MMAP, FASTQ_SLOW, 
-		NCBI, REMOTE, 
-		ASN_1, GBK, EMBL, GFF3, PTT, NONE};
+		NCBI, REMOTE,
+
+		// The file formats with annotation start here
+		GBK, EMBL, GFF3, PTT, NONE};
 	
 	private:
 	
-	#ifdef USE_NCBI
-	ReadDBFILEPtr rdbfp;
-	#endif // USE_NCBI
+	#ifdef USE_BLAST_DB
+	NCBI_NS_NCBI::CSeqDB *blast_db_ptr;
+	#endif // USE_BLAST_DB
 	
 	unsigned char format;
 	
@@ -126,14 +125,14 @@ class sequence_data
 		const unsigned int &m_index, const int &m_start, 
 		const int &m_stop) const;
 		
-	#ifdef USE_NCBI
+	#ifdef USE_BLAST_DB
 	unsigned int read_bio_seq_ncbi(std::pair<std::string, SEQPTR> &m_seq,
 		const unsigned int &m_index) const;
 		
 	unsigned int read_bio_seq_ncbi(std::pair<std::string, SEQPTR> &m_seq,
 		const unsigned int &m_index, const int &m_start, 
 		const int &m_stop) const;
-	#endif // USE_NCBI
+	#endif // USE_BLAST_DB
 	
 	#ifdef USE_MPI
 	unsigned int read_bio_seq_remote(std::pair<std::string, SEQPTR> &m_seq, 
@@ -168,11 +167,7 @@ class sequence_data
 	file_index buffer_size;
 	
 	bool _verbose;
-	
-	#ifdef USE_NCBI
-	void load_asn(const std::string &m_filename, const bool &m_sort_by_len);
-	#endif // USE_NCBI
-	
+		
 	void load_fasta(const std::string &m_filename, const bool &m_sort_by_len,
 		const bool &m_allow_fasta_mmap);
 	void load_fastq(const std::string &m_filename, const bool &m_sort_by_len,
@@ -188,9 +183,9 @@ class sequence_data
 	{
 		format = REMOTE;
 		
-		#ifdef USE_NCBI
-		rdbfp = NULL;
-		#endif // USE_NCBI
+		#ifdef USE_BLAST_DB
+		blast_db_ptr = NULL;
+		#endif // USE_BLAST_DB
 		
 		#ifdef WIN32
 		fasta_in = NULL;
@@ -216,13 +211,13 @@ class sequence_data
 		// Purge any existing sequence indicies
 		seq_index.clear();
 		
-		#ifdef USE_NCBI
-		if(rdbfp != NULL){
-		
-			// Clean up
-			rdbfp = readdb_destruct(rdbfp);
+		#ifdef USE_BLAST_DB
+		if(blast_db_ptr != NULL){
+
+			delete blast_db_ptr;
+			blast_db_ptr = NULL;
 		}
-		#endif // USE_NCBI
+		#endif // USE_BLAST_DB
 		
 		#ifdef WIN32
 		if(fasta_in != NULL){
@@ -276,7 +271,7 @@ class sequence_data
 	// Does the file format contain annotation information?
 	inline bool is_annot_format() const
 	{
-		return ( (format >= ASN_1) && (format <= PTT) );
+		return ( (format >= GBK) && (format <= PTT) );
 	};
 		
 	// A helper function. Does the specified file format use indicies?
@@ -305,7 +300,7 @@ class sequence_data
 	const DNAMol& annot(const size_t &m_index) const
 	{
 		// Remap the index in case we're using length sorted
-		// indicies. If we're not using length sorted indcies,
+		// indicies. If we're not using length sorted indicies,
 		// then the value of the index will not be changed.
 		const size_t local_index = length_sorted_index(m_index);
 		
@@ -349,4 +344,5 @@ struct sequence_order
 
 std::pair<unsigned int, unsigned int> seq_len_increment(const unsigned int &m_len, 
 	const unsigned int &m_max_len);
+
 #endif // __SEQUENCE_DATA

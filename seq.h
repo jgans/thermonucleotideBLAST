@@ -30,6 +30,13 @@
 #define	DB_GAP			16
 #define	DB_UNKNOWN		17
 
+// Sequence orientation (borrowed from the original NCBI C toolkit)
+enum{
+	Seq_strand_plus,
+	Seq_strand_minus,
+	Seq_strand_both
+};
+
 typedef unsigned char SEQBASE;
 typedef	unsigned char*	SEQPTR;
 

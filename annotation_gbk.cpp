@@ -42,8 +42,7 @@ using namespace std;
 // Local functions
 int read_gbk_key(ifstream &fin);
 bool read_locus_GBK(ifstream &fin);
-void read_accession_GBK(ifstream &fin, SeqIdPtr &sip);
-void read_version_GBK(ifstream &fin, SeqIdPtr &sip);
+void read_accession_GBK(ifstream &fin, string &m_accession);
 string read_source_GBK(ifstream &fin);
 SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len);
 
@@ -54,9 +53,6 @@ unsigned int count_bases_GBK(ifstream &m_fin);
 void load_custom_color_gbk(GeneAnnotation &m_annot, const string &m_data);
 
 int next_key_GBK(ifstream &m_fin, const bool &m_clear_line = true);
-
-SeqIdPtr write_accession_GBK(SeqIdPtr &m_sip, const string &m_accession);
-SeqIdPtr write_gi_GBK(SeqIdPtr &m_sip, const unsigned int &m_gi);
 
 int parse_gene_GBK(ifstream &m_fin, GeneAnnotation &m_gene);
 int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna);
@@ -155,11 +151,10 @@ bool DNAMol::loadGBK(const std::string &m_filename, streampos &m_pos)
 				break;
 			case GBK_ACCESSION:
 				// Load the NCBI accesion as a SeqIdPtr
-				read_accession_GBK(fin, sip);
+				read_accession_GBK(fin, accession);
 				break;
 			case GBK_VERSION:
-				// Load the NCBI accesion as a SeqIdPtr
-				read_version_GBK(fin, sip);				
+				// The version is not currently stored
 				break;
 			case GBK_SOURCE:
 				info_map[TAXA_NAME] = read_source_GBK(fin);
@@ -343,8 +338,6 @@ void DNAMol::loadGBKFeatures(ifstream &m_fin)
 
 int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds)
 {
-	SeqIdPtr sip = NULL;
-
 	// Clear any existing info
 	m_cds.clear();
 
@@ -387,17 +380,9 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds)
 			m_cds.info(GeneAnnotation::EC, field.second);
 		} else if(field.first == "protein_id"){
 			// Set the accession
-			sip = write_accession_GBK(sip, field.second);
+			m_cds.add_seqid(field.second);
 		} else if(field.first == "db_xref"){
-		
-			string::size_type pos = field.second.find("GI:");
-
-			if(pos != string::npos){
-				pos += 3; /* strlen("GI:") */
-
-				sip = write_gi_GBK(sip, 
-					atoi(field.second.substr(pos, field.second.size() - pos).c_str()) );
-			}
+			m_cds.add_seqid(field.second);
 		} else if(field.first == "pseudo"){
 			// Turn this record into a pseduo gene
 			m_cds.type(GeneAnnotation::PSEUDO_GENE);
@@ -408,21 +393,11 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds)
 		}
 	}
 
-	// Set the SeqId
-	if(sip){
-		m_cds.seqid(sip);
-
-		sip = SeqIdSetFree(sip);
-	}
-
 	return annot_key;
 }
 
 int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
 {
-
-	SeqIdPtr sip = NULL;
-
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
 	list< pair<unsigned int, unsigned int> > seg_list;
@@ -474,17 +449,9 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene
 			gene_ref.info(GeneAnnotation::EC, field.second);
 		} else if(field.first == "protein_id"){
 			// Set the accession
-			sip = write_accession_GBK(sip, field.second);
+			gene_ref.add_seqid(field.second);
 		} else if(field.first == "db_xref"){
-			
-			string::size_type pos = field.second.find("GI:");
-
-			if(pos != string::npos){
-				pos += 3; /* strlen("GI:") */
-
-				sip = write_gi_GBK(sip, 
-					atoi(field.second.substr(pos, field.second.size() - pos).c_str()) );
-			}
+			gene_ref.add_seqid(field.second);
 		} else if(field.first == "pseudo"){
 			// Turn this record into a pseduo gene
 			gene_ref.type(GeneAnnotation::PSEUDO_GENE);
@@ -493,13 +460,6 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene
 			// This is a Genomorama specific extension to the GBK standard
 			load_custom_color_gbk(m_cds, field.second);
 		}
-	}
-
-	// Set the SeqId
-	if(sip){
-		gene_ref.seqid(sip);
-
-		sip = SeqIdSetFree(sip);
 	}
 
 	return annot_key;
@@ -1523,153 +1483,9 @@ string read_source_GBK(ifstream &fin)
 	return taxa;
 }
 
-void read_version_GBK(ifstream &fin, SeqIdPtr &sip)
+void read_accession_GBK(ifstream &fin, string &m_accession)
 {
-	string buffer;
-
-	getline(fin, buffer);
-	line_number ++;
-
-	stringstream ss(buffer);
-
-	buffer = "";
-
-	ss >> buffer;
-
-	if(buffer.empty()){
-		// No version info to read
-		return;
-	}
-
-	// Is this a gi or accession?
-	string::size_type pos = buffer.find(":");
-
-	if(pos == string::npos){
-		// Accession
-		sip = write_accession_GBK(sip, buffer);
-	}
-	else{
-		// Gi
-		sip = write_gi_GBK(sip, atoi(buffer.c_str() + pos + 1) );
-	}
-
-	buffer = "";
-
-	ss >> buffer;
-
-	if(buffer.empty()){
-		// No version info to read
-		return;
-	}
-
-	// Is this a gi or accession?
-	pos = buffer.find(":");
-
-	if(pos == string::npos){
-		// Accession
-		sip = write_accession_GBK(sip, buffer);
-	}
-	else{
-		// Gi
-		sip = write_gi_GBK(sip, atoi(buffer.c_str() + pos + 1) );
-	}
-}
-
-void read_accession_GBK(ifstream &fin, SeqIdPtr &sip)
-{
-	string accession;
-
-	fin >> accession;
-
-	// Convert this string into a valid SeqIdPtr.
-	// Overwrite any existing accession entries.
-	sip = write_accession_GBK(sip, accession);
-}
-
-// Write an accession to the given SeqIdPtr. If an accession entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_accession_GBK(SeqIdPtr &m_sip, const string &m_accession)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	// Is this a properly formatted accession?
-	if(m_accession.find('|') != string::npos){
-
-		// Yes
-		sip = SeqIdParse ((char*)m_accession.c_str());
-	}
-	else{
-
-		// No
-		sip = SeqIdParse( (char*)string("gb|" + m_accession).c_str() );
-	}
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	if(sip == NULL){
-		throw error_msg(":write_accession: Unable to parse SeqId");
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-	
-		if(tmp_old->choice != SEQID_GENBANK){
-		
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-	
-	return sip;
-}
-
-// Write a gi to the given SeqIdPtr. If a gi entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_gi_GBK(SeqIdPtr &m_sip, const unsigned int &m_gi)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	sip = ValNodeNew(NULL);
-	sip->choice = SEQID_GI;
-	sip->data.intvalue = m_gi;
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-	
-		if(tmp_old->choice != SEQID_GI){
-		
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
+	fin >> m_accession;
 }
 
 bool read_locus_GBK(ifstream &fin)

@@ -45,25 +45,28 @@
 // WIN32 only?
 #include <time.h>
 
-using namespace std;
+#ifdef USE_BLAST_DB
+#include <objects/seq/Seq_descr.hpp>
+#endif // USE_BLAST_DB
 
-#ifdef USE_NCBI
-unsigned int bioseq_to_SEQPTR(SEQPTR &m_seq, const BioseqPtr &m_bsp, const int &m_start, const int &m_stop);
-#endif // USE_NCBI
+using namespace std;
 
 void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mmap,
 	const bool &m_sort_by_len)
 {
-	#ifdef USE_NCBI
+	#ifdef USE_BLAST_DB
 
 	// Does this filename refer to a blast database?
-	rdbfp = readdb_new( (char*)m_filename.c_str(), false /* Not a protein database*/ );
-			
-	// If this is a valid pointer, return right away
-	if(rdbfp){
-	
-		format = NCBI;		
-			
+	try{
+
+		blast_db_ptr = new NCBI_NS_NCBI::CSeqDB(m_filename, NCBI_NS_NCBI::CSeqDB::eNucleotide);
+
+		if(blast_db_ptr == NULL){
+        	throw __FILE__ ":sequence_data::open: Unable to allocate CSeqDB";
+        }
+
+		format = NCBI;
+
 		const size_t num_seq = size();
 
 		seq_length.resize(num_seq);
@@ -71,7 +74,7 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 		for(size_t i = 0;i < num_seq;i++){
 
 			// Don't use readdb_get_sequence_length -- it's too slow on large databases
-			const unsigned int seq_len = readdb_get_sequence_length_approx(rdbfp, i);
+			const unsigned int seq_len = blast_db_ptr->GetSeqLengthApprox(i);
 
 			seq_length[i] = make_pair(seq_len, i);
 		}
@@ -82,9 +85,12 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 		
 		return;
 	}
-	#endif // USE_NCBI
+	catch(...){
+		// This is either *not* a BLAST database, or there is an error in the BLAST database
+	}
+	#endif // USE_BLAST_DB
 	
-	// Is this file a recognized annotation file (i.e. GBK, ASN.1, etc.)?
+	// Is this file a recognized annotation file (i.e. GBK, GFF3, etc.)?
 	switch( file_type(m_filename) ){
 	
 		case DNAMol::FASTA:
@@ -92,13 +98,6 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 			return;
 		case DNAMol::FASTQ:
 			load_fastq(m_filename, m_sort_by_len, m_allow_fasta_mmap);
-			return;
-		case DNAMol::ASN_1:
-			#ifdef USE_NCBI
-			load_asn(m_filename, m_sort_by_len);
-			#else
-			throw "NCBI ASN.1 input file detected. Please compile thermonucleotideBLAST with the NCBI toolkit";
-			#endif // USE_NCBI
 			return;
 		case DNAMol::GBK:
 			load_gbk(m_filename, m_sort_by_len);
@@ -114,14 +113,13 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 			//load_ptt(m_filename, m_sort_by_len);
 			return;
 		default:
-			throw "File not found or unrecognized file type (not fasta, gbk, asn.1, ptt or embl)";
+			throw "File not found or unrecognized file type (not fasta, gbk, ptt or embl)";
 	};
 }
 
 unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq, 	
 	const unsigned int &m_index) const
 {
-
 	unsigned int seq_len = 0;
 	
 	switch(format){
@@ -137,17 +135,16 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 		case FASTQ_SLOW:
 			seq_len = read_bio_seq_fastq_slow(m_seq, m_index);
 			break;
-		#ifdef USE_NCBI			
+		#ifdef USE_BLAST_DB			
 		case NCBI:
 			seq_len = read_bio_seq_ncbi(m_seq, m_index);
-		#endif // USE_NCBI
+		#endif // USE_BLAST_DB
 			break;
 		#ifdef USE_MPI
 		case REMOTE:
 			seq_len = read_bio_seq_remote(m_seq, m_index);
 			break;
 		#endif // USE_MPI
-		case ASN_1:
 		case GBK:
 		case EMBL:
 		case GFF3:
@@ -181,17 +178,16 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 		case FASTQ_SLOW:
 			seq_len = read_bio_seq_fastq_slow(m_seq, m_index, m_start, m_stop);
 			break;
-		#ifdef USE_NCBI			
+		#ifdef USE_BLAST_DB			
 		case NCBI:
 			seq_len = read_bio_seq_ncbi(m_seq, m_index, m_start, m_stop);
-		#endif // USE_NCBI
+		#endif // USE_BLAST_DB
 			break;
 		#ifdef USE_MPI
 		case REMOTE:
 			seq_len = read_bio_seq_remote(m_seq, m_index, m_start, m_stop);
 			break;
 		#endif // USE_MPI
-		case ASN_1:
 		case GBK:
 		case EMBL:
 		case GFF3:
@@ -286,7 +282,7 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 }
 #endif // USE_MPI
 
-#ifdef USE_NCBI
+#ifdef USE_BLAST_DB
 unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq, 
 	const unsigned int &m_index) const
 {
@@ -296,67 +292,176 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq, 
 	const unsigned int &m_index, const int &m_start, const int &m_stop) const
 {
-	BioseqPtr bsp = NULL;
-	
+	unsigned int seq_len = 0;
+
 	// Read this sequence from the database file. The "omp critical"
 	// is needed to prevent multiple openMP threads from encountering
 	// a race condition in the NCBI toolbox
-	#pragma omp critical (NcbiToolbox)
-	{
-		
-		// Note that neither readdb_get_bioseq nor readdb_get_bioseq_ex is threadsafe
-		// (they both call functions like SeqLocAsnLoad() that modify global library variables
-		// which can lead to race conditions). However, by using readdb_get_bioseq_ex, we can
-		// explicitly avoid the overhead associated with the NCBI ObjMgr code and also avoid
-		// the need for an additional critical section when deleting the bsp-associated memory.
-		
-		//bsp = readdb_get_bioseq(rdbfp, m_index);
-		bsp = readdb_get_bioseq_ex(rdbfp, m_index, FALSE /* don't use the ObjMgr */, FALSE);
-		
-		if(bsp == NULL){
-			throw __FILE__ ":read_bio_seq_ncbi: NULL bsp";
-		}
-	
-		// Save the description string as a defline so we can tell the 
-		// user something about this sequence
-		char def_buffer[DEFLINE_BUFFER_SIZE];
-
-		// Make sure that we always have a valid string	
-		def_buffer[DEFLINE_BUFFER_SIZE - 1] = '\0';
-	
-		// Pass the buffer length as def_len - 1 to insure that our '\0'
-		// character does not get clobbered!
-		BioseqLabel(bsp, def_buffer, DEFLINE_BUFFER_SIZE - 1, OM_LABEL_CONTENT);
-
-		m_seq.first = def_buffer;
-
-		// Add a separator
-		def_buffer[0] = ' ';
-
-		// Pass the buffer length as def_len - 1 - 1 to insure that our '\0'
-		// character does not get clobbered!
-		SeqDescLabel(bsp->descr, def_buffer + 1, DEFLINE_BUFFER_SIZE - 2, OM_LABEL_CONTENT);
-		
-		m_seq.first += def_buffer;
-	}
-	
-	// Convert this BioseqPtr into a SEQPTR buffer
-	const unsigned int seq_len = bioseq_to_SEQPTR(m_seq.second, bsp, m_start, m_stop);
-		
-	// By using readdb_get_bioseq_ex (see above), we can explicitly avoid the NCBI ObjMgr
-	// (which is not thread safe). This allows us to free the bsp associated memory
-	// locally in each thread (and avoid an additional omp critical section).
 	//#pragma omp critical (NcbiToolbox)
 	//{
-		//bsp = BioseqFree(bsp);
-		SeqIdSetFree(bsp->id);
-		BioseqFreeComponents(bsp);
-		MemFree(bsp);
+		if(blast_db_ptr == NULL){
+			throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer";
+		}
+
+		const ncbi::CRef<ncbi::objects::CBioseq> bs = blast_db_ptr->GetBioseqNoData(m_index);
+
+		string title;
+		string accession;
+
+		const list< ncbi::CRef< ncbi::CSeq_id > >& seqIds = bs->GetId();
+     	
+		for (list< ncbi::CRef< ncbi::CSeq_id > >::const_iterator cit = seqIds.begin();cit != seqIds.end(); cit++)
+     	{
+			const ncbi::CTextseq_id* textId = (*cit)->GetTextseq_Id();
+
+         	if(textId && textId->CanGetAccession() ){
+
+            	if( textId->CanGetAccession() ){
+                 	accession = textId->GetAccession();
+				}
+
+				if( !accession.empty() ){
+					break;
+				}
+			}
+		}
+
+		ITERATE( ncbi::CSeq_descr::Tdata, desc, bs->GetDescr().Get() ) {
+        	if( (*desc)->Which() == ncbi::CSeqdesc::e_Title ) {
+            	title = (*desc)->GetTitle();
+				break;
+        	}
+    	}
+
+		if( accession.empty() ){
+			m_seq.first = title;
+		}
+		else{
+
+			if( title.empty() ){
+				m_seq.first = accession;
+			}
+			else{
+				m_seq.first = accession + " " + title;
+			}
+		}
+
+		// Extract the sequence data
+		const char* seq_buffer = NULL;
+		const int start = m_start;
+
+		// The stop value that we pass to GetAmbigSeq is not
+		// included in the extracted bases, i.e. [start, stop).
+		int stop = min( m_stop + 1, blast_db_ptr->GetSeqLength(m_index) );
+		
+		if(start > stop){
+
+			stop = blast_db_ptr->GetAmbigSeq(m_index,
+				&seq_buffer,
+				ncbi::kSeqDBNuclNcbiNA8);
+		}
+		else{
+			blast_db_ptr->GetAmbigSeq(m_index,
+				&seq_buffer,
+				ncbi::kSeqDBNuclNcbiNA8,
+				start, stop);
+		}
+
+		seq_len = stop - start;
+
+		// Allocate space to hold the sub-sequence
+		m_seq.second = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
+		
+		if(m_seq.second == NULL){
+			throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
+		}
+		
+		SEQPTR out_ptr = m_seq.second;
+		
+		// Initialize the sequence header
+		memcpy( out_ptr, &seq_len, sizeof(unsigned int) );
+		out_ptr += sizeof(unsigned int);
+		
+		const char *in_ptr = seq_buffer;
+
+		for(int i = start;i < stop;++i,++out_ptr,++in_ptr){
+
+			// kSeqDBNuclNcbiNA8
+			#define BLAST_DB_A	1
+			#define BLAST_DB_C 	2
+			#define BLAST_DB_G	4
+			#define BLAST_DB_T	8
+
+			switch(*in_ptr)
+			{
+				case BLAST_DB_A:
+					*out_ptr = DB_A;
+					break;
+				case BLAST_DB_T:
+					*out_ptr = DB_T;
+					break;
+				case BLAST_DB_G:
+					*out_ptr = DB_G;
+					break;
+				case BLAST_DB_C:
+					*out_ptr = DB_C;
+					break;
+				// G or T or C
+				case (BLAST_DB_G | BLAST_DB_T | BLAST_DB_C):
+					*out_ptr = DB_B;
+					break;
+				// G or A or T
+				case (BLAST_DB_G | BLAST_DB_A | BLAST_DB_T):
+					*out_ptr = DB_D;
+					break;
+				// A or C or T
+				case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_T):
+					*out_ptr = DB_H;
+					break;
+				// G or T
+				case (BLAST_DB_G | BLAST_DB_T):
+					*out_ptr = DB_K;
+					break;
+				// A or C
+				case (BLAST_DB_A | BLAST_DB_C):
+					*out_ptr = DB_M;
+					break;
+				// A or C or G or T
+				case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_G | BLAST_DB_T):
+					*out_ptr = DB_N;
+					break;
+				// G or A
+				case (BLAST_DB_G | BLAST_DB_A):
+					*out_ptr = DB_R;
+					break;
+				// G or C
+				case (BLAST_DB_G | BLAST_DB_C):
+					*out_ptr = DB_S;
+					break;
+				// G or C or A
+				case (BLAST_DB_G | BLAST_DB_C | BLAST_DB_A):
+					*out_ptr = DB_V;
+					break;
+				// A or T
+				case (BLAST_DB_A | BLAST_DB_T):
+					*out_ptr = DB_W;
+					break;
+				// T or C
+				case (BLAST_DB_T | BLAST_DB_C):
+					*out_ptr = DB_Y;
+					break;
+				default:
+					*out_ptr = DB_UNKNOWN;
+					break;
+			};
+		}
+
+		blast_db_ptr->RetAmbigSeq(&seq_buffer);
 	//}
 	
 	return seq_len;
 }
-#endif // USE_NCBI
+#endif // USE_BLAST_DB
 
 unsigned int sequence_data::read_bio_seq_annot(pair<string, SEQPTR> &m_seq, 
 		const unsigned int &m_index) const
@@ -405,7 +510,6 @@ unsigned int sequence_data::read_bio_seq_annot(pair<string, SEQPTR> &m_seq,
 		throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
 	}
 	
-	
 	SEQPTR ptr = m_seq.second;
 	
 	// Initialize the sequence header
@@ -433,26 +537,19 @@ size_t sequence_data::size() const
 		case FASTQ_SLOW:
 			return seq_index.size();
 		case NCBI:
-			#ifdef USE_NCBI
+			#ifdef USE_BLAST_DB
 			{
-				if(!rdbfp){
+				if(!blast_db_ptr){
 					throw __FILE__ ":sequence_data::size: NCBI database is not open";
 				}
 				
-				Int8 total_len = 0L;
-				Int4 num_seq = 0;
-
-				// Get the total length of all sequences and the number of sequences
-				readdb_get_totals(rdbfp, &total_len, &num_seq);
-				
-				return size_t(num_seq);
+				return size_t( blast_db_ptr->GetNumSeqs() );
 			}
-			#endif // USE_NCBI
+			#endif // USE_BLAST_DB
 			
 			return 0;
 		case REMOTE:
 			throw __FILE__ ":sequence_data::size: size is not defined for remote databases";
-		case ASN_1:
 		case GBK:
 		case EMBL:
 		case PTT:

@@ -73,7 +73,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 	}
 	else{ // m_melt.tm_mode != NucCruc::HAIRPIN
 	
-		s << "5'-";
+		s << "5' ";
 
 		deque<BASE::nucleic_acid>::const_iterator q_iter, t_iter;
 
@@ -107,7 +107,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 			s << base_map[ m_melt.query[m_melt.curr_align.last_match.first + 1 + i] ];
 		}
 
-		s << "-3'" << endl;
+		s << " 3'" << endl;
 
 		s << "   ";
 
@@ -183,7 +183,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 
 		s << endl;
 
-		s << "3'-" ;
+		s << "3' " ;
 
 		// The target is stored in 5' -> 3' orientation, so we need to reverse it here
 		for(int i = prefix_len;i > 0;--i){
@@ -198,7 +198,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 			s << base_map[ m_melt.target[m_melt.curr_align.last_match.second - i] ];
 		}
 
-		s << "-5'" << endl;
+		s << " 5'" << endl;
 
 		s << "dimer";
 	}

@@ -39,24 +39,11 @@
 #include "seq.h"
 #include <string>
 #include <vector>
+#include <deque>
 #include <list>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
-#ifdef USE_NCBI
-
-extern "C" {
-	#include <seqport.h>
-}
-
-#else
-
-// A collection of NCBI data types for use when
-// tntblast is built without the NCBI toolkit
-#include "ncbi_util.h"
-
-#endif // USE_NCBI
 
 // OS specific defines and includes
 #ifdef WIN32
@@ -83,7 +70,10 @@ private:
 	// Is this gene divided into multiple regions?
 	std::list< std::pair<unsigned int, unsigned int> > seg_list;
 	
-	SeqIdPtr sip;
+	// For many years tntblast used the NCBI C toolkit SeqIdPtr to track
+	// sequence ids. Now, just store a deque of all of the accessions
+	// associated with a given gene
+	std::deque<std::string> id;
 	
 	std::vector<std::string> info_map;
 
@@ -112,7 +102,7 @@ public:
 		complement = false;
 		gene_type = NONE;
 		gene_start = gene_stop = 0;
-		sip = NULL;
+		id.clear();
 		info_map = std::vector<std::string>(LAST_INFO);
 	};
 	
@@ -121,28 +111,21 @@ public:
 		complement = false;
 		gene_type = NONE;
 		gene_start = gene_stop = 0;
-		sip = NULL;
 
 		*this = m_copy;
 	};
 	
 	~GeneAnnotation()
 	{
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
+		
 	};
 	
 	inline void clear()
-	{
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
-		
+	{		
 		complement = false;
 		gene_type = NONE;
 		gene_start = gene_stop = 0;
-		sip = NULL;
+		id.clear();
 		info_map = std::vector<std::string>(LAST_INFO);
 		seg_list.clear();
 	}
@@ -153,78 +136,29 @@ public:
 		complement = m_copy.complement;
 		gene_start = m_copy.gene_start;
 		gene_stop = m_copy.gene_stop;
-
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
-				
-		if(m_copy.sip){
-			sip = SeqIdSetDup(m_copy.sip);
-		}
-		
+		id = m_copy.id;
 		info_map = m_copy.info_map;
 		seg_list = m_copy.seg_list;
 
 		return (*this);
 	};
-	
-	#ifdef USE_NCBI
-	GeneAnnotation& operator=(const SeqFeatPtr &sfp);
-	#endif // USE_NCBI
-	
-	inline bool operator==(const SeqIdPtr &m_sip) const
+
+	#ifdef NOT_NOW	
+	inline bool operator==(const std::string &m_id) const
 	{
-
-		// Only compare valid SeqIdPtr
-		if(!sip || !m_sip){
-			return false;
-		}
-
-		// An optimization for SEQID_GI
-		if( (sip->choice == SEQID_GI) && (m_sip->choice == SEQID_GI) ){
-			return (sip->data.intvalue == m_sip->data.intvalue);
-		}
-
-		SeqIdPtr a = sip;
-		
-		while(a){
-
-			SeqIdPtr b = m_sip;
-			
-			while(b){
-				switch(SeqIdComp(a, b)){
-					case SIC_YES:
-						return true;
-					case SIC_NO:
-						return false;
-					case SIC_DIFF:
-						// Couldn't compare -- keep going!
-						break;
-				};
-				
-				b = b->next;
-			}
-			
-			a = a->next;
-		}
-		
-		return false;
+		return (id == m_id);
 	};
 	
-	inline bool operator!=(const SeqIdPtr &m_sip) const
+	inline bool operator!=(const std::string &m_id) const
 	{
-		return !(*this == m_sip);
+		return (id != m_id);
 	};
 	
 	inline bool operator==(const GeneAnnotation &m_copy) const
 	{
-		// If we have valid SeqIdPtrs, compare them
-		if(sip && m_copy.sip){
-
-			// Add an optimization for SEQID_GI
-			return ( (sip->choice == SEQID_GI) && (m_copy.sip->choice == SEQID_GI) ) ?
-				(sip->data.intvalue == m_copy.sip->data.intvalue) : 
-				(SeqIdComp(sip, m_copy.sip) == SIC_YES);
+		// Do we have valid ids to compare?
+		if( !id.empty() && (id == m_copy.id) ){
+			return true;
 		}
 		
 		if(complement != m_copy.complement){
@@ -241,7 +175,8 @@ public:
 		
 		return true;
 	};
-	
+	#endif // NOT_NOW
+
 	inline bool operator<(const GeneAnnotation& m_copy) const
 	{		
 		const bool this_overlap = (gene_start > gene_stop);
@@ -299,69 +234,27 @@ public:
 		return (gene_start > gene_stop);
 	};
 	
-	inline void seqid(const SeqIdPtr m_sid)
+	inline void add_seqid(const std::string &m_id)
 	{
-		if(m_sid == NULL){
-			throw "GeneAnnotation:seqid: NULL input SeqId";
-		}
-		
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
-		
-		sip = SeqIdSetDup(m_sid);
-	};
-	
-	inline int gi() const
-	{
-		SeqIdPtr tmp_sip = sip;
-	
-		while(tmp_sip != NULL){
-			if(tmp_sip->choice == SEQID_GI){
-				return tmp_sip->data.intvalue;
-			}
-			
-			tmp_sip = tmp_sip->next;
-		}
-		
-		return -1;
-	};
-	
-	// Return the genbank accesion
-	inline std::string accession(const bool &m_include_version) const
-	{
-		SeqIdPtr tmp_sip = sip;
-		char buffer[256];
-		
-		while(tmp_sip != NULL){
-		
-			if(tmp_sip->choice == SEQID_GENBANK){
-			
-				SeqIdWrite(tmp_sip, buffer, 
-					(m_include_version) ? PRINTID_TEXTID_ACC_VER :
-						PRINTID_TEXTID_ACC_ONLY,
-					256);
-				
-				return buffer;
-			}
-			
-			tmp_sip = tmp_sip->next;
-		}
-		
-		return "";
+		id.push_back(m_id);
 	};
 	
 	inline std::string seq_id_str() const
 	{
-		char buffer[256];
+		std::string ret;
 
-		if(sip == NULL){
-			return "";
+		// Concatinate all of the accession strings into a single string
+		for(std::deque<std::string>::const_iterator i = id.begin();i != id.end();++i){
+
+			if( i == id.begin() ){
+				ret = *i;
+			}
+			else{
+				ret = ret + "|" + *i;
+			}
 		}
-		
-		SeqIdPrint(sip, buffer, PRINTID_FASTA_ALL);
-		
-		return buffer;
+
+		return ret;
 	};
 
 	inline void info(unsigned int m_key, const char *m_str)
@@ -610,8 +503,8 @@ public:
 // Classes to manage an entire DNA molecule
 class DNAMol{
 private:
-	SeqIdPtr sip;
-	
+	std::string accession;
+
 	// The sequence data
 	SEQPTR seq;
 	
@@ -626,25 +519,6 @@ private:
 	std::vector<std::string> info_map;
 	
 	std::list<GeneAnnotation> gene_list;
-	
-	#ifdef USE_NCBI
-	// Load from a file [this is a wrapper for
-	// loadASN(SeqEntryPtr sep)].
-	bool loadASN(const std::string &m_filename, std::streampos &m_pos);
-
-	// Load from the NCBI web site [this is a wrapper for
-	// loadASN(SeqEntryPtr sep].
-	bool loadNetASN(const unsigned int &m_gi);
-
-	// Load from the NCBI web site and save to disk
-	bool loadNetASN(const unsigned int &m_gi, const std::string &m_filename);
-
-	// Load from a pointer
-	bool loadASN(SeqEntryPtr sep, SeqIdPtr sid = NULL);
-	
-	void taxaInfo(ValNodePtr m_vnp);
-	
-	#endif // USE_NCBI
 	
 	// Load from a PTT file
 	bool loadPTT(const std::string &m_filename);
@@ -662,21 +536,19 @@ public:
 		GENUS, SPECIES, SUBSPECIES, LAST_INFO}; // info_map
 	
 	// Data input types:
-	// ASN_1 = NCBI's ASN.1 annotation format (either binary or ASCII)
 	// GBK = ASCII Genbank annontation flat file (similar to EMBL)
 	// EMBL = ASCII EMBL annotation file (similar to GBK)
 	// PTT = Protein translation table -- no sequence!
 	// GFF3 = Generic feature format version 3
 	// FASTA = FASTA file
 	// FASTQ = FASTQ file
-	enum {ASN_1, GBK, EMBL, PTT, FASTA, FASTQ, GFF3, LAST_ANNOT_FORMAT};
+	enum {GBK, EMBL, PTT, FASTA, FASTQ, GFF3, LAST_ANNOT_FORMAT};
 	
 	DNAMol()
 	{
 		seq = NULL;
 		seq_len = 0;
 		start = stop = 0;
-		sip = NULL;
 		info_map = std::vector<std::string>(LAST_INFO);
 	};
 	
@@ -685,7 +557,6 @@ public:
 		seq = NULL;
 		seq_len = 0;
 		start = stop = 0;
-		sip = NULL;
 		info_map = std::vector<std::string>(LAST_INFO);
 		
 		// Avoid shallow copy errors -- need to write a copy constructor
@@ -696,9 +567,6 @@ public:
 	
 	~DNAMol()
 	{
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
 	};
 	
 	inline DNAMol& operator=(const DNAMol &m_copy)
@@ -713,114 +581,31 @@ public:
 
 	inline std::string seq_id_str() const
 	{
-		char buffer[256];
-
-		if(sip == NULL){
-			return "";
-		}
-		
-		SeqIdPrint(sip, buffer, PRINTID_FASTA_ALL);
-
-		return buffer;
+		return accession;
 	};
 	
-	// Return the genbank accesion
-	inline std::string accession(const bool &m_include_version) const
-	{
-		SeqIdPtr tmp_sip = sip;
-		char buffer[256];
-		
-		while(tmp_sip != NULL){
-		
-			if(tmp_sip->choice == SEQID_GENBANK){
-			
-				SeqIdWrite(tmp_sip, buffer, 
-					(m_include_version) ? PRINTID_TEXTID_ACC_VER :
-						PRINTID_TEXTID_ACC_ONLY,
-					256);
-				
-				return buffer;
-			}
-			
-			tmp_sip = tmp_sip->next;
-		}
-		
-		return "";
-	};
-	
-	inline int gi() const
-	{
-		SeqIdPtr tmp_sip = sip;
-	
-		while(tmp_sip != NULL){
-			if(tmp_sip->choice == SEQID_GI){
-				return tmp_sip->data.intvalue;
-			}
-			
-			tmp_sip = tmp_sip->next;
-		}
-		
-		return -1;
-	};
-	
-	inline bool operator==(const SeqIdPtr &m_sip)
-	{
-		// Only compare valid SeqIdPtr
-		if(!sip || !m_sip){
-			return false;
-		}
-
-		// An optimization for SEQID_GI
-		if((sip->choice == SEQID_GI) && (m_sip->choice == SEQID_GI)){
-			return (sip->data.intvalue == m_sip->data.intvalue);
-		}
-
-		SeqIdPtr a = sip;
-		
-		while(a){
-			SeqIdPtr b = m_sip;
-			
-			while(b){
-				switch(SeqIdComp(a, b)){
-					case SIC_YES:
-						return true;
-					case SIC_NO:
-						return false;
-					case SIC_DIFF:
-						// Couldn't compare -- keep going!
-						break;
-				};
-				
-				b = b->next;
-			}
-			
-			a = a->next;
-		}
-		
-		return false;
+	inline bool operator==(const std::string &m_accession)
+	{		
+		return (accession == m_accession);
 	};
 
 	inline std::list<GeneAnnotation>::iterator begin()
 	{
-		
 		return gene_list.begin();
 	};
 	
 	inline std::list<GeneAnnotation>::iterator end()
 	{
-		
 		return gene_list.end();
 	};
 
 	inline std::list<GeneAnnotation>::const_iterator begin() const
 	{
-		
 		return gene_list.begin();
 	};
 	
 	inline std::list<GeneAnnotation>::const_iterator end() const
 	{
-		
 		return gene_list.end();
 	};
 
@@ -841,7 +626,6 @@ public:
 	
 	// Load and append the annotation file
 	bool load(const std::string &m_filename, const unsigned int &m_type, std::streampos &m_pos);
-	bool load(const int &m_gi);
 	void load(const GFF3File &m_fin, const std::string &m_source);
 	
 	bool import(const DNAMol &m_mol, const unsigned int &m_type);
@@ -849,14 +633,13 @@ public:
 	// Flush all data
 	void clear()
 	{
-		if(sip){
-			sip = SeqIdSetFree(sip);
-		}
-		
+		accession.clear();
+
 		start = stop = 0;
 		info_map.clear();
 
 		if(seq != NULL){
+
 			delete [] seq;
 			seq = NULL;
 		}

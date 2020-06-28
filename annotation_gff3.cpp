@@ -37,9 +37,6 @@
 
 using namespace std;
 
-SeqIdPtr write_accession_GFF3(SeqIdPtr &m_sip, const string &m_accession);
-SeqIdPtr write_gi_GFF3(SeqIdPtr &m_sip, const unsigned int &m_gi);
-
 void DNAMol::load(const GFF3File &m_fin, const string &m_source)
 {
 	info_map[SOURCE] = m_source;
@@ -188,23 +185,7 @@ void DNAMol::load(const GFF3File &m_fin, const string &m_source)
 				attrib = annot("Dbxref");
 				
 				for(GFF3Record::const_iterator i = attrib.first;i != attrib.second;i++){
-
-					string::size_type loc = i->second.find("GenBank:");
-					
-					if(loc != string::npos){
-
-						loc += 8;
-						sip = write_accession_GFF3( sip, i->second.substr(loc, i->second.size() - loc) );
-					}
-
-					loc = i->second.find("gi:");
-					
-					if(loc != string::npos){
-
-						loc += 3;
-						sip = write_gi_GFF3( sip, 
-							atoi( i->second.substr(loc, i->second.size() - loc).c_str() ) );
-					}
+					tmp.add_seqid(i->second);
 				}
 
 				break;
@@ -329,9 +310,8 @@ void DNAMol::load(const GFF3File &m_fin, const string &m_source)
 			tmp.info(GeneAnnotation::PRODUCT, attrib.first->second);
 		}
 
-		SeqIdPtr local_sip = NULL;
-
 		attrib = annot("Dbxref");
+
 		for(GFF3Record::const_iterator i = attrib.first;i != attrib.second;i++){
 
 			string::size_type loc = i->second.find("EC:");
@@ -346,16 +326,8 @@ void DNAMol::load(const GFF3File &m_fin, const string &m_source)
 
 			if(loc != string::npos){
 
-				loc += 11;
-				local_sip = write_accession_GFF3( local_sip, i->second.substr(loc, i->second.size() - loc) );
+				tmp.add_seqid(i->second);
 			}
-		}
-
-		// Set the SeqId
-		if(local_sip){
-			tmp.seqid(local_sip);
-
-			local_sip = SeqIdSetFree(local_sip);
 		}
 
 		// Is this annotation segmented?
@@ -380,84 +352,4 @@ void DNAMol::load(const GFF3File &m_fin, const string &m_source)
 	}
 	
 	processGeneList(true /* Loading this data for the first time */);
-}
-
-// Write an accession to the given SeqIdPtr. If an accession entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_accession_GFF3(SeqIdPtr &m_sip, const string &m_accession)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	// Is this a properly formatted accession?
-	if(m_accession.find('|') != string::npos){
-		// Yes
-		sip = SeqIdParse ((char*)m_accession.c_str());
-	}
-	else{
-		// No
-		sip = SeqIdParse( (char*)string("gb|" + m_accession).c_str() );
-	}
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	if(sip == NULL){
-		throw error_msg(":write_accession: Unable to parse SeqId");
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-		if(tmp_old->choice != SEQID_GENBANK){
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
-}
-
-// Write a gi to the given SeqIdPtr. If a gi entry
-// already exists, this code will overwrite it! The updated SedIdPtr is
-// returned and the input pointer is invalid.
-SeqIdPtr write_gi_GFF3(SeqIdPtr &m_sip, const unsigned int &m_gi)
-{
-	SeqIdPtr sip = NULL;
-	SeqIdPtr tmp_new = NULL;
-	SeqIdPtr tmp_old = NULL;
-
-	sip = ValNodeNew(NULL);
-	sip->choice = SEQID_GI;
-	sip->data.intvalue = m_gi;
-
-	if(m_sip == NULL){
-		return sip;
-	}
-
-	tmp_new = sip;
-	tmp_old = m_sip;
-
-	while(tmp_old != NULL){
-		if(tmp_old->choice != SEQID_GI){
-			tmp_new->next = SeqIdDup(tmp_old);
-			tmp_new = tmp_new->next;
-		}
-
-		tmp_old = tmp_old->next;
-	}
-
-	// Free the old ptr
-	m_sip = SeqIdSetFree(m_sip);
-
-	return sip;
 }
