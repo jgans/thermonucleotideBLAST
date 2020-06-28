@@ -12,11 +12,19 @@ PROFILE = #-pg
 OPENMP = #-Xpreprocessor -fopenmp
 
 # Define USE_MPI to enable MPI
-FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI
+# Define USE_BLAST_DB to enable the reading of Blast-formatted databases
+FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI -DUSE_BLAST_DB
 
-INC = -I. 
+# These variables only need to be defined if USE_BLAST_DB is defined
+BLAST_DIR = ncbi-blast-2.10.0+-src
+BLAST_INC = $(BLAST_DIR)/include/ncbi-tools++
+BLAST_LIBS = -L $(BLAST_DIR)/lib \
+	-ldl -lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
+	-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio
+	
+INC = -I. -I$(BLAST_INC)
 
-LIBS = -lm 
+LIBS = -lm $(BLAST_LIBS)
 
 .SUFFIXES : .o .cpp .c
 .cpp.o:
