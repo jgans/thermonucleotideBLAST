@@ -1,6 +1,6 @@
 ![tntblast logo](https://github.com/jgans/thermonucleotideBLAST/blob/master/logo.png)
 
-# Current version is 2.12 (May 3, 2020)
+# Current version is 2.14 (June 24, 2020)
 # Overview
 ThermonucleotideBLAST is a software program for searching a target database of nucleic acid sequences using an assay-specific query. ThermonucleotideBLAST queries are based on biochemical assays (i.e. a pair of oligonucleotide sequences representing PCR primers or Padlock probes, a triplet of oligos representing PCR primers and a TaqMan probe or a single oligo representing a hybridization probe). Unlike existing programs (e.g. BLAST) which use heuristic measures of sequence similarity for identifying matches between a query and target sequence, ThermonucleotideBLAST uses physically relevant measures of sequence similarity -- free energy and melting temperature. For example, given a pair of PCR primers, a database of DNA targets and an annealing temperature, ThermonucleotideBLAST will return a list of predicted amplicons that will (ideally) match experimental PCR results. To enable searching of very large sequence databases (i.e. all of Genbank), ThermonucleotideBLAST can use run-time database and query segmentation to distribute the computational load across multiple CPUs.
 
@@ -10,7 +10,6 @@ Please send bug-reports/suggestions/comments/rants to jgans@lanl.gov
 
 ## Features
 - Search by
-
   - PCR primer pair
   - PCR primer pair + hybridization probe (i.e. TaqMan PCR)
   - Padlock primer pair
@@ -20,7 +19,11 @@ Please send bug-reports/suggestions/comments/rants to jgans@lanl.gov
   - Melting temperature (Tm), computed by the nearest neighbor method
   - Free energy change upon binding, computed by the nearest neighbor method
   - Match criteria can be supplemented with experiment specific heuristics (e.g. maximum amplicon length,  3' exact matches , etc.) 
-
+- Supported file formats
+  - FASTA
+  - GBK (GenBank files containing sequence and annotation information)
+  - EMBL (EMBL files containing sequence and annotation information)
+  - BLAST-formatted databases (version 5 -- requires the NCBI C++ toolkit)
 - Adaptive query and database segmentation allows efficient parallel execution with low memory overhead (ideal for diskless clusters)
 - Annotation of genomic regions matches by query assays (requires a target database that contains annotation information)
 - Different PCR primer strand concentrations can be specified for the forward and reverse primer to model asymmetric PCR conditions
@@ -39,7 +42,7 @@ Please send bug-reports/suggestions/comments/rants to jgans@lanl.gov
 
 ThermonucleotideBLAST is written in C++ and has been tested on both shared memory and cluster based computers and compiles under Linux and OS X. 
 
-ThermonucleotideBLAST reads target databases in a number of common formats, including FASTA and Genbank flat files (GBK). To handle the task of distributing database searches across multiple CPUs, ThermonucleotideBLAST can use either MPI or OpenMP.
+ThermonucleotideBLAST reads target databases in a number of common formats, including FASTA, BLAST-databases and Genbank flat files (GBK). To handle the task of distributing database searches across multiple CPUs, ThermonucleotideBLAST can use either MPI or OpenMP.
 
 Assay query files are tab-delimited text files with two or more columns:
 - PCR assays:
@@ -61,23 +64,35 @@ Assay query files are tab-delimited text files with two or more columns:
   
 ## Optional prerequisites are:
 
-- MPI (like OpenMPI)
-- A compiler that supports OpenMP:
+- MPI (for parallel execution on a cluster computer)
+  - Development and testing uses [OpenMPI](https://www.open-mpi.org/)
+- A compiler that supports OpenMP (for multithreaded execution on a single, multi-core computer)
   - gcc/g++ versions 4.2 and higher
   - clang (however, OS X users will not have OpenMP support "out-of-the-box". I recommend following [these](https://iscinumpy.gitlab.io/post/omp-on-high-sierra/) instructions to get OpenMP working on OS X).
-
+- The NCBI C++ toolkit (for searching BLAST-formatted databases)
+  - Download and build the [NCBI C++ Toolkit] (https://ncbi.github.io/cxx-toolkit/)
+  - The current version of the NCBI C++ toolkit requires a modern C++ compiler to build
+    - The current Clang compiler on OS X works fine. Older (< 5) versions of GCC don't work.
+    - For older Centos Linux systems with GCC version < 5, the [following steps](https://linuxize.com/post/how-to-install-gcc-compiler-on-centos-7/) will install a newer GCC compiler:
+      - `sudo yum install centos-release-scl`
+      - `sudo yum install devtoolset-7`
+      - `scl enable devtoolset-7 bash`
+  - For those who need to work with older x86 hardware, you may need to compile the NCBI C++ toolkit using `--without-sse42` to disable the use of potentially unsupported SSE instructions.
+  
 ThermonucleotideBLAST uses the DNA hybridization parameters published by the SantaLucia lab to compute duplex stability. However, the parameters for computing the delta G contribution of terminal mismatches (for internal loops) have not been published. Since we have not obtained permission to include these parameters in ThermonucleotideBLAST, they have not been included. The parameters are available as part of the excellent UNAFold suite of programs. To use these terminal mismatch hybridization parameters in ThermonucleotideBLAST, first download the UNAFold package. Then, run the parse_tstacki.pl script with the path to UNAFold as the only argument and pipe the script output to the file "nuc_cruc_santa_lucia_tstacki.cpp".  For example: "parse_tstacki.pl /path/to/UNAFold > nuc_cruc_santa_lucia_tstacki.cpp". After this file has been created, ThermonucleotideBLAST can be compiled as described below. Note that including these parameters is optional: you do not need to include these terminal mismatch parameters to compile and run ThermonucleotideBLAST (although calculation accuracy will be improved by including them).
 
 Building ThermonucleotideBLAST without any of these prerequisites will generate a single CPU version that will not read BLAST-formated databases. 
 
 # How to build and install ThermonucleotideBLAST on Unix-like systems
 For now, you will need to directly edit the very simple Makefile.
+- The `USE_MPI` macro (defined by adding `-DUSE_MPI` to the `FLAGS` variable) enables MPI-based, multi-computer parallel searching.
+- The `USE_BLAST_DB` macro (defined by adding `-DUSE_BLAST_DB` to the `FLAGS` variable) enables the searchig of sequences stored in BLAST-formatted databases.
+  - This option also requires a compiled and installed NCBI C++ toolkit. 
+  - Indicate the location of the NCBI C++ toolkit with the `BLAST_DIR` variable.
+- When compiling *without* the NCBI C++ toolkit, removed the `-DUSE_BLAST_DB` flag and comment out the `BLAST_DIR` variable (i.e. `#BLAST_DIR`).
+- Adding `-fopenmp` to the `OPENMP` variable enables OpenMP-based, multiprocessor parallel searching.
 
-The `USE_MPI` macro (defined by adding `-DUSE_MPI` to the `FLAGS` variable) enables MPI-based, multicomputer parallel searching.
-
-Adding `-fopenmp` to the `OPENMP` variable enables OpenMP-based, multiprocessor parallel searching.
-
-Currently, thermonucleotideBLAST only runs in OpenMP (using multiple cores on a single comuter) or MPI (using a single processor on multiple computer) modes.
+Currently, thermonucleotideBLAST will only use OpenMP (multiple cores on a single computer) or MPI (single-threaded task on multiple computers), but not both.
 
 # How to run ThermonucleotideBLAST
 
