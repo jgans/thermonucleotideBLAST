@@ -5,14 +5,14 @@
 	- Cleaned up code to remove some historical complexity.
 	- Removed dependence on the old NCBI C toolkit for reading BLAST databases.
 		- Removed support for reading ASN.1 annotation files.
-	- Added support for reading the new (version 5) BLAST database produced by the NCBI C++ BLAST application.
-		- The current version of the [NCBI C++ toolkit](https://ncbi.github.io/cxx-toolkit/pages/ch_getcode_svn#public-access-to-the-source-code-via-ftp) requires a modern C++ compiler to build.
+	- Added support for reading the new (version 5) BLAST database produced by the NCBI BLAST+ application.
+		- The current version of [NCBI BLAST+](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/) requires a modern C++ compiler to build.
 		- The current Clang compiler on OS X works fine. Older (< 5) versions of GCC don't work.
 		- For older Centos Linux systems with GCC version < 5, the [following steps](https://linuxize.com/post/how-to-install-gcc-compiler-on-centos-7/) will install a newer GCC compiler:
 			- `sudo yum install centos-release-scl`
 			- `sudo yum install devtoolset-7`
 			- `scl enable devtoolset-7 bash`
-		- For those who need to work with older x86 hardware, you may need to compile the NCBI C++ toolkit using `--without-sse42` to disable the use of potentially unsupported SSE instructions.
+		- For those who need to work with older x86 hardware, you may need to compile the NCBI BLAST+ program using `--without-sse42` to disable the use of potentially unsupported SSE instructions.
 - Version 2.12 (May 3, 2020)
 	- Modified the alignment style (again!) to indicate complementary, but unaligned, base pairs with a ':' symbol (thanks to Paul Li for suggesting this). The complementary (but unaligned) base pairs are usually found at the ends of oligos and occur
 	when the thermodynamic penatly of incorporating a mismatch is larger than the benefit of incorporating terminal matching bases.
