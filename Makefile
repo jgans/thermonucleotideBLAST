@@ -21,18 +21,22 @@ FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI -DUSE_BLAST_DB
 BLAST_DIR = ncbi-blast-2.10.0+-src
 
 ifdef BLAST_DIR
+# Compile with the NCBI C++ toolkit (tntblast will be able to read BLAST-formatted databases)
 BLAST_INC = $(BLAST_DIR)/include/ncbi-tools++
 BLAST_LIBS = -L $(BLAST_DIR)/lib \
 	-ldl -lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
 	-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio
+INC = -I. -I$(BLAST_INC)
+LIBS = -lm $(BLAST_LIBS)
+
 else
+
+# Compile without the NCBI C++ toolkit (tntblast will not read BLAST-formatted databases)
 BLAST_INC =
 BLAST_LIBS =
+INC = -I.
+LIBS = -lm
 endif
-
-INC = -I. -I$(BLAST_INC)
-
-LIBS = -lm $(BLAST_LIBS)
 
 .SUFFIXES : .o .cpp .c
 .cpp.o:
