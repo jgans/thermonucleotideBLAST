@@ -1,3 +1,5 @@
+- Version 2.15 (July 17, 2020)
+	- Fixed sorting crtieria in bind_oligo.cpp -> sort_by_bound_match() to ensure that we preferentially display the more informative assay-template alignments.
 - Version 2.14 (June 24, 2020)
 	- Added the accession to results when search BLAST-formatted databases.
 	- Fixed the "5'-" -> "5' " and "-3'" -> " 3'" that was supposed to have taken place in version 2.1
