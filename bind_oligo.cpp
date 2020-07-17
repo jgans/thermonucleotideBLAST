@@ -66,6 +66,13 @@ struct sort_by_bound_match
 			// numbers of mismatches. Always take the alignment with the *highest* number of mismatches
 			// (since lower mismatch counts are an artifact!). I wish there were a more elegant way
 			// to handle this!
+			if(m_a.num_mm == m_b.num_mm){
+
+				// Choose the *longest* (most informative) alignment to preferentially to make sure that we show
+				// any dangling ends to the user
+				return ( m_a.alignment.size() > m_b.alignment.size() );
+			}
+
 			return (m_a.num_mm > m_b.num_mm);
 		}
 		
@@ -545,7 +552,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		// Save the alignment
 		stringstream ss_align;
 		ss_align << m_melt;
-		
+				
 		match_iter->loc_5 = target_5;
 		match_iter->loc_3 = target_3;
 		match_iter->tm = tm;
