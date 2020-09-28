@@ -32,9 +32,9 @@
 
 // Sequence orientation (borrowed from the original NCBI C toolkit)
 enum{
-	Seq_strand_plus,
-	Seq_strand_minus,
-	Seq_strand_both
+	Seq_strand_plus = 1,
+	Seq_strand_minus = 2,
+	Seq_strand_both = (Seq_strand_plus | Seq_strand_minus)
 };
 
 typedef unsigned char SEQBASE;
