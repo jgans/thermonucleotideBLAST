@@ -1,3 +1,5 @@
+- Version 2.16 (September 28, 2020)
+	- Fixed bug in seq.h that broke the relationship between "Seq_strand_plus", "Seq_strand_minus" and "Seq_strand_both". This bug prevented the search of probe and padlock queries.
 - Version 2.15 (July 17, 2020)
 	- Fixed sorting crtieria in bind_oligo.cpp -> sort_by_bound_match() to ensure that we preferentially display the more informative assay-template alignments.
 - Version 2.14 (June 24, 2020)
