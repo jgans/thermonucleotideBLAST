@@ -605,8 +605,8 @@ void NucCruc::init_param_Santa_Lucia()
 	// Please note: Since unafold is not open source software, we can not 
 	// distribute this code outside of LANL!
 	// ******************************************************************************
-	//#include "nuc_cruc_santa_lucia_tstacki.cpp"
-	//#include "nuc_cruc_santa_lucia_tstackh.cpp"
+	#include "nuc_cruc_santa_lucia_tstacki.cpp" // <-- Empty file
+	#include "nuc_cruc_santa_lucia_tstackh.cpp" // <-- Empty file
 	
 	// The following parameters are from:
 	// "The thermodynamics of DNA structural motifs"
