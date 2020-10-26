@@ -1,3 +1,7 @@
+- Version 2.17 (October 26, 2020)
+	- Simplified Makefile to remove the need to modify *both* the `USE_BLAST_DB` and `BLAST_DIR`
+	variables. Now, the `-DUSE_BLAST_DB` option is automatically added to the `FLAG` Makefile variable
+	when the user has set the `BLAST_DIR` Makfile variable.
 - Version 2.16 (September 28, 2020)
 	- Fixed bug in seq.h that broke the relationship between "Seq_strand_plus", "Seq_strand_minus" and "Seq_strand_both". This bug prevented the search of probe and padlock queries.
 - Version 2.15 (July 17, 2020)
