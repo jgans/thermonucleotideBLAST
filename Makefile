@@ -17,8 +17,9 @@ FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI
 # The BLAST_DIR variable should only be defined if you wish to be able to
 # read NCBI BLAST-formatted database files. This functionality is optional, and
 # can be disabled by commenting out the BLAST_DIR variable by adding the '#' symbol
-# to the start of the line below (i.e. "#BLAST_DIR").
-BLAST_DIR = ncbi-blast-2.10.0+-src
+# to the start of the line below (i.e. "#BLAST_DIR"). To *enable* the functionality,
+# the set the BLAST_DIR variable to the install path of the NCBI BLAST+ program.
+BLAST_DIR = ncbi-blast+-dir
 
 ifdef BLAST_DIR
 
