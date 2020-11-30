@@ -9,7 +9,7 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 CC = mpic++
 
 PROFILE = #-pg
-OPENMP = #-Xpreprocessor -fopenmp
+OPENMP = #-fopenmp
 
 # Define USE_MPI to enable MPI
 FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++11 -DUSE_MPI
