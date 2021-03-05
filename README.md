@@ -1,6 +1,6 @@
 ![tntblast logo](https://github.com/jgans/thermonucleotideBLAST/blob/master/logo.png)
 
-# Current version is 2.16 (September 28, 2020)
+# Current version is 2.18 (March 5, 2021)
 # Overview
 ThermonucleotideBLAST is a software program for searching a target database of nucleic acid sequences using an assay-specific query. ThermonucleotideBLAST queries are based on biochemical assays (i.e. a pair of oligonucleotide sequences representing PCR primers or Padlock probes, a triplet of oligos representing PCR primers and a TaqMan probe or a single oligo representing a hybridization probe). Unlike existing programs (e.g. BLAST) which use heuristic measures of sequence similarity for identifying matches between a query and target sequence, ThermonucleotideBLAST uses physically relevant measures of sequence similarity -- free energy and melting temperature. For example, given a pair of PCR primers, a database of DNA targets and an annealing temperature, ThermonucleotideBLAST will return a list of predicted amplicons that will (ideally) match experimental PCR results. To enable searching of very large sequence databases (i.e. all of Genbank), ThermonucleotideBLAST can use run-time database and query segmentation to distribute the computational load across multiple CPUs.
 
@@ -70,7 +70,7 @@ Assay query files are tab-delimited text files with two or more columns:
   - gcc/g++ versions 4.2 and higher
   - clang (however, OS X users will not have OpenMP support "out-of-the-box". I recommend following [these](https://iscinumpy.gitlab.io/post/omp-on-high-sierra/) instructions to get OpenMP working on OS X).
 - The compiled NCBI BLAST+ source code (for searching BLAST-formatted databases)
-  - Download, build and install the [NCBI BLAST+ program] (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+  - Download, build and install the [NCBI BLAST+ program](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
   - The current version of the NCBI BLAST+ program requires a modern C++ compiler to build
     - The current Clang compiler on OS X works fine. Older (< 5) versions of GCC don't work.
     - For older Centos Linux systems with GCC version < 5, the [following steps](https://linuxize.com/post/how-to-install-gcc-compiler-on-centos-7/) will install a newer GCC compiler:
