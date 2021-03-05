@@ -1,3 +1,13 @@
+- Version 2.18 (March 1, 2021)
+	- Fixed multiplex assay enumeration code to correctly handle groups of assays that share oligos (i.e., the same
+	forward primer may appear in multiple assays, or a rever primer in one assay may be the forward primer in a
+	different assay).
+	- Removed redundant calls to set the salt concentration in the DNA melting engine. These calls triggered an expensive
+	recalculation of dynamic programming parameters.
+	- Made the NucCruc::strand() function call consistent between tntblast_local and tntblast_worker.
+	- Added code to cache melting temperature calculation results for each target sequence. This significantly accelerates searching
+	assays in multiplex mode (i.e. `--plex T`) by avoiding redundant searching of the same oligo (when the oligo appears in multiple assays).
+	against the same template sequence more than once.
 - Version 2.17 (October 26, 2020)
 	- Simplified Makefile to remove the need to modify *both* the `USE_BLAST_DB` and `BLAST_DIR`
 	variables. Now, the `-DUSE_BLAST_DB` option is automatically added to the `FLAG` Makefile variable
