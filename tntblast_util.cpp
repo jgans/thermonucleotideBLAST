@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifdef USE_MPI
 #include <mpi.h>
 #endif // USE_MPI
@@ -47,18 +13,113 @@ using namespace std;
 extern int mpi_numtasks;
 extern int mpi_rank;
 
+// For case-insensitive string matching
+inline bool are_oligos_equal(const string &m_a, const string &m_b)
+{
+	if( m_a.size() != m_b.size() ){
+		return false;
+	}
+
+	const size_t len = m_a.size();
+
+	for(size_t i = 0;i < len;++i){
+		if( toupper(m_a[i]) != toupper(m_b[i]) ){
+			return false;
+		}
+	}
+
+	// If we get here, the strings are equal
+	return true;
+};
+
+inline string toupper(const string &m_str)
+{
+	string ret(m_str);
+
+	for(string::iterator i = ret.begin();i != ret.end();++i){
+		*i = toupper(*i);
+	}
+
+	return ret;
+}
+
+// Allow sorting objects of type hybrid_sig by assay oligos to remove redundant assays that
+// may have been created by multiplex assay expansion. Keep in mind that the forward and reverse
+// primer oligos can be reversed and still yeild the *same* assay!
+struct sort_by_seq // < using oligo sequences
+{
+	inline bool operator()(const hybrid_sig &m_a, const hybrid_sig &m_b) const
+	{
+
+		// Impose a consistent case and order on all assay oligo
+		string F_a = toupper(m_a.forward_oligo);
+		string R_a = toupper(m_a.reverse_oligo);
+
+		if(F_a < R_a){
+			swap(F_a, R_a);
+		}
+
+		string F_b = toupper(m_b.forward_oligo);
+		string R_b = toupper(m_b.reverse_oligo);
+
+		if(F_b < R_b){
+			swap(F_b, R_b);
+		}
+
+		if(F_a == F_b){
+			
+			if(R_a == R_b){
+				return toupper(m_a.probe_oligo) < toupper(m_b.probe_oligo);
+			}
+
+			return R_a < R_b;
+		}
+		
+		return F_a < F_b;
+	};	
+};
+
+struct compare_by_seq // == using oligo sequences
+{
+	inline bool operator()(const hybrid_sig &m_a, const hybrid_sig &m_b) const
+	{
+		// Impose a consistent case and order on all assay oligo
+		string F_a = toupper(m_a.forward_oligo);
+		string R_a = toupper(m_a.reverse_oligo);
+
+		if(F_a < R_a){
+			swap(F_a, R_a);
+		}
+
+		string F_b = toupper(m_b.forward_oligo);
+		string R_b = toupper(m_b.reverse_oligo);
+
+		if(F_b < R_b){
+			swap(F_b, R_b);
+		}
+
+		if( F_a != F_b){
+			return false;
+		}
+
+		if( R_a != R_b){
+			return false;
+		}
+
+		return toupper(m_a.probe_oligo) == toupper(m_b.probe_oligo);
+	};	
+};
+
 string top_strand(const string &m_align);
 
 void mask_binding_sites(list<hybrid_sig> &m_sig, const int &m_mask, 
 	const float &m_min_primer_tm, const float &m_min_probe_tm, NucCruc &m_melt,
-	const float &m_salt, const float &m_forward_primer_strand, 
+	const float &m_forward_primer_strand, 
 	const float &m_reverse_primer_strand, const float &m_probe_strand)
 {
 	if(m_mask == NO_MASK){
 		return;
 	}
-
-	m_melt.salt(m_salt);
 	
 	list<hybrid_sig>::iterator iter;
 	
@@ -475,11 +536,7 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 	const unsigned int &m_format)
 {
 	vector<hybrid_sig> ret;
-	
-	vector<hybrid_sig>::const_iterator i;
-	vector<hybrid_sig>::const_iterator j;
-	vector<hybrid_sig>::iterator iter;
-	
+
 	// Renumber all of the assay id's to insure that 
 	// a) they start at 0
 	// b) are contiguous
@@ -489,13 +546,12 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		
 		// Assume that all Padlock/MOLpcr probes are stored
 		// as forward-reverse pairs in the input file
-		for(i = m_sig.begin();i != m_sig.end();i++){
+		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
-			for(j = m_sig.begin();j != m_sig.end();j++){
+			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				const string name = (i == j) ? i->name : i->name + "(5')/" + j->name + "(3')";
-				
-				hybrid_sig tmp(name, i->forward_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp(i->name + "(5')/" + j->name + "(3')", 
+					i->forward_oligo, j->reverse_oligo, id++);
 				
 				ret.push_back(tmp);
 			}
@@ -504,9 +560,10 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		
 	if(m_format == ASSAY_PCR){
 		
-		unsigned int probe_count = 0;
+		// Is there at least one  probe in the collection of input assays?
+		bool has_probes = false;
 		
-		for(i = m_sig.begin();i != m_sig.end();i++){
+		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
 			if(i->forward_oligo == ""){
@@ -517,62 +574,72 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 			
 			// Count the number of PCR primer pairs that have an associated probe
 			if(i->probe_oligo != ""){
-				probe_count++;
+				has_probes = true;
 			}
 			
-			for(j = m_sig.begin();j != m_sig.end();j++){
+			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				const string name = (i == j) ? i->name : i->name + "(F)/" + j->name + "(R)";
+				// Since tntblast automatically tests for PCR with the *same* primers
+				// (i.e. two forward or two reverse), there is no need to enumerate
+				// an assay with the same primer in both positions
+				if( are_oligos_equal(i->forward_oligo, j->reverse_oligo) ){
+					continue;
+				}
 				
-				hybrid_sig tmp(name, i->forward_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp( i->name + "(F)/" + j->name + "(R)", 
+					i->forward_oligo, j->reverse_oligo, id++);
 				
 				ret.push_back(tmp);
 			}
 		}
 		
-		for(i = m_sig.begin();i != m_sig.end();i++){
+		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
 			if(i->forward_oligo == ""){
 				continue;
 			}
 			
-			for(j = m_sig.begin();j != m_sig.end();j++){
+			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				if(i == j){
+				// Since tntblast automatically tests for PCR with the *same* primers
+				// (i.e. two forward or two reverse), there is no need to enumerate
+				// an assay with the same primer in both positions
+				if( are_oligos_equal(i->forward_oligo, j->forward_oligo) ){
 					continue;
 				}
-
-				const string name = i->name + "(F)/" + j->name + "(F)";
 				
-				hybrid_sig tmp(name, i->forward_oligo, j->forward_oligo, id++);
+				hybrid_sig tmp(i->name + "(F)/" + j->name + "(F)", 
+					i->forward_oligo, j->forward_oligo, id++);
 				
 				ret.push_back(tmp);
 			}
 		}
 		
-		for(i = m_sig.begin();i != m_sig.end();i++){
+		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
 			if(i->forward_oligo == ""){
 				continue;
 			}
 			
-			for(j = m_sig.begin();j != m_sig.end();j++){
+			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				if(i == j){
+				// Since tntblast automatically tests for PCR with the *same* primers
+				// (i.e. two forward or two reverse), there is no need to enumerate
+				// an assay with the same primer in both positions
+				if( are_oligos_equal(i->reverse_oligo, j->reverse_oligo) ){
 					continue;
 				}
-
-				const string name = i->name + "(R)/" + j->name + "(R)";
 				
-				hybrid_sig tmp(name, i->reverse_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp(i->name + "(R)/" + j->name + "(R)", 
+					i->reverse_oligo, j->reverse_oligo, id++);
 				
 				ret.push_back(tmp);
 			}
 		}
 		
-		if(probe_count != 0){
+		if(has_probes){
 			
 			// Add probes to all of the assays!
 			vector<hybrid_sig> ret_with_probe;
@@ -580,9 +647,9 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 			// Reset the id
 			id = 0;
 			
-			for(i = ret.begin();i != ret.end();i++){
+			for(vector<hybrid_sig>::const_iterator i = ret.begin();i != ret.end();i++){
 				
-				for(j = m_sig.begin();j != m_sig.end();j++){
+				for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 					
 					// Allow a mixture of assay with and without probes.
 					// If one or more probes is present, then *all* of the
@@ -591,9 +658,8 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 						continue;
 					}
 					
-					const string name = i->name + "+" + j->name + "(P)";
-					
-					hybrid_sig tmp(name, i->forward_oligo, i->reverse_oligo, 
+					hybrid_sig tmp(i->name + "+" + j->name + "(P)", 
+						i->forward_oligo, i->reverse_oligo, 
 						j->probe_oligo, id++);
 					
 					ret_with_probe.push_back(tmp);
@@ -603,13 +669,31 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 			ret = ret_with_probe;
 		}
 	}
-		
+
 	if(m_format == ASSAY_AFFYMETRIX){
 
 		// This is a probe-only assay, no multiplexing is needed
 		return m_sig;
 	}
 	
+	// If our input assays shared oligos in common, than we have created additional
+	// redundant assay
+	sort(ret.begin(), ret.end(), sort_by_seq() );
+
+	// Remove the redundant assays
+	ret.erase( unique( ret.begin(), ret.end(), compare_by_seq() ), ret.end() );
+
+	// Reset the id
+	id = 0;
+
+	for(vector<hybrid_sig>::iterator i = ret.begin();i != ret.end();++i){
+
+		i->my_id(id);
+		i->my_degen_id(id);
+
+		++id;
+	}
+
 	cerr << "Multiplexing has created " << ret.size() << " assays from " << m_sig.size() 
 		<< " input assays" << endl;
 	

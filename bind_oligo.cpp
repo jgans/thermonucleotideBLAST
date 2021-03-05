@@ -124,7 +124,7 @@ void match_oligo_to_plus_strand(list<oligo_info> &info_list,
 void bind_oligo_to_minus_strand(list<oligo_info> &info_list, 
 		DNAHash &m_hash, SEQPTR m_seq, 
 		const string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -133,7 +133,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int &m_max_mismatch)
 {		
 	const unsigned int window = m_melt.size_query();
-	
+
 	// How many target bases should we add to both the 5' and 3' tails of the target sequence? 
 	const unsigned int flanking_bases_5 = NUM_FLANK_BASE;
 	const unsigned int flanking_bases_3 = NUM_FLANK_BASE;
@@ -166,156 +166,248 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		
 		unsigned int target_stop = min( target_start + target_length, SEQ_SIZE(m_seq) );
 		
-		// Clear the target buffer to make room for the bases we're about to add
-		m_melt.clear_target();
-		
-		// The first valid base of the target
-		SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
-	
-		// Attempt to extract target_length bases from the start
-		for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+		// Is there a result already in the cache?
+		BindCacheKey key(m_oligo, target_start, target_stop);
+
+		unordered_map<BindCacheKey, BindCacheValue>::const_iterator cache_iter = m_melt_cache.find(key);
+
+		if( cache_iter == m_melt_cache.end() ){ // Cache miss
 			
-			// Bind to the plus strand
-			switch(*seq_ptr){
-				case DB_A:
-					m_melt.push_front_target(BASE::T);
-					break;
-				case DB_T:
-					m_melt.push_front_target(BASE::A);
-					break;
-				case DB_C:
-					m_melt.push_front_target(BASE::G);
-					break;
-				case DB_G:
-					m_melt.push_front_target(BASE::C);
-					break;
-				case DB_I:
-					m_melt.push_front_target(BASE::I);
-					break;
-				// IUPAC degenerate bases
-				case DB_M: // A or C
-					m_melt.push_front_target(BASE::K);
-					break;
-				case DB_R: // G or A
-					m_melt.push_front_target(BASE::Y);
-					break;
-				case DB_S: // G or C
-					m_melt.push_front_target(BASE::S);
-					break;
-				case DB_V: // G or C or A
-					m_melt.push_front_target(BASE::B);
-					break;
-				case DB_W: // A or T
-					m_melt.push_front_target(BASE::W);
-					break;
-				case DB_Y: // T or C
-					m_melt.push_front_target(BASE::R);
-					break;
-				case DB_H: // A or C or T
-					m_melt.push_front_target(BASE::D);
-					break;
-				case DB_K: // G or T
-					m_melt.push_front_target(BASE::M);
-					break;
-				case DB_D: // G or A or T
-					m_melt.push_front_target(BASE::H);
-					break;
-				case DB_B: // G or T or C
-					m_melt.push_front_target(BASE::V);
-					break;
-				case DB_N: // A or T or G or C
-					m_melt.push_front_target(BASE::N);
-					break;
-				default:
+			// Clear the target buffer to make room for the bases we're about to add
+			m_melt.clear_target();
+		
+			// The first valid base of the target
+			SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
+	
+			// Attempt to extract target_length bases from the start
+			for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+			
+				// Bind to the plus strand
+				switch(*seq_ptr){
+					case DB_A:
+						m_melt.push_front_target(BASE::T);
+						break;
+					case DB_T:
+						m_melt.push_front_target(BASE::A);
+						break;
+					case DB_C:
+						m_melt.push_front_target(BASE::G);
+						break;
+					case DB_G:
+						m_melt.push_front_target(BASE::C);
+						break;
+					case DB_I:
+						m_melt.push_front_target(BASE::I);
+						break;
+					// IUPAC degenerate bases
+					case DB_M: // A or C
+						m_melt.push_front_target(BASE::K);
+						break;
+					case DB_R: // G or A
+						m_melt.push_front_target(BASE::Y);
+						break;
+					case DB_S: // G or C
+						m_melt.push_front_target(BASE::S);
+						break;
+					case DB_V: // G or C or A
+						m_melt.push_front_target(BASE::B);
+						break;
+					case DB_W: // A or T
+						m_melt.push_front_target(BASE::W);
+						break;
+					case DB_Y: // T or C
+						m_melt.push_front_target(BASE::R);
+						break;
+					case DB_H: // A or C or T
+						m_melt.push_front_target(BASE::D);
+						break;
+					case DB_K: // G or T
+						m_melt.push_front_target(BASE::M);
+						break;
+					case DB_D: // G or A or T
+						m_melt.push_front_target(BASE::H);
+						break;
+					case DB_B: // G or T or C
+						m_melt.push_front_target(BASE::V);
+						break;
+					case DB_N: // A or T or G or C
+						m_melt.push_front_target(BASE::N);
+						break;
+					default:
+						
+						// Are we closer to the start or the end?
+						if( (i - target_start) > (target_stop - (i + 1) ) ){
+						
+							// Closer to the end
+							target_stop = i;
+						}
+						else{
+							// Closer to the start
+							m_melt.clear_target();
+							target_start = i + 1;
+						}
+						
+						break;
+				};
+			}
+
+			#ifdef PROFILE
+			num_minus_tm_eval ++;
+			#endif // PROFILE
+		
+			const float tm = m_melt.approximate_tm_heterodimer();
+		
+			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+
+			const float dg = m_melt.delta_G();
+		
+			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
 					
-					// Are we closer to the start or the end?
-					if( (i - target_start) > (target_stop - (i + 1) ) ){
-					
-						// Closer to the end
-						target_stop = i;
-					}
-					else{
-						// Closer to the start
-						m_melt.clear_target();
-						target_start = i + 1;
-					}
-					
-					break;
-			};
+				continue;
+			}
+		
+			const unsigned int anchor_5 = m_melt.anchor5_query();
+		
+			if(anchor_5 < m_clamp_5){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+		
+			const unsigned int anchor_3 = m_melt.anchor3_query();
+		
+			if(anchor_3 < m_clamp_3){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+		
+			const unsigned int num_mismatch = m_melt.num_mismatch();
+		
+			if(num_mismatch > m_max_mismatch){
+				
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+		
+			const unsigned int num_gap = m_melt.num_gap();
+		
+			if(num_gap > m_max_gap){
+				
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+		
+			// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+			// Since degenerate bases get turned into 'N' by the hash function, we can
+			// end up with spurious matches to poly-N sequences. Require that at least
+			// half of the query can be aligned to real (ATGCI) bases
+			const unsigned int num_real_base = m_melt.num_real_base();
+
+			if(num_real_base < window/2){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, num_real_base, string() /*align*/);
+
+				continue;
+			}
+
+			pair<unsigned int, unsigned int> query_range;
+			pair<unsigned int, unsigned int> target_range;
+			
+			m_melt.alignment_range(query_range, target_range);
+		
+			unsigned int target_5 = target_start;
+			unsigned int target_3 = target_5;
+
+			target_5 += target_stop - target_start - 1 - (int)target_range.second;
+			target_3 += target_stop - target_start - 1 - (int)target_range.first;
+		
+			// Adjust the extent of the binding region to incorporate
+			// unbound, non-virtual query bases
+			target_5 -= (int)query_range.first;
+
+			target_3 += (int)(window - 1) - (int)query_range.second;
+
+			// Save the alignment
+			stringstream ss_align;
+			ss_align << m_melt;
+
+			const string align = ss_align.str();
+
+			hit_list.push_back(oligo_info( target_5, target_3, tm, 
+				m_melt.delta_H(), m_melt.delta_S(), anchor_5, anchor_3, 
+				num_mismatch, num_gap, align) );
+			
+			// Add this result to the cache
+			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
+				anchor_5, anchor_3, target_5, target_3,
+				num_mismatch, num_gap, num_real_base, align);
+		}
+		else{ // Cache hit
+
+			if( (cache_iter->second.tm < m_min_oligo_tm) || (cache_iter->second.tm > m_max_oligo_tm) ){
+				continue;
+			}
+
+			if( (cache_iter->second.dg < m_min_oligo_dg) || (cache_iter->second.dg > m_max_oligo_dg) ){
+				continue;
+			}
+
+			if(cache_iter->second.anchor_5 < m_clamp_5){
+				continue;
+			}
+
+			if(cache_iter->second.num_mismatch > m_max_mismatch){
+				continue;
+			}
+
+			if(cache_iter->second.num_gap > m_max_gap){
+				continue;
+			}
+
+			if(cache_iter->second.num_real_base < window/2){
+				continue;
+			}
+
+			hit_list.push_back(oligo_info( cache_iter->second.target_5, cache_iter->second.target_3, 
+				cache_iter->second.tm, 
+				cache_iter->second.dH, cache_iter->second.dS, 
+				cache_iter->second.anchor_5, cache_iter->second.anchor_3, 
+				cache_iter->second.num_mismatch, cache_iter->second.num_gap, cache_iter->second.seq_align) );
 		}
 
-		#ifdef PROFILE
-		num_minus_tm_eval ++;
-		#endif // PROFILE
-		
-		const float tm = m_melt.approximate_tm_heterodimer();
-		
-		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
-			continue;
-		}
-
-		const float dg = m_melt.delta_G();
-		
-		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
-			continue;
-		}
-		
-		const unsigned int anchor_5 = m_melt.anchor5_query();
-		
-		if(anchor_5 < m_clamp_5){
-			continue;
-		}
-		
-		const unsigned int anchor_3 = m_melt.anchor3_query();
-		
-		if(anchor_3 < m_clamp_3){
-			continue;
-		}
-		
-		const unsigned int num_mismatch = m_melt.num_mismatch();
-		
-		if(num_mismatch > m_max_mismatch){
-			continue;
-		}
-		
-		const unsigned int num_gap = m_melt.num_gap();
-		
-		if(num_gap > m_max_gap){
-			continue;
-		}
-		
-		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
-		// Since degenerate bases get turned into 'N' by the hash function, we can
-		// end up with spurious matches to poly-N sequences. Require that at least
-		// half of the query can be aligned to real (ATGCI) bases
-		if(m_melt.num_real_base() < window/2){
-			continue;
-		}
-
-		pair<unsigned int, unsigned int> query_range;
-		pair<unsigned int, unsigned int> target_range;
-		
-		m_melt.alignment_range(query_range, target_range);
-		
-		int target_5 = target_start;
-		int target_3 = target_5;
-
-		target_5 += target_stop - target_start - 1 - (int)target_range.second;
-		target_3 += target_stop - target_start - 1 - (int)target_range.first;
-		
-		// Adjust the extent of the binding region to incorporate
-		// unbound, non-virtual query bases
-		target_5 -= (int)query_range.first;
-
-		target_3 += (int)(window - 1) - (int)query_range.second;
-
-		// Save the alignment
-		stringstream ss_align;
-		ss_align << m_melt;
-
-		hit_list.push_back( oligo_info( target_5, target_3, tm, 
-			m_melt.delta_H(), m_melt.delta_S(), anchor_5, anchor_3, 
-			num_mismatch, num_gap, ss_align.str() ) );
 	}
 		
 	info_list.clear();
@@ -346,14 +438,14 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 void bind_oligo_to_minus_strand(list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
 		const string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
 		const unsigned int &m_max_mismatch)
-{		
+{
 	const unsigned int window = m_melt.size_query();
 	
 	// How many target bases should we add to both the 5' and 3' tails of the target sequence? 
@@ -373,6 +465,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		
 		//if( !(info_iter->mask & m_oligo_mask) || !(info_iter->mask & oligo_info::MINUS_STRAND) ){
 		if( (info_iter->mask & strand_and_oligo_mask) != strand_and_oligo_mask ){
+
 			++info_iter;
 			continue;
 		}
@@ -392,177 +485,285 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		
 		unsigned int target_stop = min( target_start + target_length, SEQ_SIZE(m_seq) );
 		
-		// Clear the target buffer to make room for the bases we're about to add
-		m_melt.clear_target();
+		// Is there a result already in the cache?
+		BindCacheKey key(m_oligo, target_start, target_stop);
 		
-		// The first valid base of the target
-		SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
-	
-		// Attempt to extract target_length bases from the start
-		for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+		unordered_map<BindCacheKey, BindCacheValue>::const_iterator cache_iter = m_melt_cache.find(key);
+
+		if( cache_iter == m_melt_cache.end() ){ // Cache miss
+
+			// Clear the target buffer to make room for the bases we're about to add
+			m_melt.clear_target();
 			
-			// Bind to the minus strand
-			switch(*seq_ptr){
-				case DB_A:
-					m_melt.push_front_target(BASE::T);
-					break;
-				case DB_T:
-					m_melt.push_front_target(BASE::A);
-					break;
-				case DB_C:
-					m_melt.push_front_target(BASE::G);
-					break;
-				case DB_G:
-					m_melt.push_front_target(BASE::C);
-					break;
-				case DB_I:
-					m_melt.push_front_target(BASE::I);
-					break;
-				// IUPAC degenerate bases
-				case DB_M: // A or C
-					m_melt.push_front_target(BASE::K);
-					break;
-				case DB_R: // G or A
-					m_melt.push_front_target(BASE::Y);
-					break;
-				case DB_S: // G or C
-					m_melt.push_front_target(BASE::S);
-					break;
-				case DB_V: // G or C or A
-					m_melt.push_front_target(BASE::B);
-					break;
-				case DB_W: // A or T
-					m_melt.push_front_target(BASE::W);
-					break;
-				case DB_Y: // T or C
-					m_melt.push_front_target(BASE::R);
-					break;
-				case DB_H: // A or C or T
-					m_melt.push_front_target(BASE::D);
-					break;
-				case DB_K: // G or T
-					m_melt.push_front_target(BASE::M);
-					break;
-				case DB_D: // G or A or T
-					m_melt.push_front_target(BASE::H);
-					break;
-				case DB_B: // G or T or C
-					m_melt.push_front_target(BASE::V);
-					break;
-				case DB_N: // A or T or G or C
-					m_melt.push_front_target(BASE::N);
-					break;
-				default:
-					
-					// Are we closer to the start or the end?
-					if( (i - target_start) > (target_stop - (i + 1) ) ){
-					
-						// Closer to the end
-						target_stop = i;
-					}
-					else{
-						// Closer to the start
-						m_melt.clear_target();
-						target_start = i + 1;
-					}
-					
-					break;
-			};
-		}
+			// The first valid base of the target
+			SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
 		
-		#ifdef PROFILE
-		num_minus_tm_eval ++;
-		#endif // PROFILE
-		
-		const float tm = m_melt.approximate_tm_heterodimer();
-		
-		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const float dg = m_melt.delta_G();
-		
-		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int anchor_5 = m_melt.anchor5_query();
-		
-		if(anchor_5 < m_clamp_5){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int anchor_3 = m_melt.anchor3_query();
-		
-		if(anchor_3 < m_clamp_3){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int num_mismatch = m_melt.num_mismatch();
-		
-		if(num_mismatch > m_max_mismatch){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int num_gap = m_melt.num_gap();
-		
-		if(num_gap > m_max_gap){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
-		// Since degenerate bases get turned into 'N' by the hash function, we can
-		// end up with spurious matches to poly-N sequences. Require that at least
-		// half of the query can be aligned to real (ATGCI) bases
-		if(m_melt.num_real_base() < window/2){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-
-		pair<unsigned int, unsigned int> query_range;
-		pair<unsigned int, unsigned int> target_range;
-		
-		m_melt.alignment_range(query_range, target_range);
-		
-		int target_5 = target_start;
-		int target_3 = target_5;
-
-		target_5 += target_stop - target_start - 1 - (int)target_range.second;
-		target_3 += target_stop - target_start - 1 - (int)target_range.first;
-		
-		// Adjust the extent of the binding region to incorporate
-		// unbound, non-virtual query bases
-		target_5 -= (int)query_range.first;
-
-		target_3 += (int)(window - 1) - (int)query_range.second;
-		
-		// Save the alignment
-		stringstream ss_align;
-		ss_align << m_melt;
+			// Attempt to extract target_length bases from the start
+			for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
 				
-		match_iter->loc_5 = target_5;
-		match_iter->loc_3 = target_3;
-		match_iter->tm = tm;
-		match_iter->dH = m_melt.delta_H();
-		match_iter->dS = m_melt.delta_S();
-		match_iter->anchor_5 = anchor_5;
-		match_iter->anchor_3 = anchor_3;
-		match_iter->num_mm = num_mismatch;
-		match_iter->num_gap = num_gap;
-		match_iter->alignment = ss_align.str();
+				// Bind to the minus strand
+				switch(*seq_ptr){
+					case DB_A:
+						m_melt.push_front_target(BASE::T);
+						break;
+					case DB_T:
+						m_melt.push_front_target(BASE::A);
+						break;
+					case DB_C:
+						m_melt.push_front_target(BASE::G);
+						break;
+					case DB_G:
+						m_melt.push_front_target(BASE::C);
+						break;
+					case DB_I:
+						m_melt.push_front_target(BASE::I);
+						break;
+					// IUPAC degenerate bases
+					case DB_M: // A or C
+						m_melt.push_front_target(BASE::K);
+						break;
+					case DB_R: // G or A
+						m_melt.push_front_target(BASE::Y);
+						break;
+					case DB_S: // G or C
+						m_melt.push_front_target(BASE::S);
+						break;
+					case DB_V: // G or C or A
+						m_melt.push_front_target(BASE::B);
+						break;
+					case DB_W: // A or T
+						m_melt.push_front_target(BASE::W);
+						break;
+					case DB_Y: // T or C
+						m_melt.push_front_target(BASE::R);
+						break;
+					case DB_H: // A or C or T
+						m_melt.push_front_target(BASE::D);
+						break;
+					case DB_K: // G or T
+						m_melt.push_front_target(BASE::M);
+						break;
+					case DB_D: // G or A or T
+						m_melt.push_front_target(BASE::H);
+						break;
+					case DB_B: // G or T or C
+						m_melt.push_front_target(BASE::V);
+						break;
+					case DB_N: // A or T or G or C
+						m_melt.push_front_target(BASE::N);
+						break;
+					default:
+						
+						// Are we closer to the start or the end?
+						if( (i - target_start) > (target_stop - (i + 1) ) ){
+						
+							// Closer to the end
+							target_stop = i;
+						}
+						else{
+							// Closer to the start
+							m_melt.clear_target();
+							target_start = i + 1;
+						}
+						
+						break;
+				};
+			}
+			
+			#ifdef PROFILE
+			num_minus_tm_eval ++;
+			#endif // PROFILE
+			
+			const float tm = m_melt.approximate_tm_heterodimer();
+			
+			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const float dg = m_melt.delta_G();
+			
+			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int anchor_5 = m_melt.anchor5_query();
+			
+			if(anchor_5 < m_clamp_5){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int anchor_3 = m_melt.anchor3_query();
+			
+			if(anchor_3 < m_clamp_3){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_mismatch = m_melt.num_mismatch();
+			
+			if(num_mismatch > m_max_mismatch){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_gap = m_melt.num_gap();
+			
+			if(num_gap > m_max_gap){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+			// Since degenerate bases get turned into 'N' by the hash function, we can
+			// end up with spurious matches to poly-N sequences. Require that at least
+			// half of the query can be aligned to real (ATGCI) bases
+			const unsigned int num_real_base = m_melt.num_real_base();
+
+			if(num_real_base < window/2){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, num_real_base, string() /*align*/);
+
+				continue;
+			}
+
+			pair<unsigned int, unsigned int> query_range;
+			pair<unsigned int, unsigned int> target_range;
+			
+			m_melt.alignment_range(query_range, target_range);
+			
+			int target_5 = target_start;
+			int target_3 = target_5;
+
+			target_5 += target_stop - target_start - 1 - (int)target_range.second;
+			target_3 += target_stop - target_start - 1 - (int)target_range.first;
+			
+			// Adjust the extent of the binding region to incorporate
+			// unbound, non-virtual query bases
+			target_5 -= (int)query_range.first;
+
+			target_3 += (int)(window - 1) - (int)query_range.second;
+			
+			// Save the alignment
+			stringstream ss_align;
+			ss_align << m_melt;
+			
+			const string align = ss_align.str();
+
+			match_iter->loc_5 = target_5;
+			match_iter->loc_3 = target_3;
+			match_iter->tm = tm;
+			match_iter->dH = m_melt.delta_H();
+			match_iter->dS = m_melt.delta_S();
+			match_iter->anchor_5 = anchor_5;
+			match_iter->anchor_3 = anchor_3;
+			match_iter->num_mm = num_mismatch;
+			match_iter->num_gap = num_gap;
+			match_iter->alignment = align;
+
+			// Add this result to the cache
+			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
+				anchor_5, anchor_3, target_5, target_3,
+				num_mismatch, num_gap, num_real_base, align);
+		}
+		else{ // Cache hit
+
+			if( (cache_iter->second.tm < m_min_oligo_tm) || (cache_iter->second.tm > m_max_oligo_tm) ){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if( (cache_iter->second.dg < m_min_oligo_dg) || (cache_iter->second.dg > m_max_oligo_dg) ){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.anchor_5 < m_clamp_5){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_mismatch > m_max_mismatch){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_gap > m_max_gap){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_real_base < window/2){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			match_iter->loc_5 = cache_iter->second.target_5;
+			match_iter->loc_3 = cache_iter->second.target_3;
+			match_iter->tm = cache_iter->second.tm;
+			match_iter->dH =cache_iter->second.dH;
+			match_iter->dS = cache_iter->second.dS;
+			match_iter->anchor_5 = cache_iter->second.anchor_5;
+			match_iter->anchor_3 = cache_iter->second.anchor_3;
+			match_iter->num_mm = cache_iter->second.num_mismatch;
+			match_iter->num_gap = cache_iter->second.num_gap;
+			match_iter->alignment = cache_iter->second.seq_align;
+		}
 	}
 	
 	if( curr_oligo.empty() ){
@@ -591,7 +792,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 void bind_oligo_to_plus_strand(list<oligo_info> &info_list, 
 		DNAHash &m_hash, SEQPTR m_seq, 
 		const string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -633,156 +834,247 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		
 		unsigned int target_stop = min( target_start + target_length, SEQ_SIZE(m_seq) );
 		
-		// Clear the target buffer to make room for the bases we're about to add
-		m_melt.clear_target();
-		
-		// The first valid base of the target
-		SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
-	
-		// Attempt to extract target_length bases from the start
-		for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+		// Is there a result already in the cache?
+		BindCacheKey key(m_oligo, target_start, target_stop);
+
+		unordered_map<BindCacheKey, BindCacheValue>::const_iterator cache_iter = m_melt_cache.find(key);
+
+		if( cache_iter == m_melt_cache.end() ){ // Cache miss
 			
-			// Bind to the plus strand
-			switch(*seq_ptr){
-				case DB_A:
-					m_melt.push_back_target(BASE::A);
-					break;
-				case DB_T:
-					m_melt.push_back_target(BASE::T);
-					break;
-				case DB_C:
-					m_melt.push_back_target(BASE::C);
-					break;
-				case DB_G:
-					m_melt.push_back_target(BASE::G);
-					break;
-				case DB_I:
-					m_melt.push_back_target(BASE::I);
-					break;
-				// IUPAC degenerate bases
-				case DB_M: // A or C
-					m_melt.push_back_target(BASE::M);
-					break;
-				case DB_R: // G or A
-					m_melt.push_back_target(BASE::R);
-					break;
-				case DB_S: // G or C
-					m_melt.push_back_target(BASE::S);
-					break;
-				case DB_V: // G or C or A
-					m_melt.push_back_target(BASE::V);
-					break;
-				case DB_W: // A or T
-					m_melt.push_back_target(BASE::W);
-					break;
-				case DB_Y: // T or C
-					m_melt.push_back_target(BASE::Y);
-					break;
-				case DB_H: // A or C or T
-					m_melt.push_back_target(BASE::H);
-					break;
-				case DB_K: // G or T
-					m_melt.push_back_target(BASE::K);
-					break;
-				case DB_D: // G or A or T
-					m_melt.push_back_target(BASE::D);
-					break;
-				case DB_B: // G or T or C
-					m_melt.push_back_target(BASE::B);
-					break;
-				case DB_N: // A or T or G or C
-					m_melt.push_back_target(BASE::N);
-					break;
-				default:
-					
-					// Are we closer to the start or the end?
-					if( (i - target_start) > (target_stop - (i + 1) ) ){
-					
-						// Closer to the end
-						target_stop = i;
-					}
-					else{
-						// Closer to the start
-						m_melt.clear_target();
-						target_start = i + 1;
-					}
-					
-					break;
-			};
-		}
+			// Clear the target buffer to make room for the bases we're about to add
+			m_melt.clear_target();
+			
+			// The first valid base of the target
+			SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
+		
+			// Attempt to extract target_length bases from the start
+			for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+				
+				// Bind to the plus strand
+				switch(*seq_ptr){
+					case DB_A:
+						m_melt.push_back_target(BASE::A);
+						break;
+					case DB_T:
+						m_melt.push_back_target(BASE::T);
+						break;
+					case DB_C:
+						m_melt.push_back_target(BASE::C);
+						break;
+					case DB_G:
+						m_melt.push_back_target(BASE::G);
+						break;
+					case DB_I:
+						m_melt.push_back_target(BASE::I);
+						break;
+					// IUPAC degenerate bases
+					case DB_M: // A or C
+						m_melt.push_back_target(BASE::M);
+						break;
+					case DB_R: // G or A
+						m_melt.push_back_target(BASE::R);
+						break;
+					case DB_S: // G or C
+						m_melt.push_back_target(BASE::S);
+						break;
+					case DB_V: // G or C or A
+						m_melt.push_back_target(BASE::V);
+						break;
+					case DB_W: // A or T
+						m_melt.push_back_target(BASE::W);
+						break;
+					case DB_Y: // T or C
+						m_melt.push_back_target(BASE::Y);
+						break;
+					case DB_H: // A or C or T
+						m_melt.push_back_target(BASE::H);
+						break;
+					case DB_K: // G or T
+						m_melt.push_back_target(BASE::K);
+						break;
+					case DB_D: // G or A or T
+						m_melt.push_back_target(BASE::D);
+						break;
+					case DB_B: // G or T or C
+						m_melt.push_back_target(BASE::B);
+						break;
+					case DB_N: // A or T or G or C
+						m_melt.push_back_target(BASE::N);
+						break;
+					default:
+						
+						// Are we closer to the start or the end?
+						if( (i - target_start) > (target_stop - (i + 1) ) ){
+						
+							// Closer to the end
+							target_stop = i;
+						}
+						else{
+							// Closer to the start
+							m_melt.clear_target();
+							target_start = i + 1;
+						}
+						
+						break;
+				};
+			}
 
-		#ifdef PROFILE
-		num_plus_tm_eval ++;
-		#endif // PROFILE
-		
-		const float tm = m_melt.approximate_tm_heterodimer();
-		
-		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
-			continue;
-		}
-		
-		const float dg = m_melt.delta_G();
-		
-		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
-			continue;
-		}
-		
-		const unsigned int anchor_5 = m_melt.anchor5_query();
-		
-		if(anchor_5 < m_clamp_5){
-			continue;
-		}
-		
-		const unsigned int anchor_3 = m_melt.anchor3_query();
-		
-		if(anchor_3 < m_clamp_3){
-			continue;
-		}
-		
-		const unsigned int num_mismatch = m_melt.num_mismatch();
-		
-		if(num_mismatch > m_max_mismatch){
-			continue;
-		}
-		
-		const unsigned int num_gap = m_melt.num_gap();
-		
-		if(num_gap > m_max_gap){
-			continue;
-		}
-		
-		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
-		// Since degenerate bases get turned into 'N' by the hash function, we can
-		// end up with spurious matches to poly-N sequences. Require that at least
-		// half of the query can be aligned to real (ATGCI) bases
-		if(m_melt.num_real_base() < window/2){
-			continue;
-		}
+			#ifdef PROFILE
+			num_plus_tm_eval ++;
+			#endif // PROFILE
+			
+			const float tm = m_melt.approximate_tm_heterodimer();
+			
+			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
 
-		pair<unsigned int, unsigned int> query_range;
-		pair<unsigned int, unsigned int> target_range;
-		
-		m_melt.alignment_range(query_range, target_range);
-		
-		int target_5 = target_start;
-		int target_3 = target_5;
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
 
-		target_5 += (int)target_range.first;
-		target_3 += (int)target_range.second;
+				continue;
+			}
+			
+			const float dg = m_melt.delta_G();
+			
+			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
 
-		// Adjust the extent of the binding region to incorporate
-		// unbound, non-virtual query bases
-		target_3 += (int)query_range.first;
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
 
-		target_5 -= (int)(window - 1) - (int)query_range.second;
-		
-		// Save the alignment
-		stringstream ss_align;
-		ss_align << m_melt;
-		
-		hit_list.push_back( oligo_info( target_5, target_3, tm, 
-			m_melt.delta_H(), m_melt.delta_S(), anchor_5, anchor_3, 
-			num_mismatch, num_gap, ss_align.str() ) );
+				continue;
+			}
+			
+			const unsigned int anchor_5 = m_melt.anchor5_query();
+			
+			if(anchor_5 < m_clamp_5){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int anchor_3 = m_melt.anchor3_query();
+			
+			if(anchor_3 < m_clamp_3){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_mismatch = m_melt.num_mismatch();
+			
+			if(num_mismatch > m_max_mismatch){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_gap = m_melt.num_gap();
+			
+			if(num_gap > m_max_gap){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+			// Since degenerate bases get turned into 'N' by the hash function, we can
+			// end up with spurious matches to poly-N sequences. Require that at least
+			// half of the query can be aligned to real (ATGCI) bases
+			const unsigned int num_real_base = m_melt.num_real_base();
+
+			if(num_real_base < window/2){
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, num_real_base, string() /*align*/);
+
+				continue;
+			}
+
+			pair<unsigned int, unsigned int> query_range;
+			pair<unsigned int, unsigned int> target_range;
+			
+			m_melt.alignment_range(query_range, target_range);
+			
+			int target_5 = target_start;
+			int target_3 = target_5;
+
+			target_5 += (int)target_range.first;
+			target_3 += (int)target_range.second;
+
+			// Adjust the extent of the binding region to incorporate
+			// unbound, non-virtual query bases
+			target_3 += (int)query_range.first;
+
+			target_5 -= (int)(window - 1) - (int)query_range.second;
+			
+			// Save the alignment
+			stringstream ss_align;
+			ss_align << m_melt;
+			
+			const string align = ss_align.str();
+
+			hit_list.push_back( oligo_info(target_5, target_3, tm, 
+				m_melt.delta_H(), m_melt.delta_S(), anchor_5, anchor_3, 
+				num_mismatch, num_gap, align) );
+			
+			// Add this result to the cache
+			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
+				anchor_5, anchor_3, target_5, target_3,
+				num_mismatch, num_gap, num_real_base, align);
+		}
+		else{ // Cache hit
+
+			if( (cache_iter->second.tm < m_min_oligo_tm) || (cache_iter->second.tm > m_max_oligo_tm) ){
+				continue;
+			}
+
+			if( (cache_iter->second.dg < m_min_oligo_dg) || (cache_iter->second.dg > m_max_oligo_dg) ){
+				continue;
+			}
+
+			if(cache_iter->second.anchor_5 < m_clamp_5){
+				continue;
+			}
+
+			if(cache_iter->second.num_mismatch > m_max_mismatch){
+				continue;
+			}
+
+			if(cache_iter->second.num_gap > m_max_gap){
+				continue;
+			}
+
+			if(cache_iter->second.num_real_base < window/2){
+				continue;
+			}
+
+			hit_list.push_back(oligo_info( cache_iter->second.target_5, cache_iter->second.target_3, 
+				cache_iter->second.tm, 
+				cache_iter->second.dH, cache_iter->second.dS, 
+				cache_iter->second.anchor_5, cache_iter->second.anchor_3, 
+				cache_iter->second.num_mismatch, cache_iter->second.num_gap, cache_iter->second.seq_align) );
+		}
 	}
 	
 	info_list.clear();
@@ -813,7 +1105,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 void bind_oligo_to_plus_strand(list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
 		const string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -840,6 +1132,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		
 		//if( !(info_iter->mask & m_oligo_mask) || !(info_iter->mask & oligo_info::PLUS_STRAND) ){
 		if( (info_iter->mask & strand_and_oligo_mask) != strand_and_oligo_mask ){
+
 			++info_iter;
 			continue;
 		}
@@ -859,177 +1152,285 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 		
 		unsigned int target_stop = min( target_start + target_length, SEQ_SIZE(m_seq) );
 		
-		// Clear the target buffer to make room for the bases we're about to add
-		m_melt.clear_target();
-		
-		// The first valid base of the target
-		SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
-	
-		// Attempt to extract target_length bases from the start
-		for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
+		// Is there a result already in the cache?
+		BindCacheKey key(m_oligo, target_start, target_stop);
+
+		unordered_map<BindCacheKey, BindCacheValue>::const_iterator cache_iter = m_melt_cache.find(key);
+
+		if( cache_iter == m_melt_cache.end() ){ // Cache miss
 			
-			// Bind to the plus strand
-			switch(*seq_ptr){
-				case DB_A:
-					m_melt.push_back_target(BASE::A);
-					break;
-				case DB_T:
-					m_melt.push_back_target(BASE::T);
-					break;
-				case DB_C:
-					m_melt.push_back_target(BASE::C);
-					break;
-				case DB_G:
-					m_melt.push_back_target(BASE::G);
-					break;
-				case DB_I:
-					m_melt.push_back_target(BASE::I);
-					break;
-				// IUPAC degenerate bases
-				case DB_M: // A or C
-					m_melt.push_back_target(BASE::M);
-					break;
-				case DB_R: // G or A
-					m_melt.push_back_target(BASE::R);
-					break;
-				case DB_S: // G or C
-					m_melt.push_back_target(BASE::S);
-					break;
-				case DB_V: // G or C or A
-					m_melt.push_back_target(BASE::V);
-					break;
-				case DB_W: // A or T
-					m_melt.push_back_target(BASE::W);
-					break;
-				case DB_Y: // T or C
-					m_melt.push_back_target(BASE::Y);
-					break;
-				case DB_H: // A or C or T
-					m_melt.push_back_target(BASE::H);
-					break;
-				case DB_K: // G or T
-					m_melt.push_back_target(BASE::K);
-					break;
-				case DB_D: // G or A or T
-					m_melt.push_back_target(BASE::D);
-					break;
-				case DB_B: // G or T or C
-					m_melt.push_back_target(BASE::B);
-					break;
-				case DB_N: // A or T or G or C
-					m_melt.push_back_target(BASE::N);
-					break;
-				default:
-									
-					// Are we closer to the start or the end?
-					if( (i - target_start) > (target_stop - (i + 1) ) ){
-					
-						// Closer to the end
-						target_stop = i;
-					}
-					else{
-						// Closer to the start
-						m_melt.clear_target();
-						target_start = i + 1;
-					}
-
-					break;
-			};
-		}
-
-		#ifdef PROFILE
-		num_plus_tm_eval ++;
-		#endif // PROFILE
+			// Clear the target buffer to make room for the bases we're about to add
+			m_melt.clear_target();
+			
+			// The first valid base of the target
+			SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
 		
-		const float tm = m_melt.approximate_tm_heterodimer();
-		
-		if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const float dg = m_melt.delta_G();
-		
-		if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int anchor_5 = m_melt.anchor5_query();
-		
-		if(anchor_5 < m_clamp_5){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int anchor_3 = m_melt.anchor3_query();
-		
-		if(anchor_3 < m_clamp_3){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int num_mismatch = m_melt.num_mismatch();
-		
-		if(num_mismatch > m_max_mismatch){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		const unsigned int num_gap = m_melt.num_gap();
-		
-		if(num_gap > m_max_gap){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-		
-		// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
-		// Since degenerate bases get turned into 'N' by the hash function, we can
-		// end up with spurious matches to poly-N sequences. Require that at least
-		// half of the query can be aligned to real (ATGCI) bases
-		if(m_melt.num_real_base() < window/2){
-
-			curr_oligo.pop_front();
-			continue;
-		}
-
-		pair<unsigned int, unsigned int> query_range;
-		pair<unsigned int, unsigned int> target_range;
-		
-		m_melt.alignment_range(query_range, target_range);
-		
-		int target_5 = target_start;
-		int target_3 = target_5;
-
-		target_5 += (int)target_range.first;
-		target_3 += (int)target_range.second;
-
-		// Adjust the extent of the binding region to incorporate
-		// unbound, non-virtual query bases
-		target_3 += (int)query_range.first;
-
-		target_5 -= (int)(window - 1) - (int)query_range.second;
-
-		// Save the alignment
-		stringstream ss_align;
-		ss_align << m_melt;
+			// Attempt to extract target_length bases from the start
+			for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
 				
-		match_iter->loc_5 = target_5;
-		match_iter->loc_3 = target_3;
-		match_iter->tm = tm;
-		match_iter->dH = m_melt.delta_H();
-		match_iter->dS = m_melt.delta_S();
-		match_iter->anchor_5 = anchor_5;
-		match_iter->anchor_3 = anchor_3;
-		match_iter->num_mm = num_mismatch;
-		match_iter->num_gap = num_gap;
-		match_iter->alignment = ss_align.str();
+				// Bind to the plus strand
+				switch(*seq_ptr){
+					case DB_A:
+						m_melt.push_back_target(BASE::A);
+						break;
+					case DB_T:
+						m_melt.push_back_target(BASE::T);
+						break;
+					case DB_C:
+						m_melt.push_back_target(BASE::C);
+						break;
+					case DB_G:
+						m_melt.push_back_target(BASE::G);
+						break;
+					case DB_I:
+						m_melt.push_back_target(BASE::I);
+						break;
+					// IUPAC degenerate bases
+					case DB_M: // A or C
+						m_melt.push_back_target(BASE::M);
+						break;
+					case DB_R: // G or A
+						m_melt.push_back_target(BASE::R);
+						break;
+					case DB_S: // G or C
+						m_melt.push_back_target(BASE::S);
+						break;
+					case DB_V: // G or C or A
+						m_melt.push_back_target(BASE::V);
+						break;
+					case DB_W: // A or T
+						m_melt.push_back_target(BASE::W);
+						break;
+					case DB_Y: // T or C
+						m_melt.push_back_target(BASE::Y);
+						break;
+					case DB_H: // A or C or T
+						m_melt.push_back_target(BASE::H);
+						break;
+					case DB_K: // G or T
+						m_melt.push_back_target(BASE::K);
+						break;
+					case DB_D: // G or A or T
+						m_melt.push_back_target(BASE::D);
+						break;
+					case DB_B: // G or T or C
+						m_melt.push_back_target(BASE::B);
+						break;
+					case DB_N: // A or T or G or C
+						m_melt.push_back_target(BASE::N);
+						break;
+					default:
+										
+						// Are we closer to the start or the end?
+						if( (i - target_start) > (target_stop - (i + 1) ) ){
+						
+							// Closer to the end
+							target_stop = i;
+						}
+						else{
+							// Closer to the start
+							m_melt.clear_target();
+							target_start = i + 1;
+						}
+
+						break;
+				};
+			}
+
+			#ifdef PROFILE
+			num_plus_tm_eval ++;
+			#endif // PROFILE
+			
+			const float tm = m_melt.approximate_tm_heterodimer();
+			
+			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const float dg = m_melt.delta_G();
+			
+			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int anchor_5 = m_melt.anchor5_query();
+			
+			if(anchor_5 < m_clamp_5){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int anchor_3 = m_melt.anchor3_query();
+			
+			if(anchor_3 < m_clamp_3){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_mismatch = m_melt.num_mismatch();
+			
+			if(num_mismatch > m_max_mismatch){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			const unsigned int num_gap = m_melt.num_gap();
+			
+			if(num_gap > m_max_gap){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+
+				continue;
+			}
+			
+			// How many "real" (non-degenerate, non-virtual) bases make up the target sequence?
+			// Since degenerate bases get turned into 'N' by the hash function, we can
+			// end up with spurious matches to poly-N sequences. Require that at least
+			// half of the query can be aligned to real (ATGCI) bases
+			const unsigned int num_real_base = m_melt.num_real_base();
+
+			if(num_real_base < window/2){
+
+				curr_oligo.pop_front();
+
+				// Add this partial result to the cache
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
+					num_mismatch, num_gap, num_real_base, string() /*align*/);
+
+				continue;
+			}
+
+			pair<unsigned int, unsigned int> query_range;
+			pair<unsigned int, unsigned int> target_range;
+			
+			m_melt.alignment_range(query_range, target_range);
+			
+			int target_5 = target_start;
+			int target_3 = target_5;
+
+			target_5 += (int)target_range.first;
+			target_3 += (int)target_range.second;
+
+			// Adjust the extent of the binding region to incorporate
+			// unbound, non-virtual query bases
+			target_3 += (int)query_range.first;
+
+			target_5 -= (int)(window - 1) - (int)query_range.second;
+
+			// Save the alignment
+			stringstream ss_align;
+			ss_align << m_melt;
+			
+			const string align = ss_align.str();
+
+			match_iter->loc_5 = target_5;
+			match_iter->loc_3 = target_3;
+			match_iter->tm = tm;
+			match_iter->dH = m_melt.delta_H();
+			match_iter->dS = m_melt.delta_S();
+			match_iter->anchor_5 = anchor_5;
+			match_iter->anchor_3 = anchor_3;
+			match_iter->num_mm = num_mismatch;
+			match_iter->num_gap = num_gap;
+			match_iter->alignment = align;
+
+			// Add this result to the cache
+			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
+				anchor_5, anchor_3, target_5, target_3,
+				num_mismatch, num_gap, num_real_base, align);
+		}
+		else{ // Cache miss
+
+			if( (cache_iter->second.tm < m_min_oligo_tm) || (cache_iter->second.tm > m_max_oligo_tm) ){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if( (cache_iter->second.dg < m_min_oligo_dg) || (cache_iter->second.dg > m_max_oligo_dg) ){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.anchor_5 < m_clamp_5){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_mismatch > m_max_mismatch){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_gap > m_max_gap){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			if(cache_iter->second.num_real_base < window/2){
+
+				curr_oligo.pop_front();
+				continue;
+			}
+
+			match_iter->loc_5 = cache_iter->second.target_5;
+			match_iter->loc_3 = cache_iter->second.target_3;
+			match_iter->tm = cache_iter->second.tm;
+			match_iter->dH =cache_iter->second.dH;
+			match_iter->dS = cache_iter->second.dS;
+			match_iter->anchor_5 = cache_iter->second.anchor_5;
+			match_iter->anchor_3 = cache_iter->second.anchor_3;
+			match_iter->num_mm = cache_iter->second.num_mismatch;
+			match_iter->num_gap = cache_iter->second.num_gap;
+			match_iter->alignment = cache_iter->second.seq_align;
+		}
 	}
 	
 	if( curr_oligo.empty() ){

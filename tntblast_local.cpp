@@ -17,7 +17,6 @@
 #include <iostream>
 #include <iomanip>
 #include <map>
-#include <set>
 #include <sstream>
 
 using namespace std;
@@ -351,13 +350,15 @@ int local_main(int argc, char *argv[])
 		// Initialize the melting engine. There is a fair amount of overhead involved in
 		// initialization (handled by the contructor) so it is best to do it just once
 		// per program invocation. 
-		
 		NucCruc melt(opt.melting_param, opt.target_t);
 
 		melt.Salt(opt.salt);
 		melt.dangle(opt.allow_dangle_5, opt.allow_dangle_3);
 		melt.dinkelbach(opt.use_dinkelbach);
 		
+		unordered_map<BindCacheKey, BindCacheValue> plus_strand_melt_cache;
+		unordered_map<BindCacheKey, BindCacheValue> minus_strand_melt_cache;
+
 		pair<string, SEQPTR> bio_seq = make_pair("", SEQPTR(NULL) );
 		long int last_target = -1;
 		unsigned int last_target_start = 0;
@@ -479,6 +480,10 @@ int local_main(int argc, char *argv[])
 					bio_seq.second = NULL;
 				}
 				
+				// Clear any existing cached binding data (which is only valid for a single target sequence)
+				plus_strand_melt_cache.clear();
+				minus_strand_melt_cache.clear();
+
 				// Read a DNA sequence (and defline) from either the database or the master
 				// node.
 				target_len = seq_file.read_bio_seq(bio_seq, seq_file.length_sorted_index(local_target), 
@@ -538,8 +543,8 @@ int local_main(int argc, char *argv[])
 
 							// What amplicons do these primers/probe produce?
 							local_results = amplicon(dbase, bio_seq,
-								sig_ref, melt,
-								opt.salt, forward_primer_strand, reverse_primer_strand, opt.probe_strand,
+								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
+								forward_primer_strand, reverse_primer_strand, opt.probe_strand,
 								opt.min_primer_tm, opt.max_primer_tm, 
 								opt.min_primer_dg, opt.max_primer_dg, 
 								opt.min_probe_tm, opt.max_probe_tm, 
@@ -552,14 +557,14 @@ int local_main(int argc, char *argv[])
 
 							mask_binding_sites(local_results, opt.mask_options,
 								opt.min_primer_tm, opt.min_probe_tm, melt,
-								opt.salt, forward_primer_strand, reverse_primer_strand, opt.probe_strand);
+								forward_primer_strand, reverse_primer_strand, opt.probe_strand);
 
 							break;
 						case ASSAY_PADLOCK:
 
 							local_results = padlock(dbase, bio_seq,
-								sig_ref, melt,
-								opt.salt, forward_primer_strand, reverse_primer_strand, 
+								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
+								forward_primer_strand, reverse_primer_strand, 
 								opt.min_probe_tm, opt.max_probe_tm,
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
@@ -572,9 +577,9 @@ int local_main(int argc, char *argv[])
 				else{
 
 					if(sig_ref.has_probe() == true){
-						
+
 						local_results = hybrid(dbase, bio_seq,
-							sig_ref, melt, opt.salt, opt.probe_strand, 
+							sig_ref, melt, opt.probe_strand, 
 							opt.min_probe_tm, opt.max_probe_tm, 
 							opt.min_probe_dg, opt.max_probe_dg, 
 							opt.probe_clamp_5, opt.probe_clamp_3, 

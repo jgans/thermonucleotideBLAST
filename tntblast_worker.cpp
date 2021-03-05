@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifdef USE_MPI
 
 #include <mpi.h>
@@ -193,12 +159,16 @@ int worker(int argc, char *argv[])
 		// initialization (handled by the constructor) so it is best to do it just once
 		// per program invocation.
 		NucCruc melt(melting_param, target_t);
-		
+	
+		melt.Salt(salt);
+
 		// Boolean values are transmitted as ints (so we need to convert back)
 		melt.dangle( allow_dangle_5 == int(true), allow_dangle_3 == int(true) );
-		
 		melt.dinkelbach( use_dinkelbach == int(true) );
 		
+		unordered_map<BindCacheKey, BindCacheValue> plus_strand_melt_cache;
+		unordered_map<BindCacheKey, BindCacheValue> minus_strand_melt_cache;
+
 		pair<string, SEQPTR> bio_seq = make_pair("", SEQPTR(NULL) );
 		long int last_target = -1;
 		unsigned int last_target_start = 0;
@@ -295,6 +265,10 @@ int worker(int argc, char *argv[])
 					bio_seq.second = NULL;
 				}
 				
+				// Clear any existing cached binding data (which is only valid for a single target sequence)
+				plus_strand_melt_cache.clear();
+				minus_strand_melt_cache.clear();
+				
 				// Read a DNA sequence (and defline) from either the database or the master
 				// node.
 				target_len = seq_file.read_bio_seq(bio_seq, cur_target, cur_target_start, cur_target_stop);
@@ -371,8 +345,8 @@ int worker(int argc, char *argv[])
 
 							// What amplicons do these primers/probe produce?
 							local_results = amplicon(dbase, bio_seq,
-								sig_ref, melt,
-								salt, forward_primer_strand, reverse_primer_strand, probe_strand,
+								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
+								forward_primer_strand, reverse_primer_strand, probe_strand,
 								min_primer_tm, max_primer_tm, 
 								min_primer_dg, max_primer_dg, 
 								min_probe_tm, max_probe_tm, 
@@ -385,14 +359,14 @@ int worker(int argc, char *argv[])
 
 							mask_binding_sites(local_results, mask_options,
 								min_primer_tm, min_probe_tm, melt,
-								salt, forward_primer_strand, reverse_primer_strand, probe_strand);
+								forward_primer_strand, reverse_primer_strand, probe_strand);
 
 							break;
 						case ASSAY_PADLOCK:
 
 							local_results = padlock(dbase, bio_seq,
-								sig_ref, melt,
-								salt, forward_primer_strand, reverse_primer_strand, 
+								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
+								forward_primer_strand, reverse_primer_strand, 
 								min_probe_tm, max_probe_tm,
 								min_probe_dg, max_probe_dg,
 								probe_clamp_5, probe_clamp_3, 
@@ -407,7 +381,7 @@ int worker(int argc, char *argv[])
 					if(sig_ref.has_probe() == true){
 						
 						local_results = hybrid(dbase, bio_seq,
-							sig_ref, melt, salt, probe_strand, 
+							sig_ref, melt, probe_strand, 
 							min_probe_tm, max_probe_tm, 
 							min_probe_dg, max_probe_dg, 
 							probe_clamp_5, probe_clamp_3,
@@ -459,13 +433,13 @@ int worker(int argc, char *argv[])
 					if(local_iter->has_primers() == true){
 					
 						melt.set_duplex(local_iter->forward_oligo);
-						melt.Strand(forward_primer_strand);
+						melt.Strand(forward_primer_strand, forward_primer_strand);
 
 						local_iter->forward_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->forward_dimer_tm = melt.approximate_tm_homodimer();
 
 						melt.set_duplex(local_iter->reverse_oligo);
-						melt.Strand(reverse_primer_strand);
+						melt.Strand(reverse_primer_strand, reverse_primer_strand);
 
 						local_iter->reverse_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->reverse_dimer_tm = melt.approximate_tm_homodimer();
@@ -473,9 +447,7 @@ int worker(int argc, char *argv[])
 						melt.set_query(local_iter->forward_oligo);
 						melt.set_target(local_iter->reverse_oligo);
 
-						// The strand is the *total* concentration. For forward+reverse 
-						// heterodimers we must take the sum of strands.
-						melt.Strand(forward_primer_strand + reverse_primer_strand);
+						melt.Strand(forward_primer_strand, reverse_primer_strand);
 
 						local_iter->primer_dimer_tm = melt.approximate_tm_heterodimer();
 					}
@@ -484,7 +456,7 @@ int worker(int argc, char *argv[])
 					
 						melt.set_duplex(local_iter->probe_oligo);
 
-						melt.strand(probe_strand);
+						melt.strand(probe_strand, probe_strand);
 
 						local_iter->probe_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->probe_dimer_tm = melt.approximate_tm_homodimer();

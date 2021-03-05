@@ -18,18 +18,19 @@ extern "C"{
 #include <list>
 #include <vector>
 #include <set>
+#include <unordered_map>
 
 /////////////////////////////////////////////////////////////////////////
 // Default parameter values (applied in options.h)
 
-#define	DEFAULT_MAX_LEN						2000
+#define	DEFAULT_MAX_LEN							2000
 		
 // 3' primer clamp (i.e. number of exact matches required)
 #define	DEFAULT_PRIMER_CLAMP					0
 
 // The smallest allowed maximum primer clamp (like the lowest, highest point)
 // (a value of -1 deactivates this test)
-#define	DEFAULT_MIN_MAX_PRIMER_CLAMP				-1
+#define	DEFAULT_MIN_MAX_PRIMER_CLAMP			-1
 
 #define	DEFAULT_PROBE_CLAMP_5					0
 #define	DEFAULT_PROBE_CLAMP_3					0
@@ -95,7 +96,7 @@ extern "C"{
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.17 (October 26, 2020)"
+#define		TNTBLAST_VERSION		"2.18 (March 1, 2021)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
@@ -245,6 +246,86 @@ struct oligo_info{
 	}
 };
 
+// Cache the melting temperature calculation results for a given oligo and target sequence range
+// sequence location
+struct BindCacheKey
+{
+	std::string oligo;
+	unsigned int target_start;
+	unsigned int target_stop;
+
+	BindCacheKey()
+	{
+		// Do nothing
+	};
+
+	BindCacheKey(const std::string &m_oligo, const unsigned int &m_start,
+		const unsigned int& m_stop) : oligo(m_oligo), target_start(m_start), target_stop(m_stop)
+	{
+	};
+
+	inline bool operator==(const BindCacheKey &m_rhs) const
+	{
+		return (oligo == m_rhs.oligo) && 
+			(target_start == m_rhs.target_start) && 
+			(target_stop == m_rhs.target_stop);
+	};
+};
+
+// Provide a hash function so we can store the cache results in an unordered_map
+namespace std{
+
+	template <>
+	struct hash<BindCacheKey>
+	{
+		size_t operator()(const BindCacheKey& m_key) const
+		{
+			// Pack the target_start and target_stop values into a single 64 bit value
+			return hash<string>()(m_key.oligo) ^ ( (size_t(m_key.target_start) << 32) | size_t(m_key.target_stop) );
+		};
+	};
+}
+
+struct BindCacheValue
+{
+	float tm;
+	float dg;
+	float dH;
+	float dS;
+	unsigned int anchor_5;
+	unsigned int anchor_3;
+	unsigned int target_5;
+	unsigned int target_3;
+	unsigned int num_mismatch;
+	unsigned int num_gap;
+	unsigned int num_real_base;
+	std::string seq_align;
+
+	BindCacheValue()
+	{
+		// Do nothing
+	};
+
+	BindCacheValue(const float &m_tm,
+		const float &m_dg,
+		const float &m_dH,
+		const float &m_dS,
+		const unsigned int &m_anchor_5,
+		const unsigned int &m_anchor_3,
+		const unsigned int &m_target_5,
+		const unsigned int &m_target_3,
+		const unsigned int &m_num_mismatch,
+		const unsigned int &m_num_gap,
+		const unsigned int &m_num_real_base,
+		const std::string &m_seq_align) :
+			tm(m_tm), dg(m_dg), dH(m_dH), dS(m_dS), anchor_5(m_anchor_5),
+			anchor_3(m_anchor_3), target_5(m_target_5), target_3(m_target_3),
+			num_mismatch(m_num_mismatch), num_gap(m_num_gap), num_real_base(m_num_real_base),
+			seq_align(m_seq_align)
+	{
+
+	};
+};
 
 #ifdef USE_MPI
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -271,7 +352,7 @@ int local_main(int argc, char *argv[]);
 // Show all primer binding sites in lower case (if requested by the user).
 void mask_binding_sites(std::list<hybrid_sig> &m_sig, const int &m_mask, 
 	const float &m_min_primer_tm, const float &m_min_probe_tm, NucCruc &m_melt,
-	const float &m_salt, const float &m_forward_primer_strand, 
+	const float &m_forward_primer_strand, 
 	const float &m_reverse_primer_strand, const float &m_probe_strand);
 	
 void mask_primer_5(std::string &m_amp, const std::string &m_oligo, NucCruc &m_melt,
@@ -320,7 +401,9 @@ bool query_sched(const unsigned int &m_num_target,
 // In amplicon_search.cpp
 std::list<hybrid_sig> amplicon(DNAHash &m_hash, const std::pair<std::string, SEQPTR> &m_seq, 
 	const hybrid_sig &m_sig, NucCruc &m_melt,
-	const float &m_salt, const float &m_forward_primer_strand, 
+	std::unordered_map<BindCacheKey, BindCacheValue> &m_plus_strand_melt_cache, 
+	std::unordered_map<BindCacheKey, BindCacheValue> &m_minus_strand_melt_cache,
+	const float &m_forward_primer_strand, 
 	const float &m_reverse_primer_strand, const float &m_probe_strand, 
 	const float &m_min_primer_tm, const float &m_max_primer_tm,
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
@@ -339,7 +422,9 @@ std::list<hybrid_sig> amplicon(DNAHash &m_hash, const std::pair<std::string, SEQ
 // In padlock_search.cpp
 std::list<hybrid_sig> padlock(DNAHash &m_hash, const std::pair<std::string, SEQPTR> &m_seq, 
 	const hybrid_sig &m_sig, NucCruc &m_melt,
-	const float &m_salt, const float &m_forward_primer_strand, 
+	std::unordered_map<BindCacheKey, BindCacheValue> &m_plus_strand_melt_cache, 
+	std::unordered_map<BindCacheKey, BindCacheValue> &m_minus_strand_melt_cache,
+	const float &m_forward_primer_strand, 
 	const float &m_reverse_primer_strand, 
 	const float &m_min_primer_tm, const float &m_max_primer_tm,
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
@@ -358,7 +443,7 @@ bool hybrid(
 
 std::list<hybrid_sig> hybrid(DNAHash &m_hash, const std::pair<std::string, SEQPTR> &m_seq, 
 	const hybrid_sig &m_sig, NucCruc &m_melt,
-	const float &m_salt, const float &m_probe_strand, 
+	const float &m_probe_strand, 
 	const float &m_min_probe_tm, const float &m_max_probe_tm, 
 	const float &m_min_probe_dg, const float &m_max_probe_dg, 
 	const unsigned int &m_probe_clamp_5,
@@ -375,7 +460,7 @@ std::list<hybrid_sig> hybrid(DNAHash &m_hash, const std::pair<std::string, SEQPT
 void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list, 
 		DNAHash &m_hash, SEQPTR m_seq, 
 		const std::string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, std::unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -386,7 +471,7 @@ void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list,
 void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list, 
 		DNAHash &m_hash, SEQPTR m_seq, 
 		const std::string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, std::unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -397,7 +482,7 @@ void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list,
 void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
 		const std::string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, std::unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,
@@ -408,7 +493,7 @@ void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list,
 void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
 		const std::string &m_oligo,
-		NucCruc &m_melt,
+		NucCruc &m_melt, std::unordered_map<BindCacheKey, BindCacheValue> &m_melt_cache,
 		const float &m_min_oligo_tm, const float &m_max_oligo_tm,
 		const float &m_min_oligo_dg, const float &m_max_oligo_dg,
 		const unsigned int &m_clamp_5,

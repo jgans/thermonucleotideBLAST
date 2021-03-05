@@ -57,7 +57,9 @@ struct sort_by_oligo_loc
 list<hybrid_sig> amplicon(DNAHash &m_hash, 
 	const pair<string, SEQPTR> &m_seq, 
 	const hybrid_sig &m_sig, NucCruc &m_melt,
-	const float &m_salt, const float &m_forward_primer_strand, 
+	unordered_map<BindCacheKey, BindCacheValue> &m_plus_strand_melt_cache,
+	unordered_map<BindCacheKey, BindCacheValue> &m_minus_strand_melt_cache,
+	const float &m_forward_primer_strand, 
 	const float &m_reverse_primer_strand, const float &m_probe_strand, 
 	const float &m_min_primer_tm, const float &m_max_primer_tm,
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
@@ -117,9 +119,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 	}
-		
-	m_melt.salt(m_salt);
-	
+
 	const pair<unsigned int, unsigned int> strand_count = 
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
 	
@@ -135,7 +135,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::F,
 			m_seq.second, 
 			m_sig.forward_oligo,
-			m_melt,
+			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -159,7 +159,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::R,
 			m_seq.second, 
 			m_sig.reverse_oligo,
-			m_melt,
+			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -183,7 +183,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::F,
 			m_seq.second, 
 			m_sig.forward_oligo,
-			m_melt,
+			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -203,7 +203,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::R,
 			m_seq.second, 
 			m_sig.reverse_oligo,
-			m_melt,
+			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -222,7 +222,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::F,
 			m_seq.second, 
 			m_sig.forward_oligo,
-			m_melt,
+			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -246,7 +246,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::R,
 			m_seq.second, 
 			m_sig.reverse_oligo,
-			m_melt,
+			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -270,7 +270,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::F,
 			m_seq.second, 
 			m_sig.forward_oligo,
-			m_melt,
+			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -294,7 +294,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			oligo_info::R,
 			m_seq.second, 
 			m_sig.reverse_oligo,
-			m_melt,
+			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
@@ -331,7 +331,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::P, m_seq.second, 
 			m_sig.probe_oligo,
-			m_melt,
+			m_melt, m_minus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
@@ -341,7 +341,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_plus_strand(match_list,
 			oligo_info::P, m_seq.second, 
 			m_sig.probe_oligo,
-			m_melt,
+			m_melt, m_plus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
@@ -668,7 +668,7 @@ pair<unsigned int, unsigned int> cull_oligo_match(list<oligo_info> &m_match_list
 	const unsigned int threshold = m_max_amplicon_len + 50;
 	pair<unsigned int, unsigned int> ret = make_pair(0, 0);
 	
-	// ** It may be better to move this sort out of this function an into bind oligo **
+	// ** It may be better to move this sort out of this function and into bind oligo **
 	
 	// Sort the oligo matches by the target_loc in ascending order
 	m_match_list.sort( sort_by_oligo_loc() );
