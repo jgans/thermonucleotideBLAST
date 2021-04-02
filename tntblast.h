@@ -96,7 +96,7 @@ extern "C"{
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.18 (March 1, 2021)"
+#define		TNTBLAST_VERSION		"2.191 (April 2, 2021)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
