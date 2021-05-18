@@ -8,13 +8,6 @@
 
 #include "tntblast_timer.h"
 
-#ifdef USE_NCBI
-extern "C"{
-	#include <objseq.h>
-	#include <readdb.h>
-}
-#endif // USE_NCBI
-
 #include <list>
 #include <vector>
 #include <set>
@@ -96,7 +89,7 @@ extern "C"{
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.191 (April 2, 2021)"
+#define		TNTBLAST_VERSION		"2.192 (May 15, 2021)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
