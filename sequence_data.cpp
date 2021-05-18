@@ -1,42 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-// For compatibility with windows, we must include the
-// tntblast.h header before we include the sequence_data.h header.
-// This insures that the proper version of std::min and std::max is
-// used in the hybrid_sig.h file (which will otherwise be confused by
-// the min and max macros in windows.h that is included by sequence_data.h).
 #include "tntblast.h"
 #include "sequence_data.h"
 
@@ -303,7 +264,21 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 			throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer";
 		}
 
-		const ncbi::CRef<ncbi::objects::CBioseq> bs = blast_db_ptr->GetBioseqNoData(m_index);
+		ncbi::CRef<ncbi::objects::CBioseq> bs;
+		
+		// There is at least one example of a blast 'nt' database (from May 10, 2021) for which at least
+		// one sequence index throws an error when we attempt to load the CBioseq. If this happens, return
+		// a zero length sequence.
+		try{
+			bs = blast_db_ptr->GetBioseqNoData(m_index);
+		}
+		catch(...){
+
+			m_seq.first = "Invalid";
+			m_seq.second = NULL;
+
+			return 0; // The sequence length is zero
+		}
 
 		string title;
 		string accession;
@@ -392,8 +367,7 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 			#define BLAST_DB_G	4
 			#define BLAST_DB_T	8
 
-			switch(*in_ptr)
-			{
+			switch(*in_ptr){
 				case BLAST_DB_A:
 					*out_ptr = DB_A;
 					break;
@@ -596,124 +570,3 @@ pair<unsigned int, unsigned int> seq_len_increment(const unsigned int &m_len, co
 	// If there's a remainder, add one to the length
 	return make_pair(m_len/n + ( (m_len%n != 0) ? 1 : 0), n);
 }
-
-#ifdef USE_NCBI
-unsigned int bioseq_to_SEQPTR(SEQPTR &m_seq, const BioseqPtr &m_bsp, const int &m_start, const int &m_stop)
-{
-	unsigned int seq_len = BioseqGetLen(m_bsp);
-	
-	const unsigned int start = m_start;
-	
-	unsigned int stop;
-	
-	if( (m_stop < 0) || (m_stop >= int(seq_len) ) ){
-		stop = seq_len - 1;
-	}
-	else{
-	
-		stop = m_stop;
-	}
-	
-	// Recompute the sequence size, allowing for the possibility that start > stop
-	seq_len = (start > stop) ? 0 : stop - start + 1;
-	
-	SeqPortPtr spp = NULL;
-	Uint1 residue;
-	
-	// Allocate space for the new sequence
-	m_seq = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
-	
-	if(m_seq == NULL){
-		throw __FILE__ ":bioseq_to_SEQPTR: Error allocating SEQBASE buffer";
-	}
-
-	SEQPTR iter = m_seq;
-	
-	// Initialize the sequence header
-	memcpy( iter, &seq_len, sizeof(unsigned int) );
-	iter += sizeof(unsigned int);
-	
-	if(seq_len > 0){
-	
-		// Save the sequence data
-		spp = SeqPortNew(m_bsp, start, stop, Seq_strand_plus, Seq_code_iupacna);
-
-		while( (residue = SeqPortGetResidue(spp) ) != SEQPORT_EOF){
-
-			switch(residue)
-			{
-				case 'A': case 'a':
-					*iter = DB_A;
-					break;
-				case 'T': case 't':
-				case 'U': case 'u': // Map RNA -> DNA
-					*iter = DB_T;
-					break;
-				case 'G': case 'g':
-					*iter = DB_G;
-					break;
-				case 'C': case 'c':
-					*iter = DB_C;
-					break;
-				// G or T or C
-				case 'B':	case 'b':
-					*iter = DB_B;
-					break;
-				// G or A or T
-				case 'D':	case 'd':
-					*iter = DB_D;
-					break;
-				// A or C or T
-				case 'H':	case 'h':
-					*iter = DB_H;
-					break;
-				// G or T
-				case 'K':	case 'k':
-					*iter = DB_K;
-					break;
-				// A or C
-				case 'M':	case 'm':
-					*iter = DB_M;
-					break;
-				// A or C or G or T
-				case 'N':	case 'n':
-					*iter = DB_N;
-					break;
-				// G or A
-				case 'R':	case 'r':
-					*iter = DB_R;
-					break;
-				// G or C
-				case 'S':	case 's':
-					*iter = DB_S;
-					break;
-				// G or C or A
-				case 'V':	case 'v':
-					*iter = DB_V;
-					break;
-				// A or T
-				case 'W':	case 'w':
-					*iter = DB_W;
-					break;
-				// T or C
-				case 'Y':	case 'y':
-					*iter = DB_Y;
-					break;
-				case SEQPORT_VIRT:
-					*iter = DB_GAP;
-					break;
-				default:
-					*iter = DB_UNKNOWN;
-					break;
-			};
-
-			iter++;
-		}
-		
-		spp = SeqPortFree(spp);
-	}
-	
-	return seq_len;
-}
-
-#endif // USE_NCBI
