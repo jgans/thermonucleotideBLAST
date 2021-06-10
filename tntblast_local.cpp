@@ -32,7 +32,7 @@ int local_main(int argc, char *argv[])
 		ofstream fout_atr;
 		ofstream fout_sif;
 		
-		program_options opt;
+		Options opt;
 		
 		try{
 			opt.parse(argc, argv);
@@ -159,17 +159,15 @@ int local_main(int argc, char *argv[])
 		
 		// Read the sequence data base
 		sequence_data seq_file;
-	
-		// Sorting by sequence length kills file IO!!!
-		const bool sort_by_length = false;
-		
+			
 		if(opt.dbase_filename != ""){
 			
 			if(opt.verbose){
 				cout << "Reading sequence database: " << opt.dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.dbase_filename, opt.allow_fasta_mmap, sort_by_length);
+			seq_file.open(opt.dbase_filename, opt.blast_include, opt.blast_exclude,
+				opt.allow_fasta_mmap);
 		}
 		else{
 			
@@ -177,7 +175,8 @@ int local_main(int argc, char *argv[])
 				cout << "Reading sequence database: " << opt.local_dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.local_dbase_filename, opt.allow_fasta_mmap, sort_by_length);
+			seq_file.open(opt.local_dbase_filename, opt.blast_include, opt.blast_exclude,
+				opt.allow_fasta_mmap);
 		}
 		
 		// How many sequences are in the database? The user can specify either a global
@@ -480,13 +479,15 @@ int local_main(int argc, char *argv[])
 					bio_seq.second = NULL;
 				}
 				
-				// Clear any existing cached binding data (which is only valid for a single target sequence)
-				plus_strand_melt_cache.clear();
-				minus_strand_melt_cache.clear();
+				// Free any existing cached binding data (which is only valid for a single target sequence).
+				// There is no guarentee that unordered_map will free memory when calling unordered_map::clear().
+				// To be on the same size, use the swap trick
+				unordered_map<BindCacheKey, BindCacheValue>().swap(plus_strand_melt_cache);
+				unordered_map<BindCacheKey, BindCacheValue>().swap(minus_strand_melt_cache);
 
 				// Read a DNA sequence (and defline) from either the database or the master
 				// node.
-				target_len = seq_file.read_bio_seq(bio_seq, seq_file.length_sorted_index(local_target), 
+				target_len = seq_file.read_bio_seq(bio_seq, local_target, 
 					local_target_start, local_target_stop + max_product_length);
 				
 				if( target_len < dbase.min_sequence_size() ){
@@ -1287,6 +1288,11 @@ int local_main(int argc, char *argv[])
 		cerr << "Caught the error: " << error << endl;
 		return EXIT_FAILURE;
 	}
+	catch(std::exception &e){
+		
+		cerr << "Caught the std exception: " << e.what() << endl;
+		return EXIT_FAILURE;
+	} 
 	catch(...){
 	
 		cerr << "Caught an unhandled error. Please report to " << EMAIL_ADDRESS << endl;

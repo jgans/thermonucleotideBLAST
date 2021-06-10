@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #ifndef __SEQUENCE_DATA
 #define __SEQUENCE_DATA
 
@@ -130,7 +96,7 @@ class sequence_data
 		const unsigned int &m_index) const;
 		
 	unsigned int read_bio_seq_ncbi(std::pair<std::string, SEQPTR> &m_seq,
-		const unsigned int &m_index, const int &m_start, 
+		unsigned int m_index, const int &m_start, 
 		const int &m_stop) const;
 	#endif // USE_BLAST_DB
 	
@@ -153,7 +119,7 @@ class sequence_data
 	std::deque<file_index> seq_index;
 	
 	// Store (sequence length, index) pairs, sorted by length
-	std::deque< std::pair<unsigned int, unsigned int> > seq_length;
+	std::vector< std::pair<unsigned int, unsigned int> > seq_length;
 	
 	#ifdef WIN32
 	HANDLE fasta_in;
@@ -168,14 +134,12 @@ class sequence_data
 	
 	bool _verbose;
 		
-	void load_fasta(const std::string &m_filename, const bool &m_sort_by_len,
-		const bool &m_allow_fasta_mmap);
-	void load_fastq(const std::string &m_filename, const bool &m_sort_by_len,
-		const bool &m_allow_fastq_mmap);
-	void load_gbk(const std::string &m_filename, const bool &m_sort_by_len);
-	void load_embl(const std::string &m_filename, const bool &m_sort_by_len);
-	void load_ptt(const std::string &m_filename, const bool &m_sort_by_len);
-	void load_gff3(const std::string &m_filename, const bool &m_sort_by_len);
+	void load_fasta(const std::string &m_filename, const bool &m_allow_fasta_mmap);
+	void load_fastq(const std::string &m_filename, const bool &m_allow_fastq_mmap);
+	void load_gbk(const std::string &m_filename);
+	void load_embl(const std::string &m_filename);
+	void load_ptt(const std::string &m_filename);
+	void load_gff3(const std::string &m_filename);
 	
 	public:
 
@@ -255,8 +219,8 @@ class sequence_data
 	// targets created by target sequence fragmentation
 	size_t effective_size(const unsigned int &m_max_len) const;
 	
-	void open(const std::string &m_filename, const bool &m_allow_fasta_mmap,
-		const bool &m_sort_by_len);
+	void open(const std::string &m_filename, const std::vector<std::string> &m_blast_include,
+		const std::vector<std::string> &m_blast_exclude, const bool &m_allow_fasta_mmap);
 	
 	unsigned int read_bio_seq(std::pair<std::string, SEQPTR> &m_seq, const unsigned int &m_index) const;
 		
@@ -299,27 +263,17 @@ class sequence_data
 	
 	const DNAMol& annot(const size_t &m_index) const
 	{
-		// Remap the index in case we're using length sorted
-		// indicies. If we're not using length sorted indicies,
-		// then the value of the index will not be changed.
-		const size_t local_index = length_sorted_index(m_index);
-		
-		if( local_index > mol.size() ){
+		if( m_index > mol.size() ){
 			throw "annot: m_index > mol.size()";
 		}
 		
 		std::list<DNAMol>::const_iterator iter = mol.begin();
 		
-		for(size_t i = 0;i < local_index;i++){
+		for(size_t i = 0;i < m_index;i++){
 			iter++;
 		}
 		
 		return *iter;
-	};
-	
-	inline size_t length_sorted_index(const size_t &m_i) const
-	{
-		return ( (seq_length.size() <= m_i) ? m_i : seq_length[m_i].second);
 	};
 	
 	// Return the *approximate* size (in bases) of the m_i^th sequence or zero

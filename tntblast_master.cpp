@@ -35,7 +35,7 @@ int master(int argc, char *argv[])
 		ofstream fout_atr;
 		ofstream fout_sif;
 		
-		program_options opt;
+		Options opt;
 		
 		try{
 			opt.parse(argc, argv);
@@ -88,7 +88,6 @@ int master(int argc, char *argv[])
 		
 		// Bind either stdout of fout to ptr_out
 		if(opt.output_filename == ""){
-		
 			ptr_out = &cout;
 		}
 		else{
@@ -185,17 +184,15 @@ int master(int argc, char *argv[])
 		
 		// Read the sequence data base
 		sequence_data seq_file;
-		
-		// Sorting by sequence length kills file IO!!!
-		const bool sort_by_length = false;
-		
+				
 		if(opt.dbase_filename != ""){
 			
 			if(opt.verbose){
 				cout << "Reading sequence database: " << opt.dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.dbase_filename, opt.allow_fasta_mmap, sort_by_length);
+			seq_file.open(opt.dbase_filename, opt.blast_include, opt.blast_exclude,
+				opt.allow_fasta_mmap);
 		}
 		else{
 			
@@ -203,7 +200,8 @@ int master(int argc, char *argv[])
 				cout << "Reading sequence database: " << opt.local_dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.local_dbase_filename, opt.allow_fasta_mmap, sort_by_length);
+			seq_file.open(opt.local_dbase_filename, opt.blast_include, opt.blast_exclude,
+				opt.allow_fasta_mmap);
 		}
 		
 		// How many sequences are in the database? The user can specify either a global
@@ -240,124 +238,8 @@ int master(int argc, char *argv[])
 		double profile = MPI_Wtime();
 		#endif // PROFILE
 		
-		// Allow different strand concentrations for the forward
-		// and reverse primers (i.e. asymmetric PCR). When
-		// opt.asymmetric_strand_ratio != 1, the opt.primer_strand
-		// is assumed to be the concentration of the reverse primer.
-		const float forward_primer_strand = opt.asymmetric_strand_ratio*
-			opt.primer_strand;
-		const float reverse_primer_strand = opt.primer_strand;
-		
-		// Broadcast the search parameters to the worker nodes
-		MPI_Bcast(&opt.salt, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		//MPI_Bcast(&opt.primer_strand, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast( (float*)&forward_primer_strand, 1, MPI_FLOAT, 0, 
-			MPI_COMM_WORLD);
-		MPI_Bcast( (float*)&reverse_primer_strand, 1, MPI_FLOAT, 0, 
-			MPI_COMM_WORLD);
-		MPI_Bcast(&opt.probe_strand, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.min_primer_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_primer_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.min_primer_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_primer_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.min_probe_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_probe_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.min_probe_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_probe_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.target_t, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.primer_clamp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.min_max_primer_clamp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&opt.probe_clamp_5, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.probe_clamp_3, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_len, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.target_strand, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.melting_param, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.mask_options, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.assay_format, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.output_format, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.hash_word_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		
-		// Send the fasta mmap flag as an int
-		if(opt.allow_fasta_mmap){
-		
-			int allow_fasta_mmap = true;
-			MPI_Bcast(&allow_fasta_mmap, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int allow_fasta_mmap = false;
-			MPI_Bcast(&allow_fasta_mmap, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		
-		// Send the single_primer_pcr flag as an int
-		if(opt.single_primer_pcr){
-		
-			int single_primer_pcr = true;
-			MPI_Bcast(&single_primer_pcr, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int single_primer_pcr = false;
-			MPI_Bcast(&single_primer_pcr, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		
-		// Send the dangling base flags as ints
-		if(opt.allow_dangle_5){
-		
-			int dangle = true;
-			MPI_Bcast(&dangle, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int dangle = false;
-			MPI_Bcast(&dangle, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		
-		// Send the dangling base flags as ints
-		if(opt.allow_dangle_3){
-		
-			int dangle = true;
-			MPI_Bcast(&dangle, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int dangle = false;
-			MPI_Bcast(&dangle, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		
-		// Send the use_dinkelbach flag as an int
-		if(opt.use_dinkelbach){
-		
-			int use_dinkelbach = true;
-			MPI_Bcast(&use_dinkelbach, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int use_dinkelbach = false;
-			MPI_Bcast(&use_dinkelbach, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		
-		// Send the best_match flag as an int
-		if(opt.best_match){
-		
-			int best_match = true;
-			MPI_Bcast(&best_match, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-		else{
-			
-			int best_match = false;
-			MPI_Bcast(&best_match, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		}
-
-		MPI_Bcast(&opt.max_gap, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&opt.max_mismatch, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		// Broadcast the command line options to the worker nodes
+		broadcast(opt, mpi_rank, 0);
 		
 		// Send the database file to the worker nodes
 		if(seq_file.is_annot_format() == true){
@@ -545,9 +427,8 @@ int master(int argc, char *argv[])
 				// The number of queries to search
 				buffer[1] = num_query;
 				
-				// The database sequence to search. Search the sequences in order of
-				// their lengths (to aid in load balancing)
-				buffer[2] = seq_file.length_sorted_index(cur_target);
+				// The database sequence to search.
+				buffer[2] = cur_target;
 				
 				buffer[3] = cur_target_start;
 				
@@ -700,7 +581,7 @@ int master(int argc, char *argv[])
 		// Tell the workers to start sending back their results
 		int msg = SEARCH_COMPLETE;
 		
-		for(int j = 1;j < mpi_numtasks;j++){
+		for(int j = 1;j < mpi_numtasks;++j){
 
 			// I have observed LAM MPI hanging with the error:
 			// MPI_Ssend: internal MPI error: Bad address (rank 0, MPI_COMM_WORLD)
@@ -915,7 +796,8 @@ int master(int argc, char *argv[])
 				for(unsigned int i = 0;i < num_results;i++){
 
 					search_results.push_back( hybrid_sig() );
-					ptr = search_results.back().mpi_unpack(ptr);
+					//ptr = search_results.back().mpi_unpack(ptr);
+					ptr = mpi_unpack( ptr, search_results.back() );
 				}
 
 				delete [] buffer;

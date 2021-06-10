@@ -742,7 +742,7 @@ void distribute_queries(const vector<hybrid_sig> &m_sig)
 		
 	// Send all queries to all nodes
 	for(iter = m_sig.begin();iter != m_sig.end();iter++){
-		buffer_size += iter->mpi_size();
+		buffer_size += mpi_size(*iter);
 	}
 	
 	// Tell the workers the amount of memory to allocate
@@ -760,7 +760,7 @@ void distribute_queries(const vector<hybrid_sig> &m_sig)
 	ptr += sizeof(unsigned int);
 	
 	for(iter = m_sig.begin();iter != m_sig.end();iter++){
-		ptr = iter->mpi_pack(ptr);
+		ptr = mpi_pack(ptr, *iter);
 	}
 	
 	MPI_Bcast(buffer, buffer_size, MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -793,8 +793,7 @@ void receive_queries(vector<hybrid_sig> &m_sig)
 	m_sig = vector<hybrid_sig>(num_query);
 	
 	for(unsigned int i = 0;i < num_query;i++){
-		
-		ptr = m_sig[i].mpi_unpack(ptr);
+		ptr = mpi_unpack(ptr, m_sig[i]);
 	}
 	
 	delete  [] buffer;

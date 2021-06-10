@@ -1,6 +1,6 @@
 ![tntblast logo](https://github.com/jgans/thermonucleotideBLAST/blob/master/logo.png)
 
-# Current version is 2.192 (May 15, 2021)
+# Current version is 2.2 (May 27, 2021)
 # Overview
 ThermonucleotideBLAST is a software program for searching a target database of nucleic acid sequences using an assay-specific query. ThermonucleotideBLAST queries are based on biochemical assays (i.e. a pair of oligonucleotide sequences representing PCR primers or Padlock probes, a triplet of oligos representing PCR primers and a TaqMan probe or a single oligo representing a hybridization probe). Unlike existing programs (e.g. BLAST) which use heuristic measures of sequence similarity for identifying matches between a query and target sequence, ThermonucleotideBLAST uses physically relevant measures of sequence similarity -- free energy and melting temperature. For example, given a pair of PCR primers, a database of DNA targets and an annealing temperature, ThermonucleotideBLAST will return a list of predicted amplicons that will (ideally) match experimental PCR results. To enable searching of very large sequence databases (i.e. all of Genbank), ThermonucleotideBLAST can use run-time database and query segmentation to distribute the computational load across multiple CPUs.
 
@@ -114,7 +114,18 @@ The command line required to invoke ThermonucleotideBLAST varies depending on th
 `mpirun -np N [--hostfile my_hosts] ./tntblast <args>`
 
 where N is the number of CPUs to run on, my_hosts is an optional list of machine names and <args> are a list of command arguments that are passed to ThermonucleotideBLAST. ThermonucleotideBLAST employs a master/worker architecture that requires N >= 2.
-  
+
+## BLAST database searching
+
+If compiled with the NCBI BLAST+ libraries, ThermonucleotideBLAST can read BLAST-formatted nucleotide sequence databases. By default, the user-specified queries are searched against *all* sequences in the provided BLAST database. However, thanks to the NCBI BLAST+ implementation, it is now possible to [limit database searches by sequence accession or species-level NCBI taxonomic id](https://www.ncbi.nlm.nih.gov/books/NBK569846/). 
+- The `--blast-include` command-line flag accepts a single accession or NCBI TaxID value. All corresponding sequence entires in the database will be searched. This command-line argument can be reapeated multiple times.
+- The `--blast-exclude` command-line flag accepts a single accession or NCBI TaxID value. All corresponding sequence entires in the database will *not* be searched. This command-line argument can be reapeated multiple times.
+
+By default, the set of BLAST database sequences to select for searching is entire database.
+If one or more sequences are specified with the `--blast-include` command, then the search set is limited to these sequences. Then, if one more sequences are specified with the `--blast-exclude` command, then these excluded sequences are removed from the search set.
+
+Specifing an accession or taxonomic id that does not exist in the database will generate an error. Please note that taxonomic id values are currently required to be at, or below, species-level. Providing a higher level taxonomic id (e.g., genus-level) will generate an error.
+
 ## Example 1: Testing viral hemorrhagic fever virus assays from the literature
 
 In this example, we will computationally test the specificity of PCR and TaqMan PCR based hemorrhagic fever virus (HFV) detection assays obtained from the literature.

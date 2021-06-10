@@ -14,12 +14,11 @@ extern "C" {
 
 using namespace std;
 
-void program_options::parse_command_line(int argc, char *argv[])
+void Options::parse_command_line(int argc, char *argv[])
 {
-	
 	// Command line options:
 	// -i <input file of query oligos>
-	// [-o <output file>]
+	// -o <output file>
 	// -d <database of target sequences to search against>
 	// -D <local database of target sequences to search against>
 	// -l <maximum amplicon length>
@@ -71,6 +70,8 @@ void program_options::parse_command_line(int argc, char *argv[])
 	// --max-mismatch <number of mismatches> (maximum number of mismatches allowed in a DNA duplex)
 	// --rescale-ct <T|F> (Use of degenerate bases results in rescaling of oligo concentration)
 	// --best-match (Only report the best match, in Tm, between an assay and a target)
+	// --blast-include <Accession or NCBI TaxId to include from BLAST database>
+	// --blast-exclude <Accession or NCBI TaxId to exclude from BLAST database>
 
 	const char* options = "-i:o:d:D:l:e:E:z:Z:x:X:g:G:s:t:T:y:A:W:m:a:M:k:K:r:v:p:n:L:S:?h";
 	int config_opt = 0;
@@ -98,6 +99,8 @@ void program_options::parse_command_line(int argc, char *argv[])
 		{"max-mismatch", true, &config_opt, 19},
 		{"rescale-ct", true, &config_opt, 20},
 		{"best-match", false, &config_opt, 21},
+		{"blast-include", true, &config_opt, 22},
+		{"blast-exclude", true, &config_opt, 23},
 		{0,0,0,0} // Terminate options list
 	};
 
@@ -108,7 +111,7 @@ void program_options::parse_command_line(int argc, char *argv[])
 	
 	// If no command line arguments are specified, then print the command line usage
 	print_usage = (argc == 1);
-	
+
 	// Read the command line options
 	while( (opt_code = getopt_long( argc, argv, options, long_opts, &long_index) ) != EOF ){
 	
@@ -252,6 +255,20 @@ void program_options::parse_command_line(int argc, char *argv[])
 				if(config_opt == 21){
 				
 					best_match = true;
+					break;
+				}
+
+				// --blast-include
+				if(config_opt == 22){
+				
+					blast_include.push_back(optarg);
+					break;
+				}
+
+				// --blast-exclude
+				if(config_opt == 23){
+				
+					blast_exclude.push_back(optarg);
 					break;
 				}
 
@@ -404,117 +421,79 @@ void program_options::parse_command_line(int argc, char *argv[])
 		cerr << "J. D. Gans Los Alamos National Laboratory" << endl;
 		cerr << "Options:" << endl;
 		cerr << "-i <input file of query oligos>" << endl;
-		cerr << "[-o <output file>]" << endl;
-		cerr << "\tDefault is stdout" << endl;
+		cerr << "-o <output file> (default is stdout)" << endl;
 		cerr << "-d <database of target sequences to search against>" << endl;
 		cerr << "-D <local database of target sequences to search against>" << endl;
-		cerr << "-l <maximum amplicon length>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_LEN << " bases" << endl;
-		
+		cerr << "-l <maximum amplicon length> (default is " << DEFAULT_MAX_LEN << " bases)" << endl;
 		cerr << "-e <minimum primer Tm>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MIN_PRIMER_TM << " C" << endl;
 		cerr << "-E <minimum probe Tm>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MIN_PROBE_TM << " C" << endl;
-		
-		cerr << "-z <minimum primer delta G (in Kcal/Mol)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MIN_PRIMER_DG << endl;
-		cerr << "-Z <minimum probe delta G (in Kcal/Mol)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MIN_PROBE_DG << endl;
-		
-		cerr << "-x <maximum primer Tm>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_PRIMER_TM << " C" << endl;
-		cerr << "-X <maximum probe Tm>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_PROBE_TM << " C" << endl;
-		
-		cerr << "-g <maximum primer delta G (in Kcal/Mol)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_PRIMER_DG << endl;
-		cerr << "-G <maximum probe delta G(in Kcal/Mol)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_PROBE_DG << endl;
-		
-		cerr << "-s <salt concentration (in MOL)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_SALT << "M" << endl;
-		cerr << "-t <primer strand concentration (in MOL)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_PRIMER_STRAND << "M" << endl;
-		cerr << "-T <Probe strand concentration (in MOL)>" << endl;
-		cerr << "\tDefault is primer strand concentration" << endl;
-		cerr << "-y <ratio of forward/reverse strand concentrations>" << endl;
-		cerr << "\tDefault is 1.0 (i.e. symmetric)" << endl;
-		cerr << "-A [PCR | PROBE | PADLOCK | AFFY] (assay format)" << endl;
-		cerr << "\tDefault is PCR" << endl;
-		cerr << "-W [2-8] (hash word length)" << endl;
-		cerr << "\tDefault word length is 7" << endl;
+		cerr << "-z <minimum primer delta G (in Kcal/Mol)> (default is no limit)" << endl;
+		cerr << "-Z <minimum probe delta G (in Kcal/Mol)> (default is no limit)" << endl;
+		cerr << "-x <maximum primer Tm> (default is no limit)" << endl;
+		cerr << "-X <maximum probe Tm> (default is no limit)" << endl;
+		cerr << "-g <maximum primer delta G (in Kcal/Mol)> (default is no limit)" << endl;
+		cerr << "-G <maximum probe delta G(in Kcal/Mol)> (default is no limit)" << endl;
+		cerr << "-s <salt concentration (in MOL)> (default is " << DEFAULT_SALT << " M)" << endl;
+		cerr << "-t <primer strand concentration (in MOL)> (default is " << DEFAULT_PRIMER_STRAND << " M)" << endl;
+		cerr << "-T <Probe strand concentration (in MOL)> (default is " << DEFAULT_PROBE_STRAND << " M)" << endl;
+		cerr << "-y <ratio of forward/reverse strand concentrations> (default is 1, i.e. symmetric PCR)" << endl;
+		cerr << "-A <PCR | PROBE | PADLOCK | AFFY> (assay format, default is PCR)" << endl;
+		cerr << "-W <2-8> (hash word length, default is " << DEFAULT_HASH_WORD_SIZE << ")" << endl;
 		cerr << "-m <output format> " << endl;
-		cerr << "\t0 = verbose output file" << endl;
+		cerr << "\t0 = verbose output file (default)" << endl;
 		cerr << "\t1 = fasta output file" << endl;
 		cerr << "\t2 = network output files (*.atr and *.sif)" << endl;
 		cerr << "\t3 = \"inverse target\" (targets that *don't* match any query)" << endl;
 		cerr << "\t4 = \"inverse query\" (queries that *don't* match any target)" << endl;
-		cerr << "\tDefault is 0" << endl;
-		cerr << "-a <T|F> (show alignments)" << endl;
-		cerr << "\tDefault is T (i.e. true)" << endl;
-		cerr << "-M <T|F> (show matching sequence)" << endl;
-		cerr << "\tDefault is T (i.e. true)" << endl;
-		cerr << "-k <T|F> (Mask primer binding sites)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-K <T|F> (Mask probe binding sites)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-r <T|F> (Replace primer binding sites w/ primer sequence)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-v <T|F> (Disable verbose terminal output)" << endl;
-		cerr << "\tDefault is T (i.e. true)" << endl;
-		cerr << "-p <T|F> (Ignore all probe oligos in inputfile)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-n <T|F>(One output file per query)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-L <T|F> (Append assay name to output defline)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-S <T|F> (Ouput assay summary after searching)" << endl;
-		cerr << "\tDefault is F (i.e. false)" << endl;
-		cerr << "-[?|h] (Help)" << endl;
-		cerr << "--fasta-mmap <T|F> (Allow memory mapping of fasta files)" << endl;
-		cerr << "\tDefault is true (i.e. mmap *is* enabled)" << endl;
-		cerr << "--primer-clamp <number of exact 3' primer matches requried>" << endl;
-		cerr << "\tDefault is " << DEFAULT_PRIMER_CLAMP << " bases" << endl;
-		cerr << "--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried>" << endl;
-		cerr << "\tBy default, this test is not applied" << endl;
-		cerr << "--probe-clamp5 <number of exact 5' probe matches requried>" << endl;
-		cerr << "\tDefault is " << DEFAULT_PROBE_CLAMP_5 << " bases" << endl;
-		cerr << "--probe-clamp3 <number of exact 3' probe matches requried>" << endl;
-		cerr << "\tDefault is " << DEFAULT_PROBE_CLAMP_3 << " bases" << endl;
-		
-		cerr << "--dangle5 <T|F> (Allow dangling bases on the 5' query side of an alignment)" << endl;
-		cerr << "\tDefault is " << (DEFAULT_DANGLE_5 ? "true" : "false") << endl;
-		cerr << "--dangle3 <T|F> (Allow dangling bases on the 3' query side of an alignment)" << endl;
-		cerr << "\tDefault is " << (DEFAULT_DANGLE_3 ? "true" : "false") << endl;
-		
-		cerr << "--plex <T|F> (All input assays in a single multiple reaction)" << endl;
-		cerr << "\tDefault is false" << endl;
-		cerr << "--temperature <temperature for computing Delta G (in Kelvin)>" << endl;
-		cerr << "\tDefault is " << DEFAULT_TARGET_T << endl;
-		cerr << "--single-primer-pcr <T|F> (Allow amplicons produced by a single PCR primer" << endl;
-		cerr << "\tbinding in both forward and reverse orientation)" << endl;
-		cerr << "\tDefault is true" << endl;
-		cerr << "--target-strand <plus|minus|both> (which strand to target with probes)" << endl;
-		cerr << "\tDefault is both" << endl;
-		cerr << "--max-target-len <max len> (max sequence length before targets are split)" << endl;
-		cerr << "\tDefault is " << DEFAULT_FRAGMENT_TARGET_LENGTH << " bases" << endl;
-		cerr << "--query-seg <always | never | adaptive> (query segmentation algorithm)" << endl;
-		cerr << "\tDefault is \"adaptive\"" << endl;
-		cerr << "--dump-query <T|F> (write queries to stdout)" << endl;
-		cerr << "\tDefault is false" << endl;
-		cerr << "--dinkelbach <T|F> (Use the Dinkelbach fractional programming algorithm)" << endl;
-		cerr << "\tDefault is false" << endl;
-		cerr << "--max-gap <number of gaps> (Max number of allowed gaps in a DNA duplex)" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_GAP<< endl;
-		cerr << "--max-mismatch <number of mismatches> (Max number of allowed mismatches in a DNA duplex)" << endl;
-		cerr << "\tDefault is " << DEFAULT_MAX_MISMATCH<< endl;
-		cerr << "--rescale-ct <T|F> (Use of degenerate bases results in rescaling of oligo concentration)" << endl;
-		cerr << "\tDefault is " << (DEFAULT_RESCALE_CT ? "true" : "false") << endl;
+		cerr << "-a <T|F> (show alignments, default is T)" << endl;
+		cerr << "-M <T|F> (show matching sequence, default is T)" << endl;
+		cerr << "-k <T|F> (Mask primer binding sites, default is F)" << endl;
+		cerr << "-K <T|F> (Mask probe binding sites, default is F)" << endl;
+		cerr << "-r <T|F> (Replace primer binding sites w/ primer sequence, default is F)" << endl;
+		cerr << "-v <T|F> (Disable verbose terminal output, default is T)" << endl;
+		cerr << "-p <T|F> (Ignore all probe oligos in inputfile, default is F)" << endl;
+		cerr << "-n <T|F>(One output file per query, default is F)" << endl;
+		cerr << "-L <T|F> (Append assay name to output defline, default is F)" << endl;
+		cerr << "-S <T|F> (Ouput assay summary after searching, default is F)" << endl;
+		cerr << "-h|-? (Command-line usage)" << endl;
+		cerr << "--fasta-mmap <T|F> (Allow memory mapping of fasta files, default is T)" << endl;
+		cerr << "--primer-clamp <number of exact 3' primer matches requried> (default is " 
+			<< DEFAULT_PRIMER_CLAMP << " bases)" << endl;
+		cerr << "--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried> (default is no limit)" << endl;
+		cerr << "--probe-clamp5 <number of exact 5' probe matches requried> (default is " 
+			<< DEFAULT_PROBE_CLAMP_5 << " bases)" << endl;
+		cerr << "--probe-clamp3 <number of exact 3' probe matches requried> (default is " 
+			<< DEFAULT_PROBE_CLAMP_3 << " bases)" << endl;
+		cerr << "--dangle5 <T|F> (Allow dangling bases on the 5' query side of an alignment, default is "
+			<< (DEFAULT_DANGLE_5 ? "T" : "F") << ")" << endl;
+		cerr << "--dangle3 <T|F> (Allow dangling bases on the 3' query side of an alignment, default is "
+			 << (DEFAULT_DANGLE_3 ? "T" : "F") << ")" << endl;
+		cerr << "--plex <T|F> (All input assays in a single multiple reaction, default is F)" << endl;
+		cerr << "--temperature <temperature for computing Delta G (in Kelvin)> (default is " 
+			<< DEFAULT_TARGET_T << " C)" << endl;
+		cerr << "--single-primer-pcr <T|F> (Allow amplicons produced by a single PCR primer binding in both forward and reverse orientation, default is T)" << endl;
+		cerr << "--target-strand <plus|minus|both> (which strand to target with probes, default is \"both\")" << endl;
+		cerr << "--max-target-len <max len> (max sequence length before targets are split, default is " 
+			<< DEFAULT_FRAGMENT_TARGET_LENGTH << " bases)" << endl;
+		cerr << "--query-seg <always | never | adaptive> (query segmentation algorithm, default is \"adaptive\")" << endl;
+		cerr << "--dump-query <T|F> (write queries to stdout, default is F)" << endl;
+		cerr << "--dinkelbach <T|F> (Use the Dinkelbach fractional programming algorithm, default is F)" << endl;
+		cerr << "--max-gap <number of gaps> (Max number of allowed gaps in a DNA duplex, default is " 
+			<< DEFAULT_MAX_GAP << ")" << endl;
+		cerr << "--max-mismatch <number of mismatches> (Max number of allowed mismatches in a DNA duplex, default is "
+			<< DEFAULT_MAX_MISMATCH << ")" << endl;
+		cerr << "--rescale-ct <T|F> (Use of degenerate bases results in rescaling of oligo concentration, default is "
+			<< (DEFAULT_RESCALE_CT ? "T" : "F") << ")" << endl;
 		cerr << "--best-match (Only save the best match, in Tm, between a query and target)" << endl;
+
+		#ifdef USE_BLAST_DB
+		cerr << "--blast-include <Limit search to include accessions or NCBI TaxIds from a BLAST database> (may be repeated)" << endl;
+		cerr << "--blast-exclude <Limit search to exclude accessions or NCBI TaxId from a BLAST database> (may be repeated)" << endl;
+		#endif // USE_BLAST_DB
 	}
 }
 
-unsigned int program_options::parse_assay_format(string m_opt)
+unsigned int Options::parse_assay_format(string m_opt)
 {
 
 	for(string::iterator i = m_opt.begin();i != m_opt.end();i++){
@@ -541,7 +520,7 @@ unsigned int program_options::parse_assay_format(string m_opt)
 	return ASSAY_NONE;
 }
 
-void program_options::validate_parameters()
+void Options::validate_parameters()
 {
 	if( (dbase_filename == "") && (local_dbase_filename == "") ){
 		throw "Unable to read either dbase or local_dbase";
@@ -690,7 +669,7 @@ void program_options::validate_parameters()
 	}
 }
 
-void program_options::parse_output_file(const string &m_format)
+void Options::parse_output_file(const string &m_format)
 {
 	const int opt = atoi( m_format.c_str() );
 
@@ -723,7 +702,7 @@ void program_options::parse_output_file(const string &m_format)
 	};
 }
 
-bool program_options::parse_bool(string m_opt)
+bool Options::parse_bool(string m_opt)
 {
 	// Make the input string upper case
 	for(string::iterator i = m_opt.begin();i != m_opt.end();i++){
@@ -743,7 +722,7 @@ bool program_options::parse_bool(string m_opt)
 	return false;
 }
 
-int program_options::parse_strand(string m_opt)
+int Options::parse_strand(string m_opt)
 {
 	// Make the input string upper case
 	for(string::iterator i = m_opt.begin();i != m_opt.end();i++){
@@ -771,7 +750,7 @@ int program_options::parse_strand(string m_opt)
 	throw "Unknown target-strand option";
 }
 
-int program_options::parse_query_seg(string m_opt)
+int Options::parse_query_seg(string m_opt)
 {
 	// Make the input string upper case
 	for(string::iterator i = m_opt.begin();i != m_opt.end();i++){
@@ -803,7 +782,7 @@ int program_options::parse_query_seg(string m_opt)
 
 }
 
-size_t program_options::max_product_length() const
+size_t Options::max_product_length() const
 {
 	size_t ret = 0;
 	
@@ -847,7 +826,7 @@ size_t program_options::max_product_length() const
 	return ret;
 }
 
-void program_options::validate_search_threshold()
+void Options::validate_search_threshold()
 {	
 	// Make sure that the user has specific a threshold that is appropriate to 
 	// the assay format
@@ -907,7 +886,7 @@ void program_options::validate_search_threshold()
 	};
 }
 
-void program_options::write_queries(std::ostream &s)
+void Options::write_queries(std::ostream &s)
 {
 
 	vector<hybrid_sig>::const_iterator iter;
@@ -929,7 +908,7 @@ void program_options::write_queries(std::ostream &s)
 	}
 }
 
-ostream& operator << (ostream &s, const program_options &m_opt)
+ostream& operator << (ostream &s, const Options &m_opt)
 {
 	
 	s << "Found " << m_opt.sig_list.size() << " query assays" << endl;

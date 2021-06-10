@@ -42,7 +42,8 @@
 
 #define	DEFAULT_MELT_PARAM 						NucCruc::SANTA_LUCIA
 #define	DEFAULT_SALT							50.0e-3f	// Moles
-#define	DEFAULT_PRIMER_STRAND					900.0e-9f // Moles
+#define	DEFAULT_PRIMER_STRAND					9.0e-7f // Moles
+#define	DEFAULT_PROBE_STRAND					2.5e-7f // Moles
 #define	DEFAULT_TARGET_T						310.15f	// Kelvin
 
 #define	DEFAULT_ASSAY_FORMAT					ASSAY_PCR
@@ -89,7 +90,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.192 (May 15, 2021)"
+#define		TNTBLAST_VERSION		"2.2 (May 28, 2021)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"

@@ -12,8 +12,20 @@
 
 using namespace std;
 
-void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mmap,
-	const bool &m_sort_by_len)
+// Does the input string only contains digits?
+inline bool is_number(const string &m_str)
+{
+	for(string::const_iterator i = m_str.begin();i != m_str.end();++i){
+		if( !isdigit(*i) ){
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void sequence_data::open(const string &m_filename, const vector<string> &m_blast_include,
+	const vector<string> &m_blast_exclude, const bool &m_allow_fasta_mmap)
 {
 	#ifdef USE_BLAST_DB
 
@@ -28,22 +40,199 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 
 		format = NCBI;
 
-		const size_t num_seq = size();
+		deque<string> accession_include;
+		deque<string> accession_exclude;
 
-		seq_length.resize(num_seq);
+		set<NCBI_NS_NCBI::TTaxId> taxid_include;
+		set<NCBI_NS_NCBI::TTaxId> taxid_exclude;
 
-		for(size_t i = 0;i < num_seq;i++){
+		// The m_blast_include and m_blast_exclude vectors can contain either accessions or
+		// taxid values (stored as strings). If only numbers appear in the string, then we
+		// assume that the value refers to a TaxId.
+		for(vector<string>::const_iterator i = m_blast_include.begin();i != m_blast_include.end();++i){
+
+			if( is_number(*i) ){
+				taxid_include.insert( atoi( i->c_str() ) );
+			}
+			else{
+				accession_include.push_back(*i);
+			}
+		}
+
+		for(vector<string>::const_iterator i = m_blast_exclude.begin();i != m_blast_exclude.end();++i){
+
+			if( is_number(*i) ){
+				taxid_exclude.insert( atoi( i->c_str() ) );
+			}
+			else{
+				accession_exclude.push_back(*i);
+			}
+		}
+
+		// How can we transparantly restrict the database search by TaxIDs that are *above* the
+		// level of species? See the error below:
+		// 		BLAST Database error: Taxonomy ID(s) not found. This could be because the ID(s) provided are 
+		// 		not at or below the species level. Please use get_species_taxids.sh to get taxids for nodes 
+		// 		higher than species (see https://www.ncbi.nlm.nih.gov/books/NBK546209/).
+
+		deque<unsigned int> oid_include;
+		deque<unsigned int> oid_exclude;
+
+		// For the specified *included* accessions, compute the corresponding OID values
+		for(deque<string>::const_iterator i = accession_include.begin();i != accession_include.end();++i){
+
+			vector<int> oid;
+
+			try{
+
+				blast_db_ptr->AccessionToOids(*i, oid);
+
+				if( oid.empty() ){
+					throw;
+				}
+			}
+			catch(...){
+
+				cerr << "Unable to find accession " << *i << " in BLAST database" << endl;
+				throw "Unable to find an included accession in BLAST database";
+			}
+
+			for(vector<int>::const_iterator j = oid.begin();j != oid.end();++j){
+
+				// Make sure we can convert from int -> unsigned int
+				if(*j < 0){
+					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+				}
+
+				oid_include.push_back(*j);
+			}
+		}
+
+		// For the specified *excluded* accessions, compute the corresponding OID values
+		for(deque<string>::const_iterator i = accession_exclude.begin();i != accession_exclude.end();++i){
+
+			vector<int> oid;
+
+			try{
+
+				blast_db_ptr->AccessionToOids(*i, oid);
+
+				if( oid.empty() ){
+					throw;
+				}
+			}
+			catch(...){
+
+				cerr << "Unable to find accession " << *i << " in BLAST database" << endl;
+				throw "Unable to find an excluded accession in BLAST database";
+			}
+
+			for(vector<int>::const_iterator j = oid.begin();j != oid.end();++j){
+
+				// Make sure we can convert from int -> unsigned int
+				if(*j < 0){
+					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+				}
+
+				oid_exclude.push_back(*j);
+			}
+		}
+
+		// For the specified *included* TaxIDs, compute the corresponding OID values
+		if( !taxid_include.empty() ){
+
+			vector< NCBI_NS_NCBI::blastdb::TOid > tmp;
+
+			try{
+				blast_db_ptr->TaxIdsToOids(taxid_include, tmp);
+			}
+			catch(exception &error){
+
+				cerr << error.what() << endl;
+				throw "Unable to find an included TaxID in BLAST database";
+			}
+
+			for(vector< NCBI_NS_NCBI::blastdb::TOid >::const_iterator i = tmp.begin();i != tmp.end();++i){
+
+				// Make sure we can convert from int -> unsigned int
+				if(*i < 0){
+					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+				}
+
+				oid_include.push_back(*i);
+			}
+		}
+
+		// For the specified *excluded* TaxIDs, compute the corresponding OID values
+		if( !taxid_exclude.empty() ){
+
+			vector< NCBI_NS_NCBI::blastdb::TOid > tmp;
+
+			try{
+				blast_db_ptr->TaxIdsToOids(taxid_exclude, tmp);
+			}
+			catch(exception &error){
+
+				cerr << error.what() << endl;
+				throw "Unable to find an excluded TaxID in BLAST database";
+			}
+
+			for(vector< NCBI_NS_NCBI::blastdb::TOid >::const_iterator i = tmp.begin();i != tmp.end();++i){
+
+				// Make sure we can convert from int -> unsigned int
+				if(*i < 0){
+					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+				}
+
+				oid_exclude.push_back(*i);
+			}
+		}
+
+		// Make the oid values to include and exclude unique. We could have used std::set, but
+		// wanted to be prepared for the case when we have huge numbers of unique OID values
+		// to process.
+		sort( oid_include.begin(), oid_include.end() );
+		oid_include.erase( unique( oid_include.begin(), oid_include.end() ), oid_include.end() );
+
+		sort( oid_exclude.begin(), oid_exclude.end() );
+		oid_exclude.erase( unique( oid_exclude.begin(), oid_exclude.end() ), oid_exclude.end() );
+
+		const unsigned int num_seq = blast_db_ptr->GetNumSeqs();
+
+		seq_length.reserve(num_seq);
+
+		for(unsigned int i = 0;i < num_seq;i++){
+
+			if( !oid_include.empty() ){
+
+				deque<unsigned int>::const_iterator iter = 
+					lower_bound(oid_include.begin(), oid_include.end(), i);
+
+				if( (iter == oid_include.end() ) || (*iter != i) ){
+
+					// Skip OIDs that are *not* in the include list
+					continue;
+				}
+			}
+
+			if( !oid_exclude.empty() ){
+
+				deque<unsigned int>::const_iterator iter = 
+					lower_bound(oid_exclude.begin(), oid_exclude.end(), i);
+
+				if( (iter != oid_exclude.end() ) && (*iter == i) ){
+
+					// Skip OIDs that *are* the exclude list
+					continue;
+				}
+			}
 
 			// Don't use readdb_get_sequence_length -- it's too slow on large databases
 			const unsigned int seq_len = blast_db_ptr->GetSeqLengthApprox(i);
 
-			seq_length[i] = make_pair(seq_len, i);
+			seq_length.push_back( make_pair(seq_len, i) );
 		}
-		
-		if(m_sort_by_len == true){
-			sort( seq_length.begin(), seq_length.end(), sequence_order() );
-		}
-		
+
 		return;
 	}
 	catch(...){
@@ -55,26 +244,26 @@ void sequence_data::open(const string &m_filename, const bool &m_allow_fasta_mma
 	switch( file_type(m_filename) ){
 	
 		case DNAMol::FASTA:
-			load_fasta(m_filename, m_sort_by_len, m_allow_fasta_mmap);
+			load_fasta(m_filename, m_allow_fasta_mmap);
 			return;
 		case DNAMol::FASTQ:
-			load_fastq(m_filename, m_sort_by_len, m_allow_fasta_mmap);
+			load_fastq(m_filename, m_allow_fasta_mmap);
 			return;
 		case DNAMol::GBK:
-			load_gbk(m_filename, m_sort_by_len);
+			load_gbk(m_filename);
 			return;
 		case DNAMol::EMBL:
-			load_embl(m_filename, m_sort_by_len);
+			load_embl(m_filename);
 			return;
 		case DNAMol::GFF3:
-			load_gff3(m_filename, m_sort_by_len);
+			load_gff3(m_filename);
 			return;
 		case DNAMol::PTT:
 			throw "The PTT file format is not currently supported";
-			//load_ptt(m_filename, m_sort_by_len);
+			//load_ptt(m_filename);
 			return;
 		default:
-			throw "File not found or unrecognized file type (not fasta, gbk, ptt or embl)";
+			throw "File not found, unrecognized file type, or error reading BLAST database";
 	};
 }
 
@@ -123,7 +312,6 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 	const unsigned int &m_index, const unsigned int &m_start, 
 	const unsigned int &m_stop) const
 {
-
 	unsigned int seq_len = 0;
 	
 	switch(format){
@@ -251,8 +439,16 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 }
 
 unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq, 
-	const unsigned int &m_index, const int &m_start, const int &m_stop) const
+	unsigned int m_index, const int &m_start, const int &m_stop) const
 {
+
+	// Map the sequence index to the OID of the BLAST database
+	if( m_index > seq_length.size() ){
+		throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Error looking up BLAST OID";
+	}
+
+	m_index = seq_length[m_index].second;
+
 	unsigned int seq_len = 0;
 
 	// Read this sequence from the database file. The "omp critical"
@@ -511,16 +707,7 @@ size_t sequence_data::size() const
 		case FASTQ_SLOW:
 			return seq_index.size();
 		case NCBI:
-			#ifdef USE_BLAST_DB
-			{
-				if(!blast_db_ptr){
-					throw __FILE__ ":sequence_data::size: NCBI database is not open";
-				}
-				
-				return size_t( blast_db_ptr->GetNumSeqs() );
-			}
-			#endif // USE_BLAST_DB
-			
+			return seq_length.size();
 			return 0;
 		case REMOTE:
 			throw __FILE__ ":sequence_data::size: size is not defined for remote databases";

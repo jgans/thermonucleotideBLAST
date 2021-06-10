@@ -8,6 +8,8 @@
 #include <vector>
 #include <sstream>
 
+#include "mpi_util.h"
+
 // The symbol defined by COMMENT_SYMBOL is used to comment out
 // lines in the assya input file
 #define	COMMENT_SYMBOL						'#'
@@ -15,15 +17,14 @@
 // What assay are we simulating?
 enum {ASSAY_PCR, ASSAY_PROBE, ASSAY_PADLOCK, ASSAY_AFFYMETRIX, ASSAY_NONE};
 
+// We need to protect any commas that appear in template variables
+// if we are going to combine them with X Macros
+#define SINGLE_ARG(...) __VA_ARGS__
+
 // A class for storing hybridization signatures
 class hybrid_sig {
 
 	private:
-		int id; // An identifier that is unique to an assay
-		int degen_id; // An identifier that is unique to the assays generated 
-					  // by the expansion of degenerate assays. If an assay does not
-					  // contain any degeneracy, then degen_id == id.
-		int seq_index; // The sequence index that was matched by this record
 		
 		inline int def_to_gi(const std::string &m_defline) const
 		{
@@ -54,6 +55,58 @@ class hybrid_sig {
 		// the reverse strand
 		enum {PLUS = 0, MINUS};
 		
+		// Use X Macros (https://en.wikipedia.org/wiki/X_Macro) to 
+		// ensure that structure variable are correctly serialized.
+		#define HYBRID_SIG_MEMBERS \
+			VARIABLE(std::string, name) \
+			VARIABLE(std::string, forward_oligo) \
+			VARIABLE(std::string, reverse_oligo) \
+			VARIABLE(std::string, probe_oligo) \
+			VARIABLE(std::string, amplicon_def) \
+			VARIABLE(std::string, amplicon) \
+			VARIABLE(std::string, forward_align) \
+			VARIABLE(std::string, reverse_align) \
+			VARIABLE(std::string, probe_align) \
+			VARIABLE(SINGLE_ARG(std::pair<int, int>), amplicon_range) \
+			VARIABLE(SINGLE_ARG(std::pair<int, int>), probe_range) \
+			VARIABLE(int, id) \
+			VARIABLE(int, degen_id) \
+			VARIABLE(int, seq_index) \
+			VARIABLE(float, forward_tm) \
+			VARIABLE(float, reverse_tm) \
+			VARIABLE(float, probe_tm) \
+			VARIABLE(float, forward_hairpin_tm) \
+			VARIABLE(float, reverse_hairpin_tm) \
+			VARIABLE(float, forward_dimer_tm) \
+			VARIABLE(float, reverse_dimer_tm) \
+			VARIABLE(float, primer_dimer_tm) \
+			VARIABLE(float, probe_hairpin_tm) \
+			VARIABLE(float, probe_dimer_tm) \
+			VARIABLE(float, forward_dH) \
+			VARIABLE(float, forward_dS) \
+			VARIABLE(float, reverse_dH) \
+			VARIABLE(float, reverse_dS) \
+			VARIABLE(float, probe_dH) \
+			VARIABLE(float, probe_dS) \
+			VARIABLE(int, primer_strand) \
+			VARIABLE(int, probe_strand) \
+			VARIABLE(int, forward_primer_clamp) \
+			VARIABLE(int, reverse_primer_clamp) \
+			VARIABLE(int, forward_degen) \
+			VARIABLE(int, reverse_degen) \
+			VARIABLE(int, probe_degen) \
+			VARIABLE(int, forward_mm) \
+			VARIABLE(int, forward_gap) \
+			VARIABLE(int, reverse_mm) \
+			VARIABLE(int, reverse_gap) \
+			VARIABLE(int, probe_mm) \
+			VARIABLE(int, probe_gap) \
+			VARIABLE(float, ct)
+
+		#define VARIABLE(A, B) A B;
+			HYBRID_SIG_MEMBERS
+		#undef VARIABLE
+
 		hybrid_sig() // default constructor
 		{
 			id = degen_id = -1;
@@ -273,412 +326,6 @@ class hybrid_sig {
 		~hybrid_sig()
 		{
 			// Do nothing!
-		};
-		
-		std::string name;
-		std::string forward_oligo;
-		std::string reverse_oligo;
-		std::string probe_oligo;
-		
-		std::string amplicon_def;
-		std::string amplicon;
-		
-		std::string forward_align;
-		std::string reverse_align;
-		std::string probe_align;
-		
-		std::pair<int, int> amplicon_range;
-		std::pair<int, int> probe_range;
-		
-		float forward_tm;
-		float reverse_tm;
-		float probe_tm;
-		
-		float forward_hairpin_tm;
-		float reverse_hairpin_tm;
-		float forward_dimer_tm;
-		float reverse_dimer_tm;
-		float primer_dimer_tm;
-		float probe_hairpin_tm;
-		float probe_dimer_tm;
-		
-		float forward_dH;
-		float forward_dS;
-		
-		float reverse_dH;
-		float reverse_dS;
-		
-		float probe_dH;
-		float probe_dS;
-		
-		int primer_strand;
-		int probe_strand;
-		
-		// The smallest number of exact 3' matches for the forward
-		// and reverse primer
-		int forward_primer_clamp;
-		int reverse_primer_clamp;
-		
-		// The level of degeneracy for each assay oligo
-		int forward_degen;
-		int reverse_degen;
-		int probe_degen;
-		
-		// Mismatch and gap values for each oligo
-		int forward_mm;
-		int forward_gap;
-		int reverse_mm;
-		int reverse_gap;
-		int probe_mm;
-		int probe_gap;
-		
-		// The cycle threshold value for real-time PCR
-		float ct;
-		
-		inline size_t mpi_size() const
-		{
-			return 	sizeof(id) + sizeof(degen_id) + 
-					sizeof(seq_index) +
-					name.size() + 1 + // Include '\0'
-					forward_oligo.size() + 1 + // Include '\0'
-					reverse_oligo.size() + 1 + // Include '\0'
-					probe_oligo.size() + 1 + // Include '\0'
-					amplicon_def.size() + 1 + // Include '\0'
-					amplicon.size() + 1 + // Include '\0'
-					forward_align.size() + 1 + // Include '\0'
-					reverse_align.size() + 1 + // Include '\0'
-					probe_align.size() + 1	+ // Include '\0'
-					2*sizeof(int) +	// amplicon_range
-					2*sizeof(int) +	// probe_range
-					3*sizeof(float) + // forward, reverse and probe Tms
-					7*sizeof(float) + // oligo dimer and hairpin Tms
-					6*sizeof(float) + // forward, reverse and probe dH and dS
-					sizeof(primer_strand) +
-					sizeof(probe_strand) +
-					sizeof(forward_primer_clamp) +
-					sizeof(reverse_primer_clamp) +
-					3*sizeof(int) +	// The assay oligo degeneracy levels
-					6*sizeof(int) + // The mismatch and gap parameters
-					sizeof(float); // Ct
-		
-		};
-		
-		inline unsigned char* mpi_pack(unsigned char* m_ptr) const
-		{
-			memcpy( m_ptr, &id, sizeof(id) );
-			m_ptr += sizeof(id);
-			
-			memcpy( m_ptr, &degen_id, sizeof(degen_id) );
-			m_ptr += sizeof(degen_id);
-
-			memcpy( m_ptr, &seq_index, sizeof(seq_index) );
-			m_ptr += sizeof(seq_index);
-			
-			memcpy( m_ptr, name.c_str(), name.size() + 1 );
-			m_ptr += name.size() + 1;
-			
-			memcpy( m_ptr, forward_oligo.c_str(), forward_oligo.size() + 1 );
-			m_ptr += forward_oligo.size() + 1;
-			
-			memcpy( m_ptr, reverse_oligo.c_str(), reverse_oligo.size() + 1 );
-			m_ptr += reverse_oligo.size() + 1;
-			
-			memcpy( m_ptr, probe_oligo.c_str(), probe_oligo.size() + 1 );
-			m_ptr += probe_oligo.size() + 1;
-			
-			memcpy( m_ptr, amplicon_def.c_str(), amplicon_def.size() + 1 );
-			m_ptr += amplicon_def.size() + 1;
-			
-			memcpy( m_ptr, amplicon.c_str(), amplicon.size() + 1 );
-			m_ptr += amplicon.size() + 1;
-			
-			memcpy( m_ptr, forward_align.c_str(), forward_align.size() + 1 );
-			m_ptr += forward_align.size() + 1;
-			
-			memcpy( m_ptr, reverse_align.c_str(), reverse_align.size() + 1 );
-			m_ptr += reverse_align.size() + 1;
-			
-			memcpy( m_ptr, probe_align.c_str(), probe_align.size() + 1 );
-			m_ptr += probe_align.size() + 1;
-			
-			memcpy( m_ptr, &(amplicon_range.first), sizeof(int) );
-			m_ptr += sizeof(amplicon_range.first);
-			
-			memcpy( m_ptr, &(amplicon_range.second), sizeof(int) );
-			m_ptr += sizeof(amplicon_range.second);
-			
-			memcpy( m_ptr, &(probe_range.first), sizeof(int) );
-			m_ptr += sizeof(probe_range.first);
-			
-			memcpy( m_ptr, &(probe_range.second), sizeof(int) );
-			m_ptr += sizeof(probe_range.second);
-			
-			///////////////////////////////////////////////////
-			// Melting temperatures
-			memcpy( m_ptr, &forward_tm, sizeof(forward_tm) );
-			m_ptr += sizeof(forward_tm);
-			
-			memcpy( m_ptr, &reverse_tm, sizeof(reverse_tm) );
-			m_ptr += sizeof(reverse_tm);
-			
-			memcpy( m_ptr, &probe_tm, sizeof(probe_tm) );
-			m_ptr += sizeof(probe_tm);
-			
-			///////////////////////////////////////////////////
-			// Dimer and hairpin melting temperatures
-			memcpy( m_ptr, &forward_hairpin_tm, sizeof(forward_hairpin_tm) );
-			m_ptr += sizeof(forward_hairpin_tm);
-			
-			memcpy( m_ptr, &reverse_hairpin_tm, sizeof(reverse_hairpin_tm) );
-			m_ptr += sizeof(reverse_hairpin_tm);
-			
-			memcpy( m_ptr, &forward_dimer_tm, sizeof(forward_dimer_tm) );
-			m_ptr += sizeof(forward_dimer_tm);
-			
-			memcpy( m_ptr, &reverse_dimer_tm, sizeof(reverse_dimer_tm) );
-			m_ptr += sizeof(reverse_dimer_tm);
-			
-			memcpy( m_ptr, &primer_dimer_tm, sizeof(primer_dimer_tm) );
-			m_ptr += sizeof(primer_dimer_tm);
-			
-			memcpy( m_ptr, &probe_hairpin_tm, sizeof(probe_hairpin_tm) );
-			m_ptr += sizeof(probe_hairpin_tm);
-			
-			memcpy( m_ptr, &probe_dimer_tm, sizeof(probe_dimer_tm) );
-			m_ptr += sizeof(probe_dimer_tm);
-			
-			///////////////////////////////////////////////////
-			// Thermodynamic parameters
-			memcpy( m_ptr, &forward_dH, sizeof(forward_dH) );
-			m_ptr += sizeof(forward_dH);
-			
-			memcpy( m_ptr, &forward_dS, sizeof(forward_dS) );
-			m_ptr += sizeof(forward_dS);
-			
-			memcpy( m_ptr, &reverse_dH, sizeof(reverse_dH) );
-			m_ptr += sizeof(reverse_dH);
-			
-			memcpy( m_ptr, &reverse_dS, sizeof(reverse_dS) );
-			m_ptr += sizeof(reverse_dS);
-			
-			memcpy( m_ptr, &probe_dH, sizeof(probe_dH) );
-			m_ptr += sizeof(probe_dH);
-			
-			memcpy( m_ptr, &probe_dS, sizeof(probe_dS) );
-			m_ptr += sizeof(probe_dS);
-			
-			///////////////////////////////////////////////////
-			// Strand concentrations
-			memcpy( m_ptr, &primer_strand, sizeof(primer_strand) );
-			m_ptr += sizeof(primer_strand);
-			
-			memcpy( m_ptr, &probe_strand, sizeof(probe_strand) );
-			m_ptr += sizeof(probe_strand);
-			
-			///////////////////////////////////////////////////
-			// Clamp values
-			memcpy( m_ptr, &forward_primer_clamp, sizeof(forward_primer_clamp) );
-			m_ptr += sizeof(forward_primer_clamp);
-			
-			memcpy( m_ptr, &reverse_primer_clamp, sizeof(reverse_primer_clamp) );
-			m_ptr += sizeof(reverse_primer_clamp);
-			
-			///////////////////////////////////////////////////
-			// Degeneracy levels
-			memcpy( m_ptr, &forward_degen, sizeof(forward_degen) );
-			m_ptr += sizeof(forward_degen);
-
-			memcpy( m_ptr, &reverse_degen, sizeof(reverse_degen) );
-			m_ptr += sizeof(reverse_degen);
-
-			memcpy( m_ptr, &probe_degen, sizeof(probe_degen) );
-			m_ptr += sizeof(probe_degen);
-
-			///////////////////////////////////////////////////
-			// Mismatch and gap parameters
-			memcpy( m_ptr, &forward_mm, sizeof(forward_mm) );
-			m_ptr += sizeof(forward_mm);
-			
-			memcpy( m_ptr, &forward_gap, sizeof(forward_gap) );
-			m_ptr += sizeof(forward_gap);
-			
-			memcpy( m_ptr, &reverse_mm, sizeof(reverse_mm) );
-			m_ptr += sizeof(reverse_mm);
-			
-			memcpy( m_ptr, &reverse_gap, sizeof(reverse_gap) );
-			m_ptr += sizeof(reverse_gap);
-			
-			memcpy( m_ptr, &probe_mm, sizeof(probe_mm) );
-			m_ptr += sizeof(probe_mm);
-			
-			memcpy( m_ptr, &probe_gap, sizeof(probe_gap) );
-			m_ptr += sizeof(probe_gap);
-			
-			///////////////////////////////////////////////////
-			// Ct
-			memcpy( m_ptr, &ct, sizeof(ct) );
-			m_ptr += sizeof(ct);
-			
-			return m_ptr;
-		};
-		
-		inline unsigned char* mpi_unpack(unsigned char* m_ptr)
-		{
-			memcpy( &id, m_ptr, sizeof(id) );
-			m_ptr += sizeof(id);
-
-			memcpy( &degen_id, m_ptr, sizeof(degen_id) );
-			m_ptr += sizeof(degen_id);
-			
-			memcpy( &seq_index, m_ptr, sizeof(seq_index) );
-			m_ptr += sizeof(seq_index);
-			
-			name = (char*)m_ptr;
-			m_ptr += name.size() + 1;
-			
-			forward_oligo = (char*)m_ptr;
-			m_ptr += forward_oligo.size() + 1;
-			
-			reverse_oligo = (char*)m_ptr;
-			m_ptr += reverse_oligo.size() + 1;
-			
-			probe_oligo = (char*)m_ptr;
-			m_ptr += probe_oligo.size() + 1;
-			
-			amplicon_def = (char*)m_ptr;
-			m_ptr += amplicon_def.size() + 1;
-			
-			amplicon = (char*)m_ptr;
-			m_ptr += amplicon.size() + 1;
-			
-			forward_align = (char*)m_ptr;
-			m_ptr += forward_align.size() + 1;
-			
-			reverse_align = (char*)m_ptr;
-			m_ptr += reverse_align.size() + 1;
-			
-			probe_align = (char*)m_ptr;
-			m_ptr += probe_align.size() + 1;
-			
-			memcpy( &(amplicon_range.first), m_ptr, sizeof(int) );
-			m_ptr += sizeof(amplicon_range.first);
-			
-			memcpy( &(amplicon_range.second), m_ptr, sizeof(int) );
-			m_ptr += sizeof(amplicon_range.second);
-			
-			memcpy( &(probe_range.first), m_ptr, sizeof(int) );
-			m_ptr += sizeof(probe_range.first);
-			
-			memcpy( &(probe_range.second), m_ptr, sizeof(int) );
-			m_ptr += sizeof(probe_range.second);
-			
-			///////////////////////////////////////////////////
-			// Melting temperatures
-			memcpy( &forward_tm, m_ptr, sizeof(forward_tm) );
-			m_ptr += sizeof(forward_tm);
-			
-			memcpy( &reverse_tm, m_ptr, sizeof(reverse_tm) );
-			m_ptr += sizeof(reverse_tm);
-			
-			memcpy( &probe_tm, m_ptr, sizeof(probe_tm) );
-			m_ptr += sizeof(probe_tm);
-			
-			///////////////////////////////////////////////////
-			// Dimer and hairpin melting temperatures
-			memcpy( &forward_hairpin_tm, m_ptr, sizeof(forward_hairpin_tm) );
-			m_ptr += sizeof(forward_hairpin_tm);
-			
-			memcpy( &reverse_hairpin_tm, m_ptr, sizeof(reverse_hairpin_tm) );
-			m_ptr += sizeof(reverse_hairpin_tm);
-			
-			memcpy( &forward_dimer_tm, m_ptr, sizeof(forward_dimer_tm) );
-			m_ptr += sizeof(forward_dimer_tm);
-			
-			memcpy( &reverse_dimer_tm, m_ptr, sizeof(reverse_dimer_tm) );
-			m_ptr += sizeof(reverse_dimer_tm);
-			
-			memcpy( &primer_dimer_tm, m_ptr, sizeof(primer_dimer_tm) );
-			m_ptr += sizeof(primer_dimer_tm);
-			
-			memcpy( &probe_hairpin_tm, m_ptr, sizeof(probe_hairpin_tm) );
-			m_ptr += sizeof(probe_hairpin_tm);
-			
-			memcpy( &probe_dimer_tm, m_ptr, sizeof(probe_dimer_tm) );
-			m_ptr += sizeof(probe_dimer_tm);
-			
-			///////////////////////////////////////////////////
-			// Thermodynamic parameters
-			memcpy( &forward_dH, m_ptr, sizeof(forward_dH) );
-			m_ptr += sizeof(forward_dH);
-			
-			memcpy( &forward_dS, m_ptr, sizeof(forward_dS) );
-			m_ptr += sizeof(forward_dS);
-			
-			memcpy( &reverse_dH, m_ptr, sizeof(reverse_dH) );
-			m_ptr += sizeof(reverse_dH);
-			
-			memcpy( &reverse_dS, m_ptr, sizeof(reverse_dS) );
-			m_ptr += sizeof(reverse_dS);
-			
-			memcpy( &probe_dH, m_ptr, sizeof(probe_dH) );
-			m_ptr += sizeof(probe_dH);
-			
-			memcpy( &probe_dS, m_ptr, sizeof(probe_dS) );
-			m_ptr += sizeof(probe_dS);
-			
-			///////////////////////////////////////////////////
-			// Strand concentrations
-			memcpy( &primer_strand, m_ptr, sizeof(primer_strand) );
-			m_ptr += sizeof(primer_strand);
-			
-			memcpy( &probe_strand, m_ptr, sizeof(probe_strand) );
-			m_ptr += sizeof(probe_strand);
-			
-			///////////////////////////////////////////////////
-			// Clamp values
-			memcpy( &forward_primer_clamp, m_ptr, sizeof(forward_primer_clamp) );
-			m_ptr += sizeof(forward_primer_clamp);
-			
-			memcpy( &reverse_primer_clamp, m_ptr, sizeof(reverse_primer_clamp) );
-			m_ptr += sizeof(reverse_primer_clamp);
-			
-			///////////////////////////////////////////////////
-			// Degeneracy levels
-			memcpy( &forward_degen, m_ptr, sizeof(forward_degen) );
-			m_ptr += sizeof(forward_degen);
-
-			memcpy( &reverse_degen, m_ptr, sizeof(reverse_degen) );
-			m_ptr += sizeof(reverse_degen);
-
-			memcpy( &probe_degen, m_ptr, sizeof(probe_degen) );
-			m_ptr += sizeof(probe_degen);
-
-			///////////////////////////////////////////////////
-			// Mismatch and gap parameters
-			memcpy( &forward_mm, m_ptr, sizeof(forward_mm) );
-			m_ptr += sizeof(forward_mm);
-			
-			memcpy( &forward_gap, m_ptr, sizeof(forward_gap) );
-			m_ptr += sizeof(forward_gap);
-			
-			memcpy( &reverse_mm, m_ptr, sizeof(reverse_mm) );
-			m_ptr += sizeof(reverse_mm);
-			
-			memcpy( &reverse_gap, m_ptr, sizeof(reverse_gap) );
-			m_ptr += sizeof(reverse_gap);
-			
-			memcpy( &probe_mm, m_ptr, sizeof(probe_mm) );
-			m_ptr += sizeof(probe_mm);
-			
-			memcpy( &probe_gap, m_ptr, sizeof(probe_gap) );
-			m_ptr += sizeof(probe_gap);
-			
-			///////////////////////////////////////////////////
-			// Ct
-			memcpy( &ct, m_ptr, sizeof(ct) );
-			m_ptr += sizeof(ct);
-			
-			return m_ptr;
 		};
 		
 		inline int my_id() const
@@ -909,6 +556,10 @@ class hybrid_sig {
 			//return ssout.str();
 		};
 };
+
+template<> size_t mpi_size(const hybrid_sig &m_obj);
+template<> unsigned char* mpi_pack(unsigned char* m_ptr, const hybrid_sig &m_obj);
+template<> unsigned char* mpi_unpack(unsigned char* m_ptr, hybrid_sig &m_obj);
 
 class sort_by_match{
 

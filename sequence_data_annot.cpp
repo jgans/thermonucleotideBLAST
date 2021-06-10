@@ -5,7 +5,7 @@
 
 using namespace std;
 
-void sequence_data::load_gbk(const std::string &m_filename, const bool &m_sort_by_len)
+void sequence_data::load_gbk(const std::string &m_filename)
 {
 	format = GBK;
 	
@@ -38,13 +38,9 @@ void sequence_data::load_gbk(const std::string &m_filename, const bool &m_sort_b
 
 		seq_length[i] = make_pair(seq_len, i);
 	}
-
-	if(m_sort_by_len == true){
-		sort( seq_length.begin(), seq_length.end(), sequence_order() );
-	}
 }
 
-void sequence_data::load_embl(const std::string &m_filename, const bool &m_sort_by_len)
+void sequence_data::load_embl(const std::string &m_filename)
 {
 	format = EMBL;
 	
@@ -77,13 +73,9 @@ void sequence_data::load_embl(const std::string &m_filename, const bool &m_sort_
 
 		seq_length[i] = make_pair(seq_len, i);
 	}
-
-	if(m_sort_by_len == true){
-		sort( seq_length.begin(), seq_length.end(), sequence_order() );
-	}
 }
 
-void sequence_data::load_gff3(const std::string &m_filename, const bool &m_sort_by_len)
+void sequence_data::load_gff3(const std::string &m_filename)
 {
 	format = GFF3;
 	
@@ -117,13 +109,9 @@ void sequence_data::load_gff3(const std::string &m_filename, const bool &m_sort_
 
 		seq_length[i] = make_pair(seq_len, i);
 	}
-
-	if(m_sort_by_len == true){
-		sort( seq_length.begin(), seq_length.end(), sequence_order() );
-	}
 }
 
-void sequence_data::load_ptt(const std::string &m_filename, const bool &m_sort_by_len)
+void sequence_data::load_ptt(const std::string &m_filename)
 {
 	format = PTT;
 	
@@ -155,9 +143,5 @@ void sequence_data::load_ptt(const std::string &m_filename, const bool &m_sort_b
 		const unsigned int seq_len = iter->num_bases();
 
 		seq_length[i] = make_pair(seq_len, i);
-	}
-
-	if(m_sort_by_len == true){
-		sort( seq_length.begin(), seq_length.end(), sequence_order() );
 	}
 }

@@ -4,7 +4,7 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 	tntblast_worker.o tntblast_util.o options.o tntblast_local.o bitmask.o \
 	sequence_data.o sequence_data_annot.o annotation.o annotation_embl.o \
 	annotation_gbk.o annotation_ptt.o annotation_util.o annotation_gff3.o gff3.o \
-	sequence_data_fastx.o tntblast_timer.o
+	sequence_data_fastx.o tntblast_timer.o mpi_util.o
 
 CC = mpic++
 
@@ -12,7 +12,7 @@ PROFILE = #-g #-pg
 
 # If you're using gcc and would like to enable single computer multi-threading,
 # uncomment this OPENMP variable
-OPENMP = -fopenmp
+#OPENMP = -fopenmp
 
 # If you're using the clang C++ compiler on OS X and would like to enable single 
 # computer multi-threading, please uncomment this CLANG_OPENMP variable.
@@ -23,12 +23,11 @@ OPENMP = -fopenmp
 #	- When running tntblast on OS X, please note that DYLD_LIBRARY_PATH must be set 
 #		to the directory that contains the OpenMP libomp.dylib file, i.e., :
 #	
-#		export DYLD_LIBRARY_PATH=/$(HOME)/llvm-project/build-openmp/runtime/src
-#
+#		export DYLD_LIBRARY_PATH=/$HOME/llvm-project/build-openmp/runtime/src
 # With the introduction of ncbi-blast-2.11, we must specify -std=c++14 (as opposed to the
 # -std=c++11 that was used for ncbi-blast-2.10
 
-#CLANG_OPENMP = -Xpreprocessor -fopenmp
+CLANG_OPENMP = -Xpreprocessor -fopenmp
 
 # Define USE_MPI to enable MPI
 FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++14 -DUSE_MPI

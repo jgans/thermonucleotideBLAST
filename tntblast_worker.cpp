@@ -35,92 +35,32 @@ int worker(int argc, char *argv[])
 		if(continue_exec == false){
 			return EXIT_SUCCESS;
 		}
-		
-		int max_len;
-		int primer_clamp;
-		int min_max_primer_clamp;
-		int max_gap;
-		int max_mismatch;
-		int probe_clamp_5;
-		int probe_clamp_3;
-		int target_strand;
-		float min_primer_tm;
-		float max_primer_tm;
-		float min_primer_dg;
-		float max_primer_dg;
-		float min_probe_tm;
-		float max_probe_tm;
-		float min_probe_dg;
-		float max_probe_dg;
-		float salt;
-		float forward_primer_strand;
-		float reverse_primer_strand;
-		float probe_strand;
-		float target_t;
-		int melting_param;
-		int mask_options;
-		int assay_format;
-		unsigned int output_format;
-		int hash_word_size;
-		int allow_fasta_mmap;
-		int sequence_file_format;
-		int single_primer_pcr;
-		int allow_dangle_5;
-		int allow_dangle_3;
-		int use_dinkelbach;
-		int best_match;
 
 		vector<hybrid_sig> sig_list; // The queries
 		bitmask sig_match; // Has a given query matched at least one target (for OUTPUT_INVERSE_QUERY)
 		list<hybrid_sig> results_list; // The query-target matches
 		
-		string dbase_filename;
+		Options opt;
+
+		// Receive the command-line options from the master
+		broadcast(opt, mpi_rank, 0);
 		
-		MPI_Bcast(&salt, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&forward_primer_strand, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&reverse_primer_strand, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&probe_strand, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		// Allow different strand concentrations for the forward
+		// and reverse primers (i.e. asymmetric PCR). When
+		// opt.asymmetric_strand_ratio != 1, the opt.primer_strand
+		// is assumed to be the concentration of the reverse primer.
+		const float forward_primer_strand = opt.asymmetric_strand_ratio*
+			opt.primer_strand;
+		const float reverse_primer_strand = opt.primer_strand;
 		
-		MPI_Bcast(&min_primer_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_primer_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		DNAHash dbase(opt.hash_word_size);
 		
-		MPI_Bcast(&min_primer_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_primer_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+		// The database file from the master. This may overwrite the filename
+		// provided on the command line, depending on the format of the file
+		receive(opt.dbase_filename);
 		
-		MPI_Bcast(&min_probe_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_probe_tm, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&min_probe_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_probe_dg, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&target_t, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&primer_clamp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&min_max_primer_clamp, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		
-		MPI_Bcast(&probe_clamp_5, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&probe_clamp_3, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_len, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&target_strand, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&melting_param, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&mask_options, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&assay_format, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&output_format, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&hash_word_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&allow_fasta_mmap, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&single_primer_pcr, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&allow_dangle_5, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&allow_dangle_3, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&use_dinkelbach, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&best_match, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_gap, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&max_mismatch, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		
-		DNAHash dbase(hash_word_size);
-		
-		// The database file from the master
-		receive(dbase_filename);
-		
+		int sequence_file_format;
+
 		MPI_Bcast(&sequence_file_format, 1, MPI_INT, 0, MPI_COMM_WORLD);
 		
 		// Get the queries from the master
@@ -130,7 +70,7 @@ int worker(int argc, char *argv[])
 		
 		// If the user has selected OUTPUT_INVERSE_QUERY for their output format,
 		// we will only track whether each query has matched one or more targets
-		if(output_format & OUTPUT_INVERSE_QUERY){
+		if(opt.output_format & OUTPUT_INVERSE_QUERY){
 			sig_match.resize(num_sig, false);
 		}
 		
@@ -140,7 +80,7 @@ int worker(int argc, char *argv[])
 		// Suppress output from the workers
 		seq_file.verbose(false);
 		
-		if(dbase_filename != ""){
+		if(opt.dbase_filename != ""){
 			
 			if(seq_file.wants_indicies(sequence_file_format) == true){
 				
@@ -152,19 +92,19 @@ int worker(int argc, char *argv[])
 				seq_file.indicies(tmp);
 			}
 			
-			seq_file.open( (char*)dbase_filename.c_str(), allow_fasta_mmap, false);
+			seq_file.open( (char*)opt.dbase_filename.c_str(), opt.blast_include, opt.blast_exclude,
+				opt.allow_fasta_mmap);
 		}
 		
 		// Initialize the melting engine. There is a fair amount of overhead involved in
 		// initialization (handled by the constructor) so it is best to do it just once
 		// per program invocation.
-		NucCruc melt(melting_param, target_t);
+		NucCruc melt(opt.melting_param, opt.target_t);
 	
-		melt.Salt(salt);
+		melt.Salt(opt.salt);
 
-		// Boolean values are transmitted as ints (so we need to convert back)
-		melt.dangle( allow_dangle_5 == int(true), allow_dangle_3 == int(true) );
-		melt.dinkelbach( use_dinkelbach == int(true) );
+		melt.dangle(opt.allow_dangle_5, opt.allow_dangle_3);
+		melt.dinkelbach(opt.use_dinkelbach);
 		
 		unordered_map<BindCacheKey, BindCacheValue> plus_strand_melt_cache;
 		unordered_map<BindCacheKey, BindCacheValue> minus_strand_melt_cache;
@@ -265,9 +205,11 @@ int worker(int argc, char *argv[])
 					bio_seq.second = NULL;
 				}
 				
-				// Clear any existing cached binding data (which is only valid for a single target sequence)
-				plus_strand_melt_cache.clear();
-				minus_strand_melt_cache.clear();
+				// Free any existing cached binding data (which is only valid for a single target sequence).
+				// There is no guarentee that unordered_map will free memory when calling unordered_map::clear().
+				// To be on the same size, use the swap trick
+				unordered_map<BindCacheKey, BindCacheValue>().swap(plus_strand_melt_cache);
+				unordered_map<BindCacheKey, BindCacheValue>().swap(minus_strand_melt_cache);
 				
 				// Read a DNA sequence (and defline) from either the database or the master
 				// node.
@@ -339,27 +281,27 @@ int worker(int argc, char *argv[])
 
 				if(sig_ref.has_primers() == true){
 
-					switch(assay_format){
+					switch(opt.assay_format){
 
 						case ASSAY_PCR:
 
 							// What amplicons do these primers/probe produce?
 							local_results = amplicon(dbase, bio_seq,
 								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
-								forward_primer_strand, reverse_primer_strand, probe_strand,
-								min_primer_tm, max_primer_tm, 
-								min_primer_dg, max_primer_dg, 
-								min_probe_tm, max_probe_tm, 
-								min_probe_dg, max_probe_dg, 
-								primer_clamp, min_max_primer_clamp,
-								probe_clamp_5, probe_clamp_3, 
-								max_gap, max_mismatch,
-								max_len,
-								(single_primer_pcr == true) );
+								forward_primer_strand, reverse_primer_strand, opt.probe_strand,
+								opt.min_primer_tm, opt.max_primer_tm, 
+								opt.min_primer_dg, opt.max_primer_dg, 
+								opt.min_probe_tm, opt.max_probe_tm, 
+								opt.min_probe_dg, opt.max_probe_dg, 
+								opt.primer_clamp, opt.min_max_primer_clamp,
+								opt.probe_clamp_5, opt.probe_clamp_3, 
+								opt.max_gap, opt.max_mismatch,
+								opt.max_len,
+								opt.single_primer_pcr);
 
-							mask_binding_sites(local_results, mask_options,
-								min_primer_tm, min_probe_tm, melt,
-								forward_primer_strand, reverse_primer_strand, probe_strand);
+							mask_binding_sites(local_results, opt.mask_options,
+								opt.min_primer_tm, opt.min_probe_tm, melt,
+								forward_primer_strand, reverse_primer_strand, opt.probe_strand);
 
 							break;
 						case ASSAY_PADLOCK:
@@ -367,11 +309,11 @@ int worker(int argc, char *argv[])
 							local_results = padlock(dbase, bio_seq,
 								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
 								forward_primer_strand, reverse_primer_strand, 
-								min_probe_tm, max_probe_tm,
-								min_probe_dg, max_probe_dg,
-								probe_clamp_5, probe_clamp_3, 
-								max_gap, max_mismatch,
-								target_strand);
+								opt.min_probe_tm, opt.max_probe_tm,
+								opt.min_probe_dg, opt.max_probe_dg,
+								opt.probe_clamp_5, opt.probe_clamp_3, 
+								opt.max_gap, opt.max_mismatch,
+								opt.target_strand);
 
 							break;
 					};
@@ -381,18 +323,18 @@ int worker(int argc, char *argv[])
 					if(sig_ref.has_probe() == true){
 						
 						local_results = hybrid(dbase, bio_seq,
-							sig_ref, melt, probe_strand, 
-							min_probe_tm, max_probe_tm, 
-							min_probe_dg, max_probe_dg, 
-							probe_clamp_5, probe_clamp_3,
-							max_gap, max_mismatch, 
-							target_strand);
+							sig_ref, melt, opt.probe_strand, 
+							opt.min_probe_tm, opt.max_probe_tm, 
+							opt.min_probe_dg, opt.max_probe_dg, 
+							opt.probe_clamp_5, opt.probe_clamp_3,
+							opt.max_gap, opt.max_mismatch, 
+							opt.target_strand);
 					}
 				}
 				
 				// If the user has selected OUTPUT_INVERSE_QUERY for their output format,
 				// we will only track whether each query has matched one or more targets
-				if(output_format & OUTPUT_INVERSE_QUERY){
+				if(opt.output_format & OUTPUT_INVERSE_QUERY){
 					
 					// Have we found one or more matches to this query?
 					if(local_results.empty() == false){
@@ -456,7 +398,7 @@ int worker(int argc, char *argv[])
 					
 						melt.set_duplex(local_iter->probe_oligo);
 
-						melt.strand(probe_strand, probe_strand);
+						melt.strand(opt.probe_strand, opt.probe_strand);
 
 						local_iter->probe_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->probe_dimer_tm = melt.approximate_tm_homodimer();
@@ -473,7 +415,7 @@ int worker(int argc, char *argv[])
 				results_list.splice(results_list.end(), local_results);
 
 				// If enabled, only keep the best matches between a given query and a given target
-				if(best_match == true){
+				if(opt.best_match == true){
 					select_best_match(results_list);
 				}
 			}
@@ -528,7 +470,7 @@ int worker(int argc, char *argv[])
 		
 		// If the user has selected OUTPUT_INVERSE_QUERY for their output format,
 		// we will only send back the bitmask of queries that *did* match a target
-		if(output_format & OUTPUT_INVERSE_QUERY){
+		if(opt.output_format & OUTPUT_INVERSE_QUERY){
 
 			unsigned int buffer_size = sig_match.mpi_size();
 			
@@ -573,8 +515,8 @@ int worker(int argc, char *argv[])
 				
 				if(iter->my_id() < max_sig){
 					
-					num_results ++;
-					buffer_size += iter->mpi_size();
+					++num_results;
+					buffer_size += mpi_size(*iter);
 					reaper.push_back(iter);
 				}
 			}
@@ -593,7 +535,7 @@ int worker(int argc, char *argv[])
 			for(iter = results_list.begin();iter != results_list.end();iter++){
 			
 				if(iter->my_id() < max_sig){
-					ptr = iter->mpi_pack(ptr);
+					ptr = mpi_pack(ptr, *iter);
 				}
 			}
 			
@@ -632,6 +574,11 @@ int worker(int argc, char *argv[])
 		
 		return EXIT_FAILURE;
 	}
+	catch(std::exception &e){
+		
+		cerr << "Caught the std exception: " << e.what() << endl;
+		return EXIT_FAILURE;
+	} 
 	catch(...){
 		
 		cerr << "Caught an unhandled worker [" << mpi_rank << "] error" << endl;

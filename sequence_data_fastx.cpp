@@ -9,8 +9,7 @@
 
 using namespace std;
 
-void sequence_data::load_fasta(const std::string &m_filename, const bool &m_sort_by_len,
-	const bool &m_allow_fasta_mmap)
+void sequence_data::load_fasta(const std::string &m_filename, const bool &m_allow_fasta_mmap)
 {
 	bool allow_fasta_mmap = m_allow_fasta_mmap;
 	
@@ -289,15 +288,10 @@ void sequence_data::load_fasta(const std::string &m_filename, const bool &m_sort
 			// in the file
 			seq_length[num_seq_m_1] = make_pair(buffer_size - seq_index[num_seq_m_1], num_seq_m_1);
 		}
-		
-		if(m_sort_by_len == true){
-			sort( seq_length.begin(), seq_length.end(), sequence_order() );
-		}
 	}
 }
 
-void sequence_data::load_fastq(const std::string &m_filename, const bool &m_sort_by_len,
-	const bool &m_allow_fastq_mmap)
+void sequence_data::load_fastq(const std::string &m_filename, const bool &m_allow_fastq_mmap)
 {
 	bool allow_fastq_mmap = m_allow_fastq_mmap;
 	
@@ -644,10 +638,6 @@ void sequence_data::load_fastq(const std::string &m_filename, const bool &m_sort
 			// The last sequences size is determined by its start position and the number of bytes
 			// in the file
 			seq_length[num_seq_m_1] = make_pair(buffer_size - seq_index[num_seq_m_1], num_seq_m_1);
-		}
-		
-		if(m_sort_by_len == true){
-			sort( seq_length.begin(), seq_length.end(), sequence_order() );
 		}
 	}
 }
