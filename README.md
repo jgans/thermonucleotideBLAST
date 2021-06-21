@@ -23,7 +23,7 @@ Please send bug-reports/suggestions/comments/rants to jgans@lanl.gov
   - FASTA
   - GBK (GenBank files containing sequence and annotation information)
   - EMBL (EMBL files containing sequence and annotation information)
-  - BLAST-formatted databases (version 5 -- requires the NCBI BLAST+ source code)
+  - BLAST-formatted databases (version 5 -- requires the BLAST+ source code)
 - Adaptive query and database segmentation allows efficient parallel execution with low memory overhead (ideal for diskless clusters)
 - Annotation of genomic regions matches by query assays (requires a target database that contains annotation information)
 - Different PCR primer strand concentrations can be specified for the forward and reverse primer to model asymmetric PCR conditions
@@ -70,7 +70,7 @@ Assay query files are tab-delimited text files with two or more columns:
   - gcc/g++ versions 4.2 and higher
   - clang (however, OS X users will not have OpenMP support "out-of-the-box". I recommend following [these](https://iscinumpy.gitlab.io/post/omp-on-high-sierra/) instructions to get OpenMP working on OS X).
 - The compiled NCBI BLAST+ source code (for searching BLAST-formatted databases)
-  - Download, build and install the [NCBI BLAST+ program] (https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+  - Download, build and install the [NCBI BLAST+ program](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
   - The current version of the NCBI BLAST+ program requires a modern C++ compiler to build
     - The current Clang compiler on OS X works fine. Older (< 5) versions of GCC don't work.
     - For older Centos Linux systems with GCC version < 5, the [following steps](https://linuxize.com/post/how-to-install-gcc-compiler-on-centos-7/) will install a newer GCC compiler:
