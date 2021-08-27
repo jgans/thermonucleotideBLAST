@@ -27,7 +27,7 @@ PROFILE = #-g #-pg
 # With the introduction of ncbi-blast-2.11, we must specify -std=c++14 (as opposed to the
 # -std=c++11 that was used for ncbi-blast-2.10
 
-CLANG_OPENMP = -Xpreprocessor -fopenmp
+#CLANG_OPENMP = -Xpreprocessor -fopenmp
 
 # Define USE_MPI to enable MPI
 FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++14 -DUSE_MPI
@@ -45,7 +45,7 @@ endif
 # read NCBI BLAST-formatted database files. This functionality is optional, and
 # can be disabled by commenting out the BLAST_DIR variable by adding the '#' symbol
 # to the start of the line below (i.e. "#BLAST_DIR").
-BLAST_DIR = ncbi-blast-2.11.0+-src
+#BLAST_DIR = ncbi-blast-2.11.0+-src
 
 ifdef BLAST_DIR
 
