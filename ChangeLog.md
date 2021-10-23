@@ -1,3 +1,13 @@
+# Version 2.3 (October 22, 2021)
+- Cleaned up `seq_hash.h` to address compiler warnings about clearing/setting an object of non-trivial type.
+- Removed WIN32 support for reading fasta sequences.
+- Removed support for memory mapping fasta and fastq sequences (to make the code easier to maintain -- if you need speed, please convert the sequences to a BLAST+ database).
+- Removed unused variable from `annotation_util.cpp`.
+- Removed support for sequence fragmentation.
+- Added support for reading gzip-compressed fasta, fastq, GBK and EMBL files. Please note that this is convience feature only! Reading these gzip-compressed files is slower than reading uncompressed sequence files.
+- Improved the reading of sequence annotation files by reading the sequence data in a single pass (as opposed to the previous two-pass scheme, which did not work well for compressed files).
+- Unified the previously chaotic encoding of ascii bases to binary bases. 
+
 # Version 2.2 (May 27, 2021)
 - Enabled accession and NCBI TaxId limits on BLAST database searching. As with the current version of NCBI BLAST+, TaxId values must be at the species-level (or below). Specifying a higher-level TaxId will generate an error.
 - Changed the default TaqMan probe concentration (for melting temperature calculations) to be 2.5e-7 M (used to be the same as the primer concentration).

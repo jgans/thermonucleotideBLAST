@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "annotation.h"
 
 #include <sstream>
@@ -39,23 +5,28 @@
 
 using namespace std;
 
+#define	MAX_LINE_LEN	1024
+
 unsigned long int line_number = 1;
 
 // Note that genbank entries are 1's based (not zero based like asn.1
 // entires).
-bool read_range(ifstream &m_fin, pair<unsigned int, unsigned int> &m_range, 
+bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range, 
 				list< pair<unsigned int, unsigned int> > &m_seg_list)
 {
 	unsigned int i = 0;
-	string buffer;
-	
-	getline(m_fin, buffer);
+	char buffer[MAX_LINE_LEN];
+
+	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":read_range: Unable to read line";
+	}
+
 	line_number ++;
 	
-	unsigned int len = buffer.size();
+	unsigned int len = strlen(buffer);
 
 	// Make the range parsing robust to Mac/PC?Unix EOL differences
-	if(buffer[len - 1] == '\r'){
+	if((len > 0) && (buffer[len - 1] == '\r') ){
 		len--;
 	}
 	
@@ -181,16 +152,25 @@ bool read_range(ifstream &m_fin, pair<unsigned int, unsigned int> &m_range,
 	}
 
 	while(left_paren != right_paren){
-		string tmp;
+		
+		char tmp[MAX_LINE_LEN];
 
-		getline(m_fin, tmp);
+		if(gzgets(m_fin, tmp, MAX_LINE_LEN) == NULL){
+			throw __FILE__ ":read_range: Unable to read tmp line";
+		}
+
 		line_number ++;
 
-		buffer += tmp;
+		if( ( strlen(buffer) + strlen(tmp) ) >= MAX_LINE_LEN){
+			throw __FILE__ ":read_range: Ran out of room to store range!";
+		}
+
+		strcat(buffer, tmp);
 		
 		left_paren = right_paren = 0;
 
 		for(unsigned int j = i;buffer[j] != '\0';j++){
+
 			if(buffer[j] == '('){
 				left_paren ++;
 			}
@@ -202,7 +182,7 @@ bool read_range(ifstream &m_fin, pair<unsigned int, unsigned int> &m_range,
 	}
 
 	bool is_complement = false;
-	bool is_join = false;
+	//bool is_join = false;
 
 	// Now test for complement
 	if(buffer[i] == 'c'){
@@ -213,13 +193,13 @@ bool read_range(ifstream &m_fin, pair<unsigned int, unsigned int> &m_range,
 
 	// Read the join info
 	if(buffer[i] == 'j'){
-		is_join = true;
+		//is_join = true;
 
 		i += 5; // + strlen( "join(" )
 	}
 	else{
 		if(buffer[i] == 'o'){
-			is_join = true;
+			//is_join = true;
 
 			i += 6; // + strlen( "order(" )
 		}
@@ -241,7 +221,7 @@ bool read_range(ifstream &m_fin, pair<unsigned int, unsigned int> &m_range,
 		i++;
 	}
 
-	j = buffer.size();
+	j = strlen(buffer);
 
 	while(i < j){
 		// Read a range: The first entry ...

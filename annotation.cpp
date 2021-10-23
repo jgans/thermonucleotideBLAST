@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "annotation.h"
 
 #include <fstream>
@@ -39,6 +5,7 @@
 #include <sstream>
 #include <algorithm>
 #include <string.h>
+#include <zlib.h>
 
 using namespace std;
 
@@ -168,20 +135,17 @@ string GeneAnnotation::range() const
 	return ss.str();
 }
 
-bool DNAMol::load(const std::string &m_filename, const unsigned int &m_type, streampos &m_pos)
+bool DNAMol::load(gzFile m_fin, const unsigned int &m_type, size_t &m_pos)
 {
 	// Return true if there are multiple genomes to read in this file
 	bool ret = false;
 	
 	switch(m_type){
-		case PTT:
-			loadPTT(m_filename);
-			break;
 		case GBK:
-			ret = loadGBK(m_filename, m_pos);
+			ret = loadGBK(m_fin, m_pos);
 			break;
 		case EMBL:
-			ret = loadEMBL(m_filename, m_pos);
+			ret = loadEMBL(m_fin, m_pos);
 			break;
 		default:
 			throw "Unknown file format!";
@@ -331,11 +295,11 @@ bool DNAMol::import(const DNAMol &m_mol, const unsigned int &m_type)
 int file_type(const std::string &m_filename)
 {
 	// Open the file and read until we can determine the file type
-	ifstream fin(m_filename.c_str(), ios::binary);
+	gzFile fin = gzopen(m_filename.c_str(), "r");
 
 	int ret = -1; // return -1 on error
 
-	if(!fin){
+	if(fin == NULL){
 		return ret;
 	}
 	
@@ -345,14 +309,13 @@ int file_type(const std::string &m_filename)
 	// Clear the array of bytes
 	memset(buffer, 0, buffer_size);
 
-	fin.read(buffer, buffer_size);
-
-	if(fin){
-		fin.close();
+	if(gzread(fin, buffer, buffer_size) < 0){
+		return ret;
 	}
 
+	gzclose(fin);
+	
 	bool GBK_hint = false;
-	unsigned int ptt_hint = 0;
 	
 	int first_non_space_char = -1;
 
@@ -380,12 +343,6 @@ int file_type(const std::string &m_filename)
 			
 			// This is only a hint, so don't break -- keep reading!
 		}
-		
-		if(buffer[i] == '.'){
-			if( (i != 0) && (buffer[i - 1] == '.') ){
-				ptt_hint++;
-			}
-		}
 	}
 	
 	// No valid characters detected! This is an error!
@@ -400,17 +357,6 @@ int file_type(const std::string &m_filename)
 	// Quick test for GBK file
 	if( strstr(buffer, "LOCUS") && strstr(buffer, "DEFINITION") ){
 		return DNAMol::GBK;
-	}
-	
-	// Test for GFF3 file
-	if( strstr(buffer, "##") && strstr(buffer, "gff-version") ){
-		return DNAMol::GFF3;
-	}
-	
-	// Use the arbitrary threshold of two ".." occurances
-	// to indicate a PTT file.
-	if(ptt_hint >= 2){
-		return DNAMol::PTT;
 	}
 	
 	if((ret == -1) && GBK_hint){

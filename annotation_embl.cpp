@@ -1,64 +1,30 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "annotation.h"
 
 #include <sstream>
 #include <string.h>
+#include <zlib.h>
 
 using namespace std;
 
-
 // Local functions
-int read_EMBL_key(ifstream &fin);
-bool read_locus_EMBL(ifstream &fin);
-void read_accession_EMBL(ifstream &fin, string &m_str);
-string read_source_EMBL(ifstream &fin);
-SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len);
+int read_EMBL_key(gzFile fin);
+bool read_locus_EMBL(gzFile fin);
+void read_accession_EMBL(gzFile fin, string &m_str);
+string read_source_EMBL(gzFile fin);
+SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len);
 
-int next_key_EMBL(ifstream &m_fin, const bool &m_clear_line = true);
+int next_key_EMBL(gzFile m_fin, const bool &m_clear_line = true);
 
-int parse_gene_EMBL(ifstream &m_fin, GeneAnnotation &m_gene);
-int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna);
-int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna);
-int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna);
-int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_rna);
-int parse_imp_EMBL(ifstream &m_fin, GeneAnnotation &m_imp);
-int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds);
-int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene);
+int parse_gene_EMBL(gzFile m_fin, GeneAnnotation &m_gene);
+int parse_rna_EMBL(gzFile m_fin, GeneAnnotation &m_rna);
+int parse_rna_EMBL(gzFile m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna);
+int parse_trna_EMBL(gzFile m_fin, GeneAnnotation &m_trna);
+int parse_trna_EMBL(gzFile m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_rna);
+int parse_imp_EMBL(gzFile m_fin, GeneAnnotation &m_imp);
+int parse_cds_EMBL(gzFile m_fin, GeneAnnotation &m_cds);
+int parse_cds_EMBL(gzFile m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene);
 
-int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field);
+int parse_field_EMBL(gzFile m_fin, pair<string, string> &m_field);
 
 // Enumerate all possible EMBL keys
 enum{	EMBL_EOF = 0,
@@ -85,55 +51,53 @@ enum {
 	EMBL_ANNOT_NONE
 };
 
-bool DNAMol::loadEMBL(const std::string &m_filename, streampos &m_pos)
+#define	MAX_LINE_LEN	1024
+
+bool DNAMol::loadEMBL(gzFile m_fin, size_t &m_pos)
 {
 	// Read a EMBL file
 
-	// First, open the file [in binary mode to allow use of
-	// read()].
-	ifstream fin(m_filename.c_str(), ios::binary);
-
-	if(!fin){
-		throw "Unable to open EMBL file";
-	}
-	
 	// Are we reading from the body of this file?
 	if(m_pos > 0){
-		fin.seekg(m_pos);
+		gzseek(m_fin, m_pos, SEEK_SET);
 	}
 
 	int key;
-	string line;
+	char line[MAX_LINE_LEN];
 
 	// Some defaults for EMBL files (or until I find out how to 
 	// parse these entries!)
 	info_map[SOURCE] = "Unknown";
 
-	while( (key = read_EMBL_key(fin)) != EMBL_EOF){
+	while( (key = read_EMBL_key(m_fin)) != EMBL_EOF){
 		switch(key){
 			case EMBL_NO_KEY:
 				// Read and throw away the line
-				getline(fin, line);
+				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+					throw __FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_NO_KEY";
+				}
 				break;
 			case EMBL_UNKNOWN_KEY:
 				// Read and throw away the line
-				getline(fin, line);
+				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+					throw __FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_UNKNOWN_KEY";
+				}
 				break;
 			case EMBL_LOCUS:
-				read_locus_EMBL(fin);
+				read_locus_EMBL(m_fin);
 				break;
 			case EMBL_ACCESSION:
 				// Load the NCBI accesion as a SeqIdPtr
-				read_accession_EMBL(fin, accession);
+				read_accession_EMBL(m_fin, accession);
 				break;
 			case EMBL_VERSION:
 				// The version is not currently stored
 				break;
 			case EMBL_SOURCE:
-				info_map[TAXA_NAME] = read_source_EMBL(fin);
+				info_map[TAXA_NAME] = read_source_EMBL(m_fin);
 				break;
 			case EMBL_FEATURES:
-				loadEMBLFeatures(fin);
+				loadEMBLFeatures(m_fin);
 				break;
 			case EMBL_ORIGIN:
 			
@@ -147,14 +111,14 @@ bool DNAMol::loadEMBL(const std::string &m_filename, streampos &m_pos)
 					seq_len = 0;
 				}
 				
-				seq = read_sequence_EMBL(fin, seq_len);
+				seq = read_sequence_EMBL(m_fin, seq_len);
 
 				processGeneList(true /* Loading this data for the first time */);
 				
-				m_pos = fin.tellg();
+				m_pos = gztell(m_fin);
 
 				// All done. Is there more data to read?
-				return !fin.eof();
+				return (gzeof(m_fin) == 0);
 			default:
 				throw "loadEMBL: Unknown key encountered!";
 		};
@@ -163,20 +127,23 @@ bool DNAMol::loadEMBL(const std::string &m_filename, streampos &m_pos)
 	return false;
 }
 
-void DNAMol::loadEMBLFeatures(ifstream &m_fin)
+void DNAMol::loadEMBLFeatures(gzFile m_fin)
 {
 	// Read and process all of the feature elements in an EMBL file
 	// Skip to the next line
-	string buffer;
+	char buffer[MAX_LINE_LEN];
 
-	streampos pos = m_fin.tellg();
+	size_t pos = gztell(m_fin);
 	
-	getline(m_fin, buffer);
+	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":DNAMol::loadEMBLFeatures: Error reading the first line";
+	}
+
 	
-	if(buffer.find("FT") != string::npos){
+	if(strstr(buffer, "FT") != NULL){
+
 		// This is an Artemis file -- don't skip this line!
-		
-		m_fin.seekg(pos);
+		gzseek(m_fin, pos, SEEK_SET);
 	}
 	
 	int annot_key = next_key_EMBL(m_fin);
@@ -198,7 +165,10 @@ void DNAMol::loadEMBLFeatures(ifstream &m_fin)
 			case EMBL_ANNOT_SOURCE:
 				// Skip the source feature for now. We'll need to parse
 				// this feature to extract the taxon id).
-				getline(m_fin, buffer);
+				if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+					throw __FILE__ ":DNAMol::loadEMBLFeatures: Error reading EMBL_ANNOT_SOURCE";
+				}
+
 				annot_key = next_key_EMBL(m_fin);
 				break;
 			case EMBL_ANNOT_GENE:
@@ -282,7 +252,7 @@ void DNAMol::loadEMBLFeatures(ifstream &m_fin)
 	}
 }
 
-int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds)
+int parse_cds_EMBL(gzFile m_fin, GeneAnnotation &m_cds)
 {
 	// Clear any existing info
 	m_cds.clear();
@@ -345,7 +315,7 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds)
 	return annot_key;
 }
 
-int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
+int parse_cds_EMBL(gzFile m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -417,7 +387,7 @@ int parse_cds_EMBL(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gen
 	return annot_key;
 }
 
-int parse_gene_EMBL(ifstream &m_fin, GeneAnnotation &m_gene)
+int parse_gene_EMBL(gzFile m_fin, GeneAnnotation &m_gene)
 {
 	// Clear any existing info
 	m_gene.clear();
@@ -463,7 +433,7 @@ int parse_gene_EMBL(ifstream &m_fin, GeneAnnotation &m_gene)
 	return annot_key;
 }
 
-int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna)
+int parse_rna_EMBL(gzFile m_fin, GeneAnnotation &m_rna)
 {
 	// Clear any existing info
 	m_rna.clear();
@@ -506,7 +476,7 @@ int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna)
 	return annot_key;
 }
 
-int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna)
+int parse_rna_EMBL(gzFile m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -562,7 +532,7 @@ int parse_rna_EMBL(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gen
 	return annot_key;
 }
 
-int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna)
+int parse_trna_EMBL(gzFile m_fin, GeneAnnotation &m_trna)
 {
 	// Clear any existing info
 	m_trna.clear();
@@ -605,7 +575,7 @@ int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna)
 	return annot_key;
 }
 
-int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_trna)
+int parse_trna_EMBL(gzFile m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_trna)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -662,7 +632,7 @@ int parse_trna_EMBL(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_g
 }
 
 
-int parse_imp_EMBL(ifstream &m_fin, GeneAnnotation &m_imp)
+int parse_imp_EMBL(gzFile m_fin, GeneAnnotation &m_imp)
 {
 	// Clear any existing info
 	m_imp.clear();
@@ -705,7 +675,7 @@ int parse_imp_EMBL(ifstream &m_fin, GeneAnnotation &m_imp)
 	return annot_key;
 }
 
-int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field)
+int parse_field_EMBL(gzFile m_fin, pair<string, string> &m_field)
 {
 	// Check for a possible annotation key
 	const int annot_key = next_key_EMBL(m_fin, false /* Don't clear the line */);
@@ -734,16 +704,18 @@ int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field)
 	// Count the number of matching '(' and ')'
 	int paren_count = 0;
 
-	m_fin.getline(buffer, buffer_size);
+	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":parse_field_EMBL: Error reading line (1)";
+	}
 	
 	// How many characters did we read?
-	unsigned int len = m_fin.gcount();
+	unsigned int len = strlen(buffer);
 
 	// Read the key from buffer
 	start_ptr = strchr(buffer, '/');
 
 	if(start_ptr == NULL){
-		throw ":parse_field: Unable to find key start";
+		throw ":parse_field_EMBL: Unable to find key start";
 	}
 	
 	// Skip the '/' character
@@ -801,8 +773,9 @@ int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field)
 
 	// Do we have a single line field?
 	if((paren_count == 0) && *start_ptr != '"'){
+
 		// Yes -- this is a single line field
-		stop_ptr = buffer + len - 2;
+		stop_ptr = buffer + (len - 1);
 
 		while(isspace(*stop_ptr)){
 			*stop_ptr = '\0';
@@ -889,11 +862,14 @@ int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field)
 		}
 
 		// Read another line, skipping the first two characters!
-		m_fin.ignore(2);
+		gzgetc(m_fin);
+		gzgetc(m_fin);
 
-		m_fin.getline(buffer, buffer_size);
+		if( gzgets(m_fin, buffer, buffer_size) == NULL){
+			throw __FILE__ ":parse_field_EMBL: Unable to read line (2)";
+		}
 		
-		len = m_fin.gcount();
+		len = strlen(buffer);
 
 		// Empty lines are not allowed!
 		if(len == 0){
@@ -906,58 +882,60 @@ int parse_field_EMBL(ifstream &m_fin, pair<string, string> &m_field)
 			start_ptr++;
 		}
 
-		stop_ptr = buffer + len - 2;
+		stop_ptr = buffer + (len - 1);
 	}
 
 	return annot_key;
 }
 
 
-int next_key_EMBL(ifstream &m_fin, const bool &m_clear_line /* = true */)
+int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 {
-	const int buffer_size = 19; // 21 - 2 letter record code
-	
-	char buffer[buffer_size + 1];
+	char buffer[MAX_LINE_LEN];
 	char *start_ptr = buffer;
 
 	// First read the two letter code
-	if( !m_fin.read(buffer, 2) ){
-		throw "Unable to read next annotation key";
+	if( gzread(m_fin, buffer, 2) ){
+		throw ":next_key_EMBL: Unable to read next annotation key";
 	}
 
 	// Check the two letter record code
 	if(buffer[0] == 'X'){
+
 		// Throw away the rest of the line
-		m_fin.ignore(80, '\n');
+		if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+			throw ":next_key_EMBL: Unable to read remaining characters in line";
+		}
 
 		return EMBL_ANNOT_END;
 	}
 	
 	if(buffer[0] == 'S'){
+
 		// This is an Artemis file, rewind by two bases
-		m_fin.unget();
-		m_fin.unget();
+		gzungetc(buffer[1], m_fin);
+		gzungetc(buffer[0], m_fin);
 		
 		return EMBL_ANNOT_END;
 	}
 
 	if((buffer[0] == 'F') && (buffer[1] == 'H')){
+
 		// Throw away the rest of the line
-		m_fin.ignore(80, '\n');
+		if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+			throw __FILE__ ":next_key_EMBL: Unable to skip remaining characters in line";
+		}
 
 		return EMBL_ANNOT_NONE;
 	}
 	
 	// We had better have an "FT" !
 	if((buffer[0] != 'F') && (buffer[1] != 'T')){
-		throw "Premature end of file or blank line encountered";
+		throw __FILE__ ":next_key_EMBL: Premature end of file or blank line encountered";
 	}
 
-	// Terminate the array
-	buffer[buffer_size] = '\0';
-
-	if( !m_fin.read(buffer, buffer_size) ){
-		throw "Unable to read next annotation key";
+	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":next_key_EMBL: Unable to read next annotation key";
 	}
 
 	// Find the start of the string
@@ -967,9 +945,12 @@ int next_key_EMBL(ifstream &m_fin, const bool &m_clear_line /* = true */)
 
 	// Is this an empty string?
 	if(*start_ptr == '\0'){
+
 		if(m_clear_line){
 			// Throw away the rest of the line
-			m_fin.ignore(80, '\n');
+			if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+				throw __FILE__ ":next_key_EMBL: Unable to discard remaining characters in line";
+			}
 		}
 
 		return EMBL_ANNOT_NONE;
@@ -1006,7 +987,7 @@ int next_key_EMBL(ifstream &m_fin, const bool &m_clear_line /* = true */)
 }
 
 // EMBL files use a two letter key code
-int read_EMBL_key(ifstream &fin)
+int read_EMBL_key(gzFile m_fin)
 {
 	const int buffer_size = 2;
 	
@@ -1015,7 +996,7 @@ int read_EMBL_key(ifstream &fin)
 	// Terminate the string and zero the array
 	memset(buffer, '\0', buffer_size);
 
-	if( !fin.read(buffer, buffer_size) ){
+	if(gzread(m_fin, buffer, buffer_size) != buffer_size){
 		return EMBL_EOF;
 	}
 
@@ -1053,9 +1034,9 @@ int read_EMBL_key(ifstream &fin)
 	if((buffer[0] == 'F') && (buffer[1] == 'T')){
 		
 		// Rewind by two bases
-		fin.unget();
-		fin.unget();
-		
+		gzungetc(buffer[1], m_fin);
+		gzungetc(buffer[0], m_fin);
+
 		return EMBL_FEATURES;
 	}
 	
@@ -1063,32 +1044,53 @@ int read_EMBL_key(ifstream &fin)
 	return EMBL_UNKNOWN_KEY;
 }
 
-bool read_locus_EMBL(ifstream &fin)
+bool read_locus_EMBL(gzFile m_fin)
 {
-	string line;
+	char line[MAX_LINE_LEN];
 
-	getline(fin, line);
+	if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":read_locus_EMBL: Unable to read line";
+	}
+	
+	const int len = strlen(line);
 
-	string::iterator iter;
-
-	for(iter = line.begin();iter != line.end(); iter++){
-		*iter = tolower(*iter);
+	for(int i = 0;i < len;++i){
+		line[i] = tolower(line[i]);
 	}
 
-	return (string::npos != line.find("circular"));
+	return (strstr(line, "circular") != NULL);
 }
 
-void read_accession_EMBL(ifstream &fin, string &m_accession)
+void read_accession_EMBL(gzFile m_fin, string &m_accession)
 {
-	fin >> m_accession;
+	m_accession.clear();
+
+	char c;
+
+	while( ( c = gzgetc(m_fin) ) != -1 ){
+
+		if( !m_accession.empty() && isspace(c) ){
+
+			gzungetc(c, m_fin);
+			return;
+		}
+
+		m_accession.push_back(c);
+	}
 }
 
-string read_source_EMBL(ifstream &fin)
+string read_source_EMBL(gzFile m_fin)
 {
 	string taxa;
 	string buffer;
 
-	getline(fin, buffer);
+	char line[MAX_LINE_LEN];
+
+	if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":read_source_EMBL: Unable to read line";
+	}
+
+	buffer = line;
 
 	stringstream ss(buffer);
 
@@ -1105,18 +1107,20 @@ string read_source_EMBL(ifstream &fin)
 }
 
 // Read nucleotide sequence and return the gc content
-SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
+SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 {
 	// The buffer size is a parameter that must be tuned for the file IO of 
 	// a given machine.
 	const unsigned int buffer_size = 2046;
 	char buffer[buffer_size];
 
-	streampos pos = m_fin.tellg();
+	size_t pos = gztell(m_fin);
 
 	// First, read the base counts from the Sequence line, i.e.:
 	// Sequence 70159 BP; 19675 A; 15631 C; 15833 G; 19020 T; 0 other;
-	m_fin.getline(buffer, buffer_size);
+	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":read_sequence_EMBL: Unable to read line (1)";
+	}
 	
 	// Track the current position
 	pos += strlen(buffer);
@@ -1174,23 +1178,23 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 	}
 
 	if(a_count < 0){
-		throw "Unable to count number of A's";
+		throw __FILE__ ":read_sequence_EMBL: Unable to count number of A's";
 	}
 
 	if(t_count < 0){
-		throw "Unable to count number of T's";
+		throw __FILE__ ":read_sequence_EMBL: Unable to count number of T's";
 	}
 
 	if(g_count < 0){
-		throw "Unable to count number of G's";
+		throw __FILE__ ":read_sequence_EMBL: Unable to count number of G's";
 	}
 
 	if(c_count < 0){
-		throw "Unable to count number of C's";
+		throw __FILE__ ":read_sequence_EMBL: Unable to count number of C's";
 	}
 
 	if(other_count < 0){
-		throw "Unable to count number of \"others\"'s";
+		throw __FILE__ ":read_sequence_EMBL: Unable to count number of \"others\"'s";
 	}
 	
 	// Set the sequence size
@@ -1200,7 +1204,7 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 	SEQPTR seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 	
 	if(!seq){
-		throw __FILE__ ": Unable to allocate memory for sequence data";
+		throw __FILE__ ":read_sequence_EMBL: Unable to allocate memory for sequence data";
 	}
 
 	unsigned int base_count = 0;
@@ -1211,13 +1215,15 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 	iter += sizeof(unsigned int);
 	
 	// Read until we hit a "/" symbol or reach the end of the file
-	while( !m_fin.eof() ){
+	while( gzeof(m_fin) == 0 ){
 	
-		m_fin.read(buffer, buffer_size);
+		if(gzgets(m_fin, buffer, buffer_size) == NULL){
+			throw __FILE__ ":read_sequence_EMBL: Unable to read line (2)";
+		}
 
 		ptr = buffer;
 		
-		const unsigned int len = m_fin.gcount();
+		const unsigned int len = strlen(buffer);
 
 		for(unsigned int i = 0;i < len;i++, ptr++){
 			
@@ -1230,8 +1236,8 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 				
 				pos += i;
 
-				m_fin.clear();
-				m_fin.seekg(pos);
+				gzclearerr(m_fin);
+				gzseek(m_fin, pos, SEEK_SET);
 				
 				return seq;
 			}
@@ -1241,59 +1247,7 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 			// Skip numbers and white space
 			if( (local_base >= 'A') && (local_base <= 'Z') ){
 				
-				switch( toupper(local_base) ){
-					case 'A':
-						*(iter++) = DB_A;
-						break;
-					case 'T':
-						*(iter++) = DB_T;
-						break;
-					case 'G':
-						*(iter++) = DB_G;
-						break;
-					case 'C':
-						*(iter++) = DB_C;
-						break;
-					case 'I':
-						*(iter++) = DB_I;
-						break;
-					case 'M':
-						*(iter++) = DB_M;
-						break;
-					case 'R':
-						*(iter++) = DB_R;
-						break;
-					case 'S':
-						*(iter++) = DB_S;
-						break;
-					case 'V':
-						*(iter++) = DB_V;
-						break;
-					case 'W':
-						*(iter++) = DB_W;
-						break;
-					case 'Y':
-						*(iter++) = DB_Y;
-						break;
-					case 'H':
-						*(iter++) = DB_H;
-						break;
-					case 'K':
-						*(iter++) = DB_K;
-						break;
-					case 'D':
-						*(iter++) = DB_D;
-						break;
-					case 'B':
-						*(iter++) = DB_B;
-						break;
-					case 'N':
-						*(iter++) = DB_N;
-						break;
-					default:
-						*(iter++) = DB_UNKNOWN;
-						break;
-				};
+				*(iter++) = ascii_to_hash_base(local_base);
 				
 				// Keep track of the number of bases read
 				base_count++;
@@ -1304,7 +1258,7 @@ SEQPTR read_sequence_EMBL(ifstream &m_fin, unsigned int &m_seq_len)
 		pos += len;
 	}
 
-	throw "Could not find end-of-sequence terminator!";
+	throw __FILE__ ":read_sequence_EMBL: Could not find end-of-sequence terminator!";
 	
 	return NULL;
 }

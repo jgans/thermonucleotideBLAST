@@ -3,16 +3,16 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 	amplicon_search.o probe_search.o padlock_search.o tntblast_master.o \
 	tntblast_worker.o tntblast_util.o options.o tntblast_local.o bitmask.o \
 	sequence_data.o sequence_data_annot.o annotation.o annotation_embl.o \
-	annotation_gbk.o annotation_ptt.o annotation_util.o annotation_gff3.o gff3.o \
+	annotation_gbk.o annotation_util.o \
 	sequence_data_fastx.o tntblast_timer.o mpi_util.o
 
 CC = mpic++
 
-PROFILE = #-g #-pg
+PROFILE = #-g -pg
 
 # If you're using gcc and would like to enable single computer multi-threading,
 # uncomment this OPENMP variable
-#OPENMP = -fopenmp
+OPENMP = -fopenmp
 
 # If you're using the clang C++ compiler on OS X and would like to enable single 
 # computer multi-threading, please uncomment this CLANG_OPENMP variable.
@@ -32,8 +32,8 @@ PROFILE = #-g #-pg
 # Define USE_MPI to enable MPI
 FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++14 -DUSE_MPI
 
-INC = -I.
-LIBS = -lm
+INC = -I. 
+LIBS = -lm -lz
 
 ifdef CLANG_OPENMP
 	OPENMP = $(CLANG_OPENMP)
@@ -45,7 +45,7 @@ endif
 # read NCBI BLAST-formatted database files. This functionality is optional, and
 # can be disabled by commenting out the BLAST_DIR variable by adding the '#' symbol
 # to the start of the line below (i.e. "#BLAST_DIR").
-#BLAST_DIR = ncbi-blast-2.11.0+-src
+BLAST_DIR = $(HOME)/ncbi-blast-2.12.0+-src
 
 ifdef BLAST_DIR
 
@@ -54,8 +54,8 @@ ifdef BLAST_DIR
 	# Compile with the NCBI C++ toolkit (tntblast will be able to read BLAST-formatted databases)
 	INC += -I$(BLAST_DIR)/include/ncbi-tools++
 	LIBS += -L $(BLAST_DIR)/lib \
-		-ldl -lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
-		-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio
+		-lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
+		-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio -ldl
 
 endif
 

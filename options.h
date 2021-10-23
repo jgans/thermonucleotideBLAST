@@ -65,7 +65,6 @@ struct Options
 		VARIABLE(bool, verbose) \
 		VARIABLE(bool, print_usage) \
 		VARIABLE(bool, assay_summary) \
-		VARIABLE(bool, allow_fasta_mmap) \
 		VARIABLE(bool, multiplex) \
 		VARIABLE(bool, single_primer_pcr) \
 		VARIABLE(bool, dump_query) \
@@ -134,7 +133,6 @@ struct Options
 			one_output_file_per_query = false;
 			append_name_to_defline = false;
 			assay_summary = false;
-			allow_fasta_mmap = true;
 			multiplex = false;
 			dump_query = false;
 			

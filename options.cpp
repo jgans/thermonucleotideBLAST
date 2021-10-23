@@ -50,7 +50,6 @@ void Options::parse_command_line(int argc, char *argv[])
 	// -? help
 	// -h help
 	// --help
-	// --disable-mmap (disable memory mapping of fasta files)
 	// --primer-clamp <number of exact 3' primer matches requried>
 	// --probe-clamp5 <number of exact 5' probe matches requried>
 	// --probe-clamp3 <number of exact 3' probe matches requried>
@@ -79,7 +78,6 @@ void Options::parse_command_line(int argc, char *argv[])
 
 	struct option long_opts[] = {
 		{"help", false, &config_opt, 1},
-		{"fasta-mmap", true, &config_opt, 2},
 		{"primer-clamp", true, &config_opt, 3},
 		{"probe-clamp5", true, &config_opt, 4},
 		{"probe-clamp3", true, &config_opt, 5},
@@ -120,12 +118,6 @@ void Options::parse_command_line(int argc, char *argv[])
 				// --help
 				if(config_opt == 1){
 					print_usage = true;
-					break;
-				}
-								
-				// --fasta-mmap
-				if(config_opt == 2){
-					allow_fasta_mmap = parse_bool(optarg);
 					break;
 				}
 				
@@ -456,7 +448,6 @@ void Options::parse_command_line(int argc, char *argv[])
 		cerr << "-L <T|F> (Append assay name to output defline, default is F)" << endl;
 		cerr << "-S <T|F> (Ouput assay summary after searching, default is F)" << endl;
 		cerr << "-h|-? (Command-line usage)" << endl;
-		cerr << "--fasta-mmap <T|F> (Allow memory mapping of fasta files, default is T)" << endl;
 		cerr << "--primer-clamp <number of exact 3' primer matches requried> (default is " 
 			<< DEFAULT_PRIMER_CLAMP << " bases)" << endl;
 		cerr << "--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried> (default is no limit)" << endl;

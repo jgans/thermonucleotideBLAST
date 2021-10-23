@@ -22,6 +22,10 @@
 // Version 2.1 (4/15/20)
 //	- Don't include kmers that contain non-ATGC bases. The previous scheme matched these bases 
 //	  to 'A', which can lead to spurious matches.
+//
+// Version 2.2 (10/22/21)
+//	- Replace "std::pair<size_t, size_t> *hash_table" with "hash_pair *hash_table". This is needed because, formally,
+//	  std::pair is *not* trivially copyable and we could get into trouble when calling memset/memcpy
 
 #ifndef __HASH_DBASE
 #define __HASH_DBASE
@@ -46,6 +50,13 @@ const unsigned short int word_mask_lookup[] =
 	0xffff, // 2^16 - 1
 };
 
+// A trivially copyable replacement for std::pair<size_t, size_t>
+struct hash_pair
+{
+	size_t first;
+	size_t second;
+};
+
 class DNAHash_iterator;
 
 class DNAHash {
@@ -55,7 +66,7 @@ class DNAHash {
 		typedef DNAHash_iterator iterator;
 	private:
 	
-		std::pair<size_t, size_t> *hash_table;
+		hash_pair *hash_table;
 		size_t *index_table;
 		size_t index_table_size;
 		unsigned char word_length;
@@ -149,14 +160,14 @@ class DNAHash_iterator
 	private:
 		friend class DNAHash;
 		
-		const std::pair<size_t, size_t> *hash_table;
+		const hash_pair *hash_table;
 		const size_t *index_table;
 		unsigned char word_length;
 		std::vector<unsigned short int> word_list;
 		
 		size_t word_index;
 		size_t hash_index;
-		std::pair<size_t, size_t> hash_range;
+		hash_pair hash_range;
 		
 		inline void clear()
 		{
@@ -171,10 +182,10 @@ class DNAHash_iterator
 		DNAHash_iterator()
 		{
 			hash_table = NULL;
-                        index_table = NULL;
-                        word_list.clear();
-                        word_index = 0;
-                        hash_index = SEQ_HASH_END;
+			index_table = NULL;
+			word_list.clear();
+			word_index = 0;
+			hash_index = SEQ_HASH_END;
 		};
 		
 		DNAHash_iterator(const DNAHash &m_hash) : hash_table(m_hash.hash_table),
@@ -384,7 +395,7 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 	// the hash table
 	if(hash_table == NULL){
 		
-		hash_table = new std::pair<size_t, size_t> [table_size];
+		hash_table = new hash_pair [table_size];
 		
 		if(hash_table == NULL){
 			throw __FILE__ ":DNAHash::hash: Unable to allocate hash_table";
@@ -392,7 +403,8 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 		
 	}
 	
-	memset( hash_table, 0, table_size*sizeof(std::pair<size_t, size_t>) );
+	// Cast to void* to avoid spurious warnings about "writing to an object of non-trivially copyable type" for std::pair.
+	memset( hash_table, 0, table_size*sizeof(hash_pair) );
 	
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// The current hash scheme makes *two* passes through the sequence to be hashed! The first
@@ -528,14 +540,14 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 	// the hash table
 	if(hash_table == NULL){
 		
-		hash_table = new std::pair<size_t, size_t> [table_size];
+		hash_table = new hash_pair [table_size];
 		
 		if(hash_table == NULL){
 			throw __FILE__ ":DNAHash::hash: Unable to allocate hash_table";
 		}
 	}
 	
-	memset( hash_table, 0, table_size*sizeof(std::pair<size_t, size_t>) );
+	memset( hash_table, 0, table_size*sizeof(hash_pair) );
 	
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// The current hash scheme makes *two* passes through the sequence to be hashed! The first

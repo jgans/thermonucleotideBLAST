@@ -1,37 +1,3 @@
-// ThermonucleotideBLAST
-// 
-// Copyright (c) 2007, Los Alamos National Security, LLC
-// All rights reserved.
-// 
-// Copyright 2007. Los Alamos National Security, LLC. This software was produced under U.S. Government 
-// contract DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which is operated by Los Alamos 
-// National Security, LLC for the U.S. Department of Energy. The U.S. Government has rights to use, 
-// reproduce, and distribute this software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY, 
-// LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.  
-// If software is modified to produce derivative works, such modified software should be clearly marked, 
-// so as not to confuse it with the version available from LANL.
-// 
-// Additionally, redistribution and use in source and binary forms, with or without modification, 
-// are permitted provided that the following conditions are met:
-// 
-//      * Redistributions of source code must retain the above copyright notice, this list of conditions 
-//        and the following disclaimer.
-//      * Redistributions in binary form must reproduce the above copyright notice, this list of conditions 
-//        and the following disclaimer in the documentation and/or other materials provided with the distribution.
-//      * Neither the name of Los Alamos National Security, LLC, Los Alamos National Laboratory, LANL, 
-//        the U.S. Government, nor the names of its contributors may be used to endorse or promote products 
-//        derived from this software without specific prior written permission.
-// 
-// 
-// THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS "AS IS" AND ANY 
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
-// AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC 
-// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, 
-// OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, 
-// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "annotation.h"
 
 #include <sstream>
@@ -40,31 +6,31 @@
 using namespace std;
 
 // Local functions
-int read_gbk_key(ifstream &fin);
-bool read_locus_GBK(ifstream &fin);
-void read_accession_GBK(ifstream &fin, string &m_accession);
-string read_source_GBK(ifstream &fin);
-SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len);
+int read_gbk_key(gzFile fin);
+bool read_locus_GBK(gzFile fin);
+void read_accession_GBK(gzFile in, string &m_accession);
+string read_source_GBK(gzFile fin);
+SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len);
 
-SEQPTR read_base_count_GBK(ifstream &m_fin, unsigned int &m_seq_len);
+SEQPTR read_base_count_GBK(gzFile m_fin, unsigned int &m_seq_len);
 
-unsigned int count_bases_GBK(ifstream &m_fin);
+unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq);
 
 void load_custom_color_gbk(GeneAnnotation &m_annot, const string &m_data);
 
-int next_key_GBK(ifstream &m_fin, const bool &m_clear_line = true);
+int next_key_GBK(gzFile m_fin, const bool &m_clear_line = true);
 
-int parse_gene_GBK(ifstream &m_fin, GeneAnnotation &m_gene);
-int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna);
-int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna);
-int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna);
-int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_rna);
-int parse_imp_GBK(ifstream &m_fin, GeneAnnotation &m_imp);
-int parse_user_GBK(ifstream &m_fin, GeneAnnotation &m_sig);
-int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds);
-int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene);
+int parse_gene_GBK(gzFile m_fin, GeneAnnotation &m_gene);
+int parse_rna_GBK(gzFile m_fin, GeneAnnotation &m_rna);
+int parse_rna_GBK(gzFile m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna);
+int parse_trna_GBK(gzFile m_fin, GeneAnnotation &m_trna);
+int parse_trna_GBK(gzFile m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_rna);
+int parse_imp_GBK(gzFile m_fin, GeneAnnotation &m_imp);
+int parse_user_GBK(gzFile m_fin, GeneAnnotation &m_sig);
+int parse_cds_GBK(gzFile m_fin, GeneAnnotation &m_cds);
+int parse_cds_GBK(gzFile m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene);
 
-int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field);
+int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field);
 
 // Enumerate all possible GBK keys
 enum{	GBK_EOF = 0,
@@ -94,24 +60,18 @@ enum {
 	GBK_ANNOT_NONE
 };
 
+#define	MAX_LINE_LEN	1024
+
 // Track the line number for error reporting!
 extern unsigned long int line_number;
 
-bool DNAMol::loadGBK(const std::string &m_filename, streampos &m_pos)
+bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 {
 	// Read a Genebank flat file
 
-	// First, open the file [in binary mode to allow use of
-	// read()].
-	ifstream fin(m_filename.c_str(), ios::binary);
-
-	if(!fin){
-		throw error_msg("Unable to open Genbank Flat File (gbk)");
-	}
-
 	// Are we reading from the body of this file?
 	if(m_pos > 0){
-		fin.seekg(m_pos);
+		gzseek(m_fin, m_pos, SEEK_SET);
 	}
 	else{
 		// If we're reading from the head of the file, reset the line counter
@@ -128,70 +88,83 @@ bool DNAMol::loadGBK(const std::string &m_filename, streampos &m_pos)
 	}
 
 	int key;
-	string line;
+
+	char line[MAX_LINE_LEN];
 
 	// Some defaults for GBK files (or until I find out how to 
 	// parse these entries!)
 	info_map[SOURCE] = "Unknown";
 
-	while( (key = read_gbk_key(fin)) != GBK_EOF){
+	while( (key = read_gbk_key(m_fin)) != GBK_EOF){
+
 		switch(key){
 			case GBK_NO_KEY:
+
 				// Read and throw away the line
-				getline(fin, line);
+				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+					throw error_msg("Error reading GBK_NO_KEY");
+				}
+
 				line_number ++;
 				break;
 			case GBK_UNKNOWN_KEY:
+
 				// Read and throw away the line
-				getline(fin, line);
+				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+					throw error_msg("Error reading GBK_UNKNOWN_KEY");
+				}
+
 				line_number ++;
 				break;
 			case GBK_LOCUS:
-				read_locus_GBK(fin);
+				read_locus_GBK(m_fin);
 				break;
 			case GBK_ACCESSION:
 				// Load the NCBI accesion as a SeqIdPtr
-				read_accession_GBK(fin, accession);
+				read_accession_GBK(m_fin, accession);
 				break;
 			case GBK_VERSION:
 				// The version is not currently stored
 				break;
 			case GBK_SOURCE:
-				info_map[TAXA_NAME] = read_source_GBK(fin);
+				info_map[TAXA_NAME] = read_source_GBK(m_fin);
 				break;
 			case GBK_FEATURES:
-				loadGBKFeatures(fin);
+				loadGBKFeatures(m_fin);
 				break;
 			case GBK_ORIGIN:
 				
-				seq = read_sequence_GBK(fin, seq, seq_len);
+				seq = read_sequence_GBK(m_fin, seq, seq_len);
 
 				processGeneList(true /* Loading this data for the first time */);
 				
-				m_pos = fin.tellg();
+				m_pos = gztell(m_fin);
 
 				// All done. Is there more data to read?
-				return !fin.eof();
+				return (gzeof(m_fin) == 0);
 			case GBK_CONTIG:
 				
 				// Read and throw away the CONTIG record, which may be a multi-line
 				// record. 
-				while( getline(fin, line) ){
+				//while( getline(fin, line) ){
+				while(gzgets(m_fin, line, MAX_LINE_LEN) != NULL){
 					
 					// Is the last, non-white space character a comma? If so,
 					// then this is a multi-line CONTIG record, and we need to
 					// keep reading.
 					bool is_multi_line = false;
 					
-					for(string::const_reverse_iterator i = line.rbegin();i != line.rend();++i){
+					const int len = strlen(line);
+
+					for(int i = len - 1;i >= 0;--i){
 						
-						if(*i == ','){
+						if(line[i] == ','){
 						
 							is_multi_line = true;
 							break;
 						}
 						
-						if( isalnum(*i) ){
+						if( isalnum(line[i]) ){
 							break;
 						}
 					}
@@ -205,7 +178,7 @@ bool DNAMol::loadGBK(const std::string &m_filename, streampos &m_pos)
 				break;
 			case GBK_BASE_COUNT:
 			
-				seq = read_base_count_GBK(fin, seq_len);
+				seq = read_base_count_GBK(m_fin, seq_len);
 				break;
 
 			default:
@@ -216,13 +189,16 @@ bool DNAMol::loadGBK(const std::string &m_filename, streampos &m_pos)
 	return false;
 }
 
-void DNAMol::loadGBKFeatures(ifstream &m_fin)
+void DNAMol::loadGBKFeatures(gzFile m_fin)
 {
 	// Read and process all of the feature elements in a GBK file
 	// Skip to the next line
-	string buffer;
+	char buffer[MAX_LINE_LEN];
 
-	getline(m_fin, buffer);
+	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading first line";
+	}
+
 	line_number ++;
 	
 	int annot_key = next_key_GBK(m_fin);
@@ -244,7 +220,10 @@ void DNAMol::loadGBKFeatures(ifstream &m_fin)
 			case GBK_ANNOT_SOURCE:
 				// Skip the source feature for now. We'll need to parse
 				// this feature to extract the taxon id).
-				getline(m_fin, buffer);
+				if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+					throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading GBK_ANNOT_SOURCE";
+				}
+
 				line_number ++;
 				
 				annot_key = next_key_GBK(m_fin);
@@ -336,7 +315,7 @@ void DNAMol::loadGBKFeatures(ifstream &m_fin)
 	}
 }
 
-int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds)
+int parse_cds_GBK(gzFile m_fin, GeneAnnotation &m_cds)
 {
 	// Clear any existing info
 	m_cds.clear();
@@ -396,7 +375,7 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds)
 	return annot_key;
 }
 
-int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
+int parse_cds_GBK(gzFile m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene, bool &m_add_gene)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -466,7 +445,7 @@ int parse_cds_GBK(ifstream &m_fin, GeneAnnotation &m_cds, GeneAnnotation &m_gene
 }
 
 
-int parse_gene_GBK(ifstream &m_fin, GeneAnnotation &m_gene)
+int parse_gene_GBK(gzFile m_fin, GeneAnnotation &m_gene)
 {
 	// Clear any existing info
 	m_gene.clear();
@@ -516,7 +495,7 @@ int parse_gene_GBK(ifstream &m_fin, GeneAnnotation &m_gene)
 	return annot_key;
 }
 
-int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna)
+int parse_rna_GBK(gzFile m_fin, GeneAnnotation &m_rna)
 {
 	// Clear any existing info
 	m_rna.clear();
@@ -563,7 +542,7 @@ int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna)
 	return annot_key;
 }
 
-int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna)
+int parse_rna_GBK(gzFile m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene, bool &m_add_rna)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -623,7 +602,7 @@ int parse_rna_GBK(ifstream &m_fin, GeneAnnotation &m_rna, GeneAnnotation &m_gene
 	return annot_key;
 }
 
-int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna)
+int parse_trna_GBK(gzFile m_fin, GeneAnnotation &m_trna)
 {
 	// Clear any existing info
 	m_trna.clear();
@@ -670,7 +649,7 @@ int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna)
 	return annot_key;
 }
 
-int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_trna)
+int parse_trna_GBK(gzFile m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_gene, bool &m_add_trna)
 {
 	// Read the range of this annotation
 	pair<unsigned int, unsigned int> range;
@@ -730,8 +709,7 @@ int parse_trna_GBK(ifstream &m_fin, GeneAnnotation &m_trna, GeneAnnotation &m_ge
 	return annot_key;
 }
 
-
-int parse_imp_GBK(ifstream &m_fin, GeneAnnotation &m_imp)
+int parse_imp_GBK(gzFile m_fin, GeneAnnotation &m_imp)
 {
 	// Clear any existing info
 	m_imp.clear();
@@ -778,7 +756,7 @@ int parse_imp_GBK(ifstream &m_fin, GeneAnnotation &m_imp)
 	return annot_key;
 }
 
-int parse_user_GBK(ifstream &m_fin, GeneAnnotation &m_sig)
+int parse_user_GBK(gzFile m_fin, GeneAnnotation &m_sig)
 {
 	// Clear any existing info
 	m_sig.clear();
@@ -829,7 +807,7 @@ int parse_user_GBK(ifstream &m_fin, GeneAnnotation &m_sig)
 	return annot_key;
 }
 
-int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
+int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 {
 	// Check for a possible annotation key
 	const int annot_key = next_key_GBK(m_fin, false /* Don't clear the line */);
@@ -857,11 +835,14 @@ int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
 	// Count the number of matching '(' and ')'
 	int paren_count = 0;
 
-	m_fin.getline(buffer, buffer_size);
+	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":parse_field_GBK: Error reading line (1)";
+	}
+
 	line_number ++;
 	
 	// How many characters did we read?
-	unsigned int len = m_fin.gcount();
+	unsigned int len = strlen(buffer);
 
 	// Read the key from buffer
 	start_ptr = strchr(buffer, '/');
@@ -926,7 +907,7 @@ int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
 	// Do we have a single line field?
 	if((paren_count == 0) && *start_ptr != '"'){
 		// Yes -- this is a single line field
-		stop_ptr = buffer + len - 2;
+		stop_ptr = buffer + (len - 1);
 
 		while(isspace(*stop_ptr)){
 			*stop_ptr = '\0';
@@ -949,7 +930,7 @@ int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
 	// Clear the field variable
 	m_field.second = "";
 
-	stop_ptr = buffer + len - 2;
+	stop_ptr = buffer + (len - 1);
 
 	while(true){
 		
@@ -1012,10 +993,13 @@ int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
 		}
 
 		// Read another line
-		m_fin.getline(buffer, buffer_size);
+		if(gzgets(m_fin, buffer, buffer_size) == NULL){
+			throw __FILE__ ":parse_field_GBK: Error reading line (2)";
+		}
+
 		line_number ++;
 		
-		len = m_fin.gcount();
+		len = strlen(buffer);
 		
 		// Empty lines are not allowed!
 		if(len == 0){
@@ -1028,13 +1012,13 @@ int parse_field_GBK(ifstream &m_fin, pair<string, string> &m_field)
 			start_ptr++;
 		}
 
-		stop_ptr = buffer + len - 2;
+		stop_ptr = buffer + (len - 1);
 	}
 
 	return annot_key;
 }
 
-int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
+int next_key_GBK(gzFile m_fin, const bool &m_clear_line /* = true */)
 {
 	const int buffer_size = 21;
 	
@@ -1044,7 +1028,7 @@ int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
 	// Terminate the array
 	buffer[buffer_size] = '\0';
 
-	if( !m_fin.read(buffer, buffer_size) ){
+	if( gzread(m_fin, buffer, buffer_size) != buffer_size ){
 		throw error_msg("Unable to read next annotation key");
 	}
 	
@@ -1056,8 +1040,13 @@ int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
 	// Is this an empty string?
 	if(*start_ptr == '\0'){
 		if(m_clear_line){
-			// Throw away the rest of the line
-			m_fin.ignore(80, '\n');
+
+			char buffer[MAX_LINE_LEN];
+
+			if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+				throw __FILE__ ":next_key_GBK: Unable to discard remaining characters";
+			}
+
 			line_number ++;
 		}
 
@@ -1071,17 +1060,17 @@ int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
 
 	// Have we read into the base count section?
 	if(strncmp(start_ptr, "BASE", 4 /*strlen("BASE")*/) == 0){
-	
+
 		// Rewind the stream by buffer_size characters
-		m_fin.seekg(-buffer_size, ios::cur);
+		gzseek(m_fin, -buffer_size, SEEK_CUR);
 
 		return GBK_ANNOT_END;
 	}
 
 	if(strncmp(start_ptr, "CONTIG", 6 /*strlen("CONTIG")*/) == 0){
-	
+		
 		// Rewind the stream by buffer_size characters
-		m_fin.seekg(-buffer_size, ios::cur);
+		gzseek(m_fin, -buffer_size, SEEK_CUR);
 
 		return GBK_ANNOT_END;
 	}
@@ -1090,8 +1079,9 @@ int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
 	// record from derailing the parsing of the entire GBK file (2/17/2017).
 	if( (strncmp(start_ptr, "ORIGIN", 6 /*strlen("ORIGIN")*/) == 0) ||
 	    (strncmp(start_ptr, "//", 2 /*strlen("//")*/) == 0) ){
+
 		// Rewind the stream by buffer_size characters
-		m_fin.seekg(-buffer_size, ios::cur);
+		gzseek(m_fin, -buffer_size, SEEK_CUR);
 
 		return GBK_ANNOT_END;
 	}
@@ -1125,14 +1115,17 @@ int next_key_GBK(ifstream &m_fin, const bool &m_clear_line /* = true */)
 	return GBK_ANNOT_IMP;
 }
 
-SEQPTR read_base_count_GBK(ifstream &m_fin, unsigned int &m_seq_len)
+SEQPTR read_base_count_GBK(gzFile m_fin, unsigned int &m_seq_len)
 {
 	// Read the number of bases to expect in the sequence
 	const char buffer_size = 126;
 	char buffer[buffer_size];
 	char *start_ptr, *stop_ptr;
 
-	m_fin.getline(buffer, buffer_size);
+	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":read_base_count_GBK: Unable to read line";
+	}
+
 	line_number ++;
 	
 	///////////// Read the number of a's /////////////
@@ -1226,7 +1219,7 @@ SEQPTR read_base_count_GBK(ifstream &m_fin, unsigned int &m_seq_len)
 
 	// Set the sequence size
 	m_seq_len = a_count + t_count + g_count + c_count + other_count;
-	
+
 	SEQPTR seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 	
 	if(!seq){
@@ -1237,9 +1230,9 @@ SEQPTR read_base_count_GBK(ifstream &m_fin, unsigned int &m_seq_len)
 }
 
 // Read nucleotide sequence and return the gc content
-SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
+SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 {
-	streampos pos = m_fin.tellg();
+	size_t pos = gztell(m_fin);
 	SEQPTR seq = m_seq;
 		
 	// Have we read the number of bases in the sequence?
@@ -1247,18 +1240,36 @@ SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 
 		// We don't know the size of the DNA molecule
 		// Count the number of bases and ALSO the GC content!
-		m_seq_len = count_bases_GBK(m_fin);
+		deque<char> local_seq;
+
+		m_seq_len = count_bases_GBK(m_fin, local_seq);
 		
 		seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 		
 		if(!seq){
-			throw __FILE__ ": Unable to allocate memory for sequence data";
+			throw __FILE__ ":read_sequence_GBK: Unable to allocate memory for sequence data";
 		}
 
-		// Restore the state of the input file
-		m_fin.clear();
+		SEQPTR iter = seq;
 
-		m_fin.seekg(pos);
+		// Initialize the sequence length component of the header
+		memcpy( iter, &m_seq_len, sizeof(unsigned int) );
+		iter += sizeof(unsigned int);
+
+		for(deque<char>::const_iterator i = local_seq.begin();i != local_seq.end();++i,++iter){
+			*iter = ascii_to_hash_base(*i);
+		}
+
+		// Put the end of record terminator back
+		gzungetc('/', m_fin);
+		gzungetc('/', m_fin);
+		gzungetc('\n', m_fin);
+
+		// Restore the state of the input file
+		//gzclearerr(m_fin);
+		//gzseek(m_fin, pos, SEEK_SET);
+
+		return seq;
 	}
 
 	// The buffer size is a parameter that must be tuned for the file IO of 
@@ -1276,19 +1287,21 @@ SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 	iter += sizeof(unsigned int);
 	
 	// First, throw away the line that contains "ORIGIN"
-	m_fin.getline(buffer, buffer_size);
+	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":read_sequence_GBK: Error reading ORIGIN";
+	}
+
 	line_number ++;
 	
 	// Track the current position
 	pos += strlen(buffer);
 
 	// Read until we hit a "/" symbol or reach the end of the file
-	while( !m_fin.eof() ){
+	while(gzread(m_fin, buffer, buffer_size) > 0){
 	
-		m_fin.read(buffer, buffer_size);
 		ptr = buffer;
 		
-		const unsigned int len = m_fin.gcount();
+		const unsigned int len = strlen(buffer);
 
 		for(unsigned int i = 0;i < len;i++, ptr++){
 			
@@ -1296,13 +1309,13 @@ SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 			
 				// all done!
 				if( base_count != m_seq_len ){					
-					throw error_msg("Did not read enough bases");
+					throw __FILE__ ":read_sequence_GBK: Did not read enough bases";
 				}
 				
 				pos += i;
 
-				m_fin.clear();
-				m_fin.seekg(pos);
+				gzclearerr(m_fin);
+				gzseek(m_fin, pos, SEEK_SET);
 				
 				return seq;
 			}
@@ -1380,7 +1393,7 @@ SEQPTR read_sequence_GBK(ifstream &m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 	return NULL;
 }
 
-unsigned int count_bases_GBK(ifstream &m_fin)
+unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 {
 	// The buffer size is a parameter that must be tuned for the file IO of 
 	// a given machine.
@@ -1391,24 +1404,32 @@ unsigned int count_bases_GBK(ifstream &m_fin)
 	unsigned int base_count = 0;
 	
 	// First, throw away the line that contains "ORIGIN"
-	m_fin.getline(buffer, buffer_size);
+	if( gzgets(m_fin, buffer, buffer_size) == NULL){
+		throw __FILE__ ":count_bases_GBK: Unable to read line (1)";
+	}
 	
 	// We're going to rewind, so don't increment the line number counter
 	
 	// Read until we hit a "/" symbol or reach the end of the file
-	while( !m_fin.eof() ){
+	while( gzeof(m_fin) == 0 ){
 	
-		m_fin.read(buffer, buffer_size);
+		if( gzgets(m_fin, buffer, buffer_size) == NULL){
+			throw __FILE__ ":count_bases_GBK: Unable to read line (2)";
+		}
+
 		ptr = buffer;
 		
-		const unsigned int len = m_fin.gcount();
+		const unsigned int len = strlen(buffer);
 
 		for(unsigned int i = 0;i < len;i++, ptr++){
 
-			// We expect upper case letters, so test for these first
-			if( (*ptr >= 'A') && (*ptr <= 'Z') ){
+			const char b = toupper(*ptr);
+
+			if( (b >= 'A') && (b <= 'Z') ){
 			
 				base_count++;
+				m_seq.push_back(b);
+
 				continue;
 			}
 			
@@ -1417,42 +1438,6 @@ unsigned int count_bases_GBK(ifstream &m_fin)
 				// all done!
 				return base_count;
 			}
-			
-			// Test for lower case letters
-			if( (*ptr >= 'a') && (*ptr <= 'z') ){
-			
-				base_count++;
-				continue;
-			}
-					
-			#ifdef OPTIMIZE
-			 
-			switch(buffer[i]){
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9':
-				case ' ':
-				case '\t':
-				case '\n':
-				case '\r':
-					// Skip digits and white space
-					break;
-				case '/':
-					// all done!
-					return base_count;
-				default:
-					base_count++;
-					break;
-			};
-			
-			#endif // OPTIMIZE
 		}
 	}
 
@@ -1461,12 +1446,19 @@ unsigned int count_bases_GBK(ifstream &m_fin)
 	return 0;
 }
 
-string read_source_GBK(ifstream &fin)
+string read_source_GBK(gzFile m_fin)
 {
 	string taxa;
 	string buffer;
 
-	getline(fin, buffer);
+	char line[MAX_LINE_LEN];
+
+	if( gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":read_source_GBK: Unable to read line";
+	}
+
+	buffer = line;
+
 	line_number ++;
 
 	stringstream ss(buffer);
@@ -1483,28 +1475,42 @@ string read_source_GBK(ifstream &fin)
 	return taxa;
 }
 
-void read_accession_GBK(ifstream &fin, string &m_accession)
+void read_accession_GBK(gzFile m_fin, string &m_accession)
 {
-	fin >> m_accession;
+	m_accession.clear();
+
+	char c;
+
+	while( ( c = gzgetc(m_fin) ) != -1 ){
+
+		if( !m_accession.empty() && isspace(c) ){
+
+			gzungetc(c, m_fin);
+			return;
+		}
+
+		m_accession.push_back(c);
+	}
 }
 
-bool read_locus_GBK(ifstream &fin)
+bool read_locus_GBK(gzFile m_fin)
 {
-	string line;
+	char line[MAX_LINE_LEN];
 
-	getline(fin, line);
-	line_number ++;
+	if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+		throw __FILE__ ":read_locus_GBK: Unable to read line";
+	}
+	
+	const int len = strlen(line);
 
-	string::iterator iter;
-
-	for(iter = line.begin();iter != line.end(); iter++){
-		*iter = tolower(*iter);
+	for(int i = 0;i < len;++i){
+		line[i] = tolower(line[i]);
 	}
 
-	return (string::npos != line.find("circular"));
+	return (strstr(line, "circular") != NULL);
 }
 
-int read_gbk_key(ifstream &fin)
+int read_gbk_key(gzFile m_fin)
 {
 	const int buffer_size = 12;
 	
@@ -1514,8 +1520,8 @@ int read_gbk_key(ifstream &fin)
 	// key words
 	for(int i = 0;i < buffer_size;++i){
 		
-		const int c = fin.get();
-		
+		const int c = gzgetc(m_fin);
+
 		if(c == '\r'){
 			continue;
 		}
@@ -1539,7 +1545,6 @@ int read_gbk_key(ifstream &fin)
 
 	string::iterator iter;
 	
-
 	for(iter = key.begin();iter != key.end();iter++){
 		*iter = toupper(*iter);
 	}

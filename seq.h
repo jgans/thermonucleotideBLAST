@@ -1,6 +1,8 @@
 #ifndef __SEQ
 #define __SEQ
 
+#include <ctype.h>
+
 // Provide a mapping back to ATGC
 #define	DB_MASK			3
 
@@ -139,6 +141,49 @@ inline char hash_base_to_ascii_complement(const unsigned char &m_base)
 	
 	// Should never get here
 	return -1;
+}
+
+inline char ascii_to_hash_base(char m_base)
+{
+	switch( toupper(m_base) ){
+		case 'A':
+			return DB_A;
+		case 'C':
+			return DB_C;
+		case 'G':
+			return DB_G;
+		case 'T':
+		case 'U': // <-- Map RNA to DNA
+			return DB_T;
+		case 'I':
+			return DB_I;
+		case 'M':
+			return DB_M;
+		case 'R':
+			return DB_R;
+		case 'S':
+			return DB_S;
+		case 'V':
+			return DB_V;
+		case 'W':
+			return DB_W;
+		case 'Y':
+			return DB_Y;
+		case 'H':
+			return DB_H;
+		case 'K':
+			return DB_K;
+		case 'D':
+			return DB_D;
+		case 'B':
+			return DB_B;
+		case 'N':
+			return DB_N;
+		case '-':
+			return DB_GAP;
+	};
+	
+	return DB_UNKNOWN;
 }
 
 #endif // __SEQ

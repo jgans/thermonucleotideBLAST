@@ -25,7 +25,7 @@ inline bool is_number(const string &m_str)
 }
 
 void sequence_data::open(const string &m_filename, const vector<string> &m_blast_include,
-	const vector<string> &m_blast_exclude, const bool &m_allow_fasta_mmap)
+	const vector<string> &m_blast_exclude)
 {
 	#ifdef USE_BLAST_DB
 
@@ -240,27 +240,20 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 	}
 	#endif // USE_BLAST_DB
 	
-	// Is this file a recognized annotation file (i.e. GBK, GFF3, etc.)?
+	// Is this file a recognized annotation file (i.e. GBK, EMBL, etc.)?
 	switch( file_type(m_filename) ){
 	
 		case DNAMol::FASTA:
-			load_fasta(m_filename, m_allow_fasta_mmap);
+			load_fasta(m_filename);
 			return;
 		case DNAMol::FASTQ:
-			load_fastq(m_filename, m_allow_fasta_mmap);
+			load_fastq(m_filename);
 			return;
 		case DNAMol::GBK:
 			load_gbk(m_filename);
 			return;
 		case DNAMol::EMBL:
 			load_embl(m_filename);
-			return;
-		case DNAMol::GFF3:
-			load_gff3(m_filename);
-			return;
-		case DNAMol::PTT:
-			throw "The PTT file format is not currently supported";
-			//load_ptt(m_filename);
 			return;
 		default:
 			throw "File not found, unrecognized file type, or error reading BLAST database";
@@ -273,14 +266,8 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 	unsigned int seq_len = 0;
 	
 	switch(format){
-		case FASTA_MMAP:
-			seq_len = read_bio_seq_fasta_mmap(m_seq, m_index);
-			break;
 		case FASTA_SLOW:
 			seq_len = read_bio_seq_fasta_slow(m_seq, m_index);
-			break;
-		case FASTQ_MMAP:
-			seq_len = read_bio_seq_fastq_mmap(m_seq, m_index);
 			break;
 		case FASTQ_SLOW:
 			seq_len = read_bio_seq_fastq_slow(m_seq, m_index);
@@ -297,8 +284,6 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 		#endif // USE_MPI
 		case GBK:
 		case EMBL:
-		case GFF3:
-		case PTT:
 			seq_len = read_bio_seq_annot(m_seq, m_index);
 			break;
 		default:
@@ -315,14 +300,8 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 	unsigned int seq_len = 0;
 	
 	switch(format){
-		case FASTA_MMAP:
-			seq_len = read_bio_seq_fasta_mmap(m_seq, m_index, m_start, m_stop);
-			break;
 		case FASTA_SLOW:
 			seq_len = read_bio_seq_fasta_slow(m_seq, m_index, m_start, m_stop);
-			break;
-		case FASTQ_MMAP:
-			seq_len = read_bio_seq_fastq_mmap(m_seq, m_index, m_start, m_stop);
 			break;
 		case FASTQ_SLOW:
 			seq_len = read_bio_seq_fastq_slow(m_seq, m_index, m_start, m_stop);
@@ -339,8 +318,6 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 		#endif // USE_MPI
 		case GBK:
 		case EMBL:
-		case GFF3:
-		case PTT:
 			seq_len = read_bio_seq_annot(m_seq, m_index, m_start, m_stop);
 			break;
 		default:
@@ -701,19 +678,15 @@ size_t sequence_data::size() const
 	// function is called before seq_length is initialized!
 	
 	switch(format){
-		case FASTA_MMAP:
 		case FASTA_SLOW:
-		case FASTQ_MMAP:
 		case FASTQ_SLOW:
 			return seq_index.size();
 		case NCBI:
 			return seq_length.size();
-			return 0;
 		case REMOTE:
 			throw __FILE__ ":sequence_data::size: size is not defined for remote databases";
 		case GBK:
 		case EMBL:
-		case PTT:
 			return mol.size();
 		default:
 			throw __FILE__ ":sequence_data::size: size is not defined for uninitialized databases";

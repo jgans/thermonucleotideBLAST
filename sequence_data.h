@@ -9,17 +9,7 @@
 #include <fstream>
 #include <string>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#ifdef WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#include <sys/mman.h>
-#endif // WIN32
-
-#include <fcntl.h>
+#include <zlib.h>
 
 #include "seq_hash.h"
 
@@ -41,12 +31,11 @@ class sequence_data
 {
 	public:
 	
-	// Note that PTT must be the last annotation type in the enumeration
-	enum {FASTA_MMAP = 0, FASTA_SLOW, FASTQ_MMAP, FASTQ_SLOW, 
+	enum {FASTA_SLOW, FASTQ_SLOW, 
 		NCBI, REMOTE,
 
 		// The file formats with annotation start here
-		GBK, EMBL, GFF3, PTT, NONE};
+		GBK, EMBL, NONE};
 	
 	private:
 	
@@ -55,25 +44,11 @@ class sequence_data
 	#endif // USE_BLAST_DB
 	
 	unsigned char format;
-	
-	unsigned int read_bio_seq_fasta_mmap(std::pair<std::string, SEQPTR> &m_seq, 
-		const unsigned int &m_index) const;
-	
-	unsigned int read_bio_seq_fasta_mmap(std::pair<std::string, SEQPTR> &m_seq, 
-		const unsigned int &m_index, const int &m_start, 
-		const int &m_stop) const;
 		
 	unsigned int read_bio_seq_fasta_slow(std::pair<std::string, SEQPTR> &m_seq, 
 		const unsigned int &m_index) const;
 
 	unsigned int read_bio_seq_fasta_slow(std::pair<std::string, SEQPTR> &m_seq, 
-		const unsigned int &m_index, const int &m_start, 
-		const int &m_stop) const;
-	
-	unsigned int read_bio_seq_fastq_mmap(std::pair<std::string, SEQPTR> &m_seq, 
-		const unsigned int &m_index) const;
-	
-	unsigned int read_bio_seq_fastq_mmap(std::pair<std::string, SEQPTR> &m_seq, 
 		const unsigned int &m_index, const int &m_start, 
 		const int &m_stop) const;
 		
@@ -121,25 +96,16 @@ class sequence_data
 	// Store (sequence length, index) pairs, sorted by length
 	std::vector< std::pair<unsigned int, unsigned int> > seq_length;
 	
-	#ifdef WIN32
-	HANDLE fasta_in;
-	HANDLE h_map_file;
-	HANDLE buffer;
-	#else
-	int fasta_in;
-	unsigned char *buffer;
-	#endif // WIN32
+	gzFile fasta_in;
 	
 	file_index buffer_size;
 	
 	bool _verbose;
 		
-	void load_fasta(const std::string &m_filename, const bool &m_allow_fasta_mmap);
-	void load_fastq(const std::string &m_filename, const bool &m_allow_fastq_mmap);
+	void load_fasta(const std::string &m_filename);
+	void load_fastq(const std::string &m_filename);
 	void load_gbk(const std::string &m_filename);
 	void load_embl(const std::string &m_filename);
-	void load_ptt(const std::string &m_filename);
-	void load_gff3(const std::string &m_filename);
 	
 	public:
 
@@ -151,14 +117,8 @@ class sequence_data
 		blast_db_ptr = NULL;
 		#endif // USE_BLAST_DB
 		
-		#ifdef WIN32
 		fasta_in = NULL;
-		h_map_file = NULL;
-		#else
-		fasta_in = -1;
-		#endif // WIN32
-
-		buffer = NULL;
+		
 		buffer_size = 0;
 		
 		_verbose = true;
@@ -183,33 +143,18 @@ class sequence_data
 		}
 		#endif // USE_BLAST_DB
 		
-		#ifdef WIN32
 		if(fasta_in != NULL){
 
-			if(h_map_file != NULL){
-				UnmapViewOfFile(h_map_file);
-				CloseHandle(h_map_file);
-			}
+			//if(buffer != NULL){
+			//	munmap(buffer, buffer_size);
+			//}
 			
-			buffer = NULL;
+			//buffer = NULL;
 			buffer_size = 0;
-			CloseHandle(fasta_in);
+			
+			gzclose(fasta_in);
 			fasta_in = NULL;
 		}
-		#else
-		if(fasta_in != -1){
-
-			if(buffer != NULL){
-				munmap(buffer, buffer_size);
-			}
-			
-			buffer = NULL;
-			buffer_size = 0;
-			
-			::close(fasta_in);
-			fasta_in = -1;
-		}
-		#endif // WIN32
 	};
 	
 	// The number of target sequences
@@ -220,7 +165,7 @@ class sequence_data
 	size_t effective_size(const unsigned int &m_max_len) const;
 	
 	void open(const std::string &m_filename, const std::vector<std::string> &m_blast_include,
-		const std::vector<std::string> &m_blast_exclude, const bool &m_allow_fasta_mmap);
+		const std::vector<std::string> &m_blast_exclude);
 	
 	unsigned int read_bio_seq(std::pair<std::string, SEQPTR> &m_seq, const unsigned int &m_index) const;
 		
@@ -235,13 +180,13 @@ class sequence_data
 	// Does the file format contain annotation information?
 	inline bool is_annot_format() const
 	{
-		return ( (format >= GBK) && (format <= PTT) );
+		return ( (format == GBK) || (format == EMBL) );
 	};
 		
 	// A helper function. Does the specified file format use indicies?
 	inline bool wants_indicies(const int &m_format) const
 	{
-		return ( (m_format == FASTA_MMAP) || (m_format == FASTA_SLOW) );
+		return (m_format == FASTA_SLOW);
 	};
 	
 	// Use previously computed indicies for loading sequence records from fasta files
