@@ -28,6 +28,7 @@ int master(int argc, char *argv[])
 {
 
 	try{
+		
 		ofstream fout;
 		ostream *ptr_out = NULL;
 		
@@ -191,8 +192,7 @@ int master(int argc, char *argv[])
 				cout << "Reading sequence database: " << opt.dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.dbase_filename, opt.blast_include, opt.blast_exclude,
-				opt.allow_fasta_mmap);
+			seq_file.open(opt.dbase_filename, opt.blast_include, opt.blast_exclude);
 		}
 		else{
 			
@@ -200,8 +200,7 @@ int master(int argc, char *argv[])
 				cout << "Reading sequence database: " << opt.local_dbase_filename << endl;
 			}
 			
-			seq_file.open(opt.local_dbase_filename, opt.blast_include, opt.blast_exclude,
-				opt.allow_fasta_mmap);
+			seq_file.open(opt.local_dbase_filename, opt.blast_include, opt.blast_exclude);
 		}
 		
 		// How many sequences are in the database? The user can specify either a global

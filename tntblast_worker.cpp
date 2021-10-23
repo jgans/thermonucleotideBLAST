@@ -92,8 +92,7 @@ int worker(int argc, char *argv[])
 				seq_file.indicies(tmp);
 			}
 			
-			seq_file.open( (char*)opt.dbase_filename.c_str(), opt.blast_include, opt.blast_exclude,
-				opt.allow_fasta_mmap);
+			seq_file.open( (char*)opt.dbase_filename.c_str(), opt.blast_include, opt.blast_exclude);
 		}
 		
 		// Initialize the melting engine. There is a fair amount of overhead involved in
