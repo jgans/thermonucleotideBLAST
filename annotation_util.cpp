@@ -9,6 +9,8 @@ using namespace std;
 
 unsigned long int line_number = 1;
 
+bool is_eol(char m_c);
+
 // Note that genbank entries are 1's based (not zero based like asn.1
 // entires).
 bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range, 
@@ -17,15 +19,15 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 	unsigned int i = 0;
 	char buffer[MAX_LINE_LEN];
 
-	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
 		throw __FILE__ ":read_range: Unable to read line";
 	}
 
-	line_number ++;
+	++line_number;
 	
 	unsigned int len = strlen(buffer);
 
-	// Make the range parsing robust to Mac/PC?Unix EOL differences
+	// Make the range parsing robust to Mac/PC/Unix EOL differences
 	if((len > 0) && (buffer[len - 1] == '\r') ){
 		len--;
 	}
@@ -42,7 +44,7 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 
 	// Is this a basic range (i.e. xxx..yyy) ?
 	if( isdigit(buffer[i]) ){
-	
+
 		// Read a basic range: The first entry ...
 		list<char> number;
 
@@ -155,7 +157,7 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 		
 		char tmp[MAX_LINE_LEN];
 
-		if(gzgets(m_fin, tmp, MAX_LINE_LEN) == NULL){
+		if( (gzgets(m_fin, tmp, MAX_LINE_LEN) == NULL) || !strip_eol(tmp, MAX_LINE_LEN) ){
 			throw __FILE__ ":read_range: Unable to read tmp line";
 		}
 
@@ -326,3 +328,29 @@ char *error_msg(const char *m_error)
 	return error;
 }
 
+bool is_eol(char m_c)
+{
+	return (m_c == '\n') || (m_c == '\r');
+}
+
+// Return true if we successfully found and removed any trailing eol
+// characters (i.e., '\n' or '\r')
+bool strip_eol(char *m_buffer, const size_t &m_max_len)
+{
+	size_t len = strnlen(m_buffer, m_max_len);
+
+	if(len == m_max_len){
+		return false;
+	}
+
+	bool found_eol = false;
+
+	while( (len > 0) && is_eol(m_buffer[len - 1]) ){
+
+		found_eol = true;
+		m_buffer[len - 1] = '\0';
+		--len;
+	}
+
+	return found_eol;
+}

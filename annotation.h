@@ -597,6 +597,7 @@ bool read_range(gzFile m_fin, std::pair<unsigned int, unsigned int> &m_range,
 	std::list< std::pair<unsigned int, unsigned int> > &m_seg_list);
 unsigned int list_to_int(std::list<char> &m_number);
 char *error_msg(const char *m_error);
+bool strip_eol(char *m_buffer, const size_t &m_max_len);
 
 // In annotation_export.cpp
 std::string itoa(const int &m_int);

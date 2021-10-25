@@ -1,3 +1,6 @@
+# Version 2.4 (October 25, 2021)
+- Fixed parsing error for annotation files (GBK and EMBL).
+
 # Version 2.3 (October 22, 2021)
 - Cleaned up `seq_hash.h` to address compiler warnings about clearing/setting an object of non-trivial type.
 - Removed WIN32 support for reading fasta sequences.

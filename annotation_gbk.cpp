@@ -101,7 +101,7 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 			case GBK_NO_KEY:
 
 				// Read and throw away the line
-				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 					throw error_msg("Error reading GBK_NO_KEY");
 				}
 
@@ -110,7 +110,7 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 			case GBK_UNKNOWN_KEY:
 
 				// Read and throw away the line
-				if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 					throw error_msg("Error reading GBK_UNKNOWN_KEY");
 				}
 
@@ -133,7 +133,7 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 				loadGBKFeatures(m_fin);
 				break;
 			case GBK_ORIGIN:
-				
+
 				seq = read_sequence_GBK(m_fin, seq, seq_len);
 
 				processGeneList(true /* Loading this data for the first time */);
@@ -143,11 +143,11 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 				// All done. Is there more data to read?
 				return (gzeof(m_fin) == 0);
 			case GBK_CONTIG:
-				
+
 				// Read and throw away the CONTIG record, which may be a multi-line
 				// record. 
 				//while( getline(fin, line) ){
-				while(gzgets(m_fin, line, MAX_LINE_LEN) != NULL){
+				while( (gzgets(m_fin, line, MAX_LINE_LEN) != NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 					
 					// Is the last, non-white space character a comma? If so,
 					// then this is a multi-line CONTIG record, and we need to
@@ -177,7 +177,7 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 				line_number ++;
 				break;
 			case GBK_BASE_COUNT:
-			
+
 				seq = read_base_count_GBK(m_fin, seq_len);
 				break;
 
@@ -195,7 +195,7 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 	// Skip to the next line
 	char buffer[MAX_LINE_LEN];
 
-	if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
 		throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading first line";
 	}
 
@@ -220,7 +220,7 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 			case GBK_ANNOT_SOURCE:
 				// Skip the source feature for now. We'll need to parse
 				// this feature to extract the taxon id).
-				if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+				if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
 					throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading GBK_ANNOT_SOURCE";
 				}
 
@@ -295,6 +295,7 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 
 				break;
 			case GBK_ANNOT_IMP:
+
 				annot_key = parse_imp_GBK(m_fin, tmp_gene);
 
 				// Save this gene
@@ -835,7 +836,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 	// Count the number of matching '(' and ')'
 	int paren_count = 0;
 
-	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 		throw __FILE__ ":parse_field_GBK: Error reading line (1)";
 	}
 
@@ -993,7 +994,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 		}
 
 		// Read another line
-		if(gzgets(m_fin, buffer, buffer_size) == NULL){
+		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 			throw __FILE__ ":parse_field_GBK: Error reading line (2)";
 		}
 
@@ -1043,7 +1044,7 @@ int next_key_GBK(gzFile m_fin, const bool &m_clear_line /* = true */)
 
 			char buffer[MAX_LINE_LEN];
 
-			if(gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL){
+			if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
 				throw __FILE__ ":next_key_GBK: Unable to discard remaining characters";
 			}
 
@@ -1122,7 +1123,7 @@ SEQPTR read_base_count_GBK(gzFile m_fin, unsigned int &m_seq_len)
 	char buffer[buffer_size];
 	char *start_ptr, *stop_ptr;
 
-	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 		throw __FILE__ ":read_base_count_GBK: Unable to read line";
 	}
 
@@ -1261,9 +1262,9 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 		}
 
 		// Put the end of record terminator back
-		gzungetc('/', m_fin);
-		gzungetc('/', m_fin);
-		gzungetc('\n', m_fin);
+		//gzungetc('/', m_fin);
+		//gzungetc('/', m_fin);
+		//gzungetc('\n', m_fin);
 
 		// Restore the state of the input file
 		//gzclearerr(m_fin);
@@ -1287,7 +1288,7 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 	iter += sizeof(unsigned int);
 	
 	// First, throw away the line that contains "ORIGIN"
-	if(gzgets(m_fin, buffer, buffer_size) == NULL){
+	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 		throw __FILE__ ":read_sequence_GBK: Error reading ORIGIN";
 	}
 
@@ -1404,7 +1405,7 @@ unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 	unsigned int base_count = 0;
 	
 	// First, throw away the line that contains "ORIGIN"
-	if( gzgets(m_fin, buffer, buffer_size) == NULL){
+	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 		throw __FILE__ ":count_bases_GBK: Unable to read line (1)";
 	}
 	
@@ -1413,7 +1414,7 @@ unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 	// Read until we hit a "/" symbol or reach the end of the file
 	while( gzeof(m_fin) == 0 ){
 	
-		if( gzgets(m_fin, buffer, buffer_size) == NULL){
+		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
 			throw __FILE__ ":count_bases_GBK: Unable to read line (2)";
 		}
 
@@ -1453,7 +1454,7 @@ string read_source_GBK(gzFile m_fin)
 
 	char line[MAX_LINE_LEN];
 
-	if( gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 		throw __FILE__ ":read_source_GBK: Unable to read line";
 	}
 
@@ -1497,7 +1498,7 @@ bool read_locus_GBK(gzFile m_fin)
 {
 	char line[MAX_LINE_LEN];
 
-	if(gzgets(m_fin, line, MAX_LINE_LEN) == NULL){
+	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 		throw __FILE__ ":read_locus_GBK: Unable to read line";
 	}
 	
