@@ -23,7 +23,7 @@ void sequence_data::load_gbk(const std::string &m_filename)
 	}
 
 	while(true){
-		
+
 		mol.push_back( DNAMol() );
 		
 		if(mol.back().load(fin, DNAMol::GBK, pos) == false){
