@@ -1,3 +1,23 @@
+# Version 2.6 (August 4, 2023)
+- Updated command line options output to indicate optional arguments
+- Fixed algorithm that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
+  There was a bug that had the side effect of removing matches to primers with more than 50% unalignable bases.
+  This test has been fixed and the `num_read_bases()` member function in `nuc_cruc.h` has been replaced by the `fraction_aligned_real_base_pairs()` member function. The test for fraction of aligned real bases in applied in the
+  `bind_oligo_to_*()` functions contained in `bind_oligo.cpp`.
+- Fixed bug in the display of unaligned bases in primer alignments (in `nuc_cruc_output.cpp`). 
+  This bug only appears when the primer sequence dangled beyond the ends of the target sequence.
+- Fixed a bug in masking primer binding sites (see `mask_primer_5()` and `mask_primer_3()`) that generated incorrect masking
+  when primer sequences dangled off the end of target sequences.
+- Fixed a bug in the display of amplicon sequences for primers that overhang the target sequence (see `amplicon_search.cpp`).
+  Only effected amplicons that needed to be displayed as the reverse complement. 
+- Fixed buffer overflow error in `file_type()` (see `annotation.cpp`).
+- Fixed bug when searching fasta and fastq formatted databases using the MPI version of the code. This bug was caused by
+  not broadcasting the total size of the fasta or fastq sequence file to the workers. 
+
+# Version 2.5 (Dec 11, 2021)
+- Fixed run-time error when only a single MPI rank is specified (tntblast.cpp).
+- Fixed the temperature units in the program usage output for `--temperature`. Should read 'K' for Kelvin (options.cpp).
+
 # Version 2.4 (October 25, 2021)
 - Fixed parsing error for annotation files (GBK and EMBL).
 
