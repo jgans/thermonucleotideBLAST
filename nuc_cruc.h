@@ -87,6 +87,12 @@
 //		-- Handling conversions from different nucleotide encoding schemes.
 //		-- Display of pairwise sequence alignments (alignments are no longer trimmed to remove dangling mismatches).
 //	- Added an explicit version string in the NUC_CRUC_VERSION macro
+//
+// version 5.5 (August 4, 2023)
+//	- Fixed test that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
+//    This poorly implemented test had the side effect of removing matches to primers with more than 50% unalignable bases.
+//    This test has been fixed and the `num_read_bases()` member function in `nuc_cruc.h` has been replaced by the 
+//    `fraction_aligned_real_base_pairs()` member function.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef __NUC_CRUC
@@ -101,7 +107,7 @@
 
 #include "circle_buffer.h"
 
-#define	NUC_CRUC_VERSION	"5.4"
+#define	NUC_CRUC_VERSION	"5.5"
 
 // Define ENUMERATE_PATH to enable enumeration of multiple, equally high scoring
 //  paths through the dynamic programming matrix
@@ -524,25 +530,27 @@ struct alignment {
 		return mismatch_count;
 	};
 
-	// Count the number of real bases in the alignment
-	inline unsigned int num_real_base() const
+	// Count the fraction of real base pairs in the alignment
+	inline unsigned int fraction_aligned_real_base_pairs() const
 	{
 		std::deque<BASE::nucleic_acid>::const_iterator q = query_align.begin();
 		std::deque<BASE::nucleic_acid>::const_iterator t = target_align.begin();
 		
 		unsigned int num_real = 0;
-		
+		unsigned int num_aligned = 0;
+
 		while( q != query_align.end() ){
 
 			if( IS_REAL_BASE(*q) && IS_REAL_BASE(*t) ){
 				++num_real;
 			}
 
+			++num_aligned;
 			++q;
 			++t;
 		}
 		
-		return num_real;
+		return (num_aligned == 0) ? 0.0f : float(num_real)/num_aligned;
 	};
 };
 
@@ -1234,9 +1242,9 @@ class NucCruc{
 			return curr_align.num_mismatch_by_query( query.size() );
 		};
 		
-		inline unsigned int num_real_base() const
+		inline unsigned int fraction_aligned_real_base_pairs() const
 		{
-			return curr_align.num_real_base();
+			return curr_align.fraction_aligned_real_base_pairs();
 		};
 
 		inline void dangle(const bool &m_dangle_5, const bool &m_dangle_3)

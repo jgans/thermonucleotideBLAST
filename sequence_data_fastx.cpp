@@ -26,7 +26,7 @@ void sequence_data::load_fasta(const std::string &m_filename)
 		// 1) count the number of sequences
 		// 2) the file location of each defline (the '>' symbol)
 
-		buffer_size = 0; // <-- global location in file
+		file_index buffer_size = 0; // <-- global location in file
 
 		char file_buffer[FASTA_BUFFER_SIZE];
 		int bytes_read = 0;
@@ -51,17 +51,17 @@ void sequence_data::load_fasta(const std::string &m_filename)
 			}
 		}
 
+		seq_index.push_back(buffer_size); // Save the location of the end of the fasta file
+
 		gzrewind(fasta_in);
 		
 		const size_t num_seq = size();
 
 		if(num_seq != 0){
 
-			const size_t num_seq_m_1 = num_seq - 1;
-
 			seq_length.resize(num_seq);
 
-			for(size_t i = 0;i < num_seq_m_1;i++){
+			for(size_t i = 0;i < num_seq;i++){
 
 				// This is an overestimate of the sequence length since
 				// the defline sizes are also included (as well as any white space)
@@ -72,7 +72,7 @@ void sequence_data::load_fasta(const std::string &m_filename)
 
 			// The last sequences size is determined by its start position and the number of bytes
 			// in the file
-			seq_length[num_seq_m_1] = make_pair(buffer_size - seq_index[num_seq_m_1], num_seq_m_1);
+			seq_length[num_seq - 1] = make_pair(seq_index[num_seq] - seq_index[num_seq - 1], num_seq - 1);
 		}
 	}
 }
@@ -96,7 +96,7 @@ void sequence_data::load_fastq(const std::string &m_filename)
 		// 1) count the number of sequences
 		// 2) the file location of each defline (the '@' symbol)
 
-		buffer_size = 0; // <-- global location in file
+		file_index buffer_size = 0; // <-- global location in file
 
 		char file_buffer[FASTA_BUFFER_SIZE];
 		int bytes_read = 0;
@@ -106,7 +106,7 @@ void sequence_data::load_fastq(const std::string &m_filename)
 		while( (bytes_read = gzread(fasta_in, file_buffer, FASTA_BUFFER_SIZE) ) > 0 ){
 
 			// Since the '@' symbol can appear in quality scores, only test for the
-			// '@' as the first
+			// '@' as the first character
 			for(int i = 0;i < bytes_read;++i, ++buffer_size){
 
 				switch(file_buffer[i]){
@@ -156,6 +156,8 @@ void sequence_data::load_fastq(const std::string &m_filename)
 				};
 			}
 		}
+
+		seq_index.push_back(buffer_size); // Save the location of the end of the fastq file
 	
 		gzrewind(fasta_in);
 			
@@ -163,11 +165,9 @@ void sequence_data::load_fastq(const std::string &m_filename)
 
 		if(num_seq != 0){
 
-			const size_t num_seq_m_1 = num_seq - 1;
-
 			seq_length.resize(num_seq);
 
-			for(size_t i = 0;i < num_seq_m_1;i++){
+			for(size_t i = 0;i < num_seq;i++){
 
 				// This is an overestimate of the sequence length since
 				// the defline sizes are also included (as well as any white space)
@@ -178,7 +178,7 @@ void sequence_data::load_fastq(const std::string &m_filename)
 
 			// The last sequences size is determined by its start position and the number of bytes
 			// in the file
-			seq_length[num_seq_m_1] = make_pair(buffer_size - seq_index[num_seq_m_1], num_seq_m_1);
+			seq_length[num_seq - 1] = make_pair(seq_index[num_seq] - seq_index[num_seq - 1], num_seq - 1);
 		}
 	}
 }
@@ -208,8 +208,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 
 	// Buffer the reading of fasta records in chunks of FASTA_BUFFER_SIZE or size of the 
 	// record -- whichever is smaller.
-	file_index record_size = (m_index == seq_index.size() - 1) ? buffer_size - seq_index[m_index] : 
-		seq_index[m_index + 1] - seq_index[m_index];
+	file_index record_size = seq_index[m_index + 1] - seq_index[m_index];
 	
 	const file_index file_buffer_size = min(record_size, file_index(FASTA_BUFFER_SIZE) );
 	
@@ -264,16 +263,17 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	char* defline_start = ptr;
 
 	while( (last > ptr) && (*ptr != '\n') && (*ptr != '\r') ){
-		ptr++;
+		++ptr;
 	}
 
 	if(ptr == last){
+
 		delete [] file_buffer;
 		throw "Truncated fasta file detected!";
 	}
 
 	m_seq.first = string(defline_start, ptr - defline_start);
-	
+
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	// Read the sequence
 	///////////////////////////////////////////////////////////////////////////////////////////////
@@ -308,6 +308,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 		throw __FILE__ ":sequence_data::read_bio_seq_fasta_slow: Unable to allocate memory for sequence";
 	}
 	
+	// A pointer to the num_base header that preceeds the sequence data
 	unsigned int *num_base = (unsigned int*)(m_seq.second);
 	
 	SEQPTR seq_ptr = m_seq.second;
@@ -404,8 +405,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 
 	// Buffer the reading of fasta records in chunks of FASTA_BUFFER_SIZE or size of the 
 	// record -- whichever is smaller.
-	file_index record_size = (m_index == seq_index.size() - 1) ? buffer_size - seq_index[m_index] : 
-		seq_index[m_index + 1] - seq_index[m_index];
+	file_index record_size = seq_index[m_index + 1] - seq_index[m_index];
 	
 	const file_index file_buffer_size = min(record_size, file_index(FASTA_BUFFER_SIZE) );
 	

@@ -159,7 +159,7 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	
 	const size_t len = m_amp.size();
 	const size_t oligo_len = m_oligo.size();
-		
+	
 	// If the oligo sequence binds to the amplicon, mask the binding site with lower
 	// case letters
 	m_melt.set_query(m_oligo);
@@ -167,29 +167,64 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	m_melt.clear_target();
 	
 	bool valid_base = true;
+	unsigned int gap_offset = 0;
 
 	// Load the reverse complement of the target (while avoiding any illegal bases)
 	for(unsigned int i = 0;valid_base && (i < oligo_len);i++){
 		
-		switch(m_amp[i]){
+		switch(toupper(m_amp[i])){
 			case 'A':
-			case 'a':
 				m_melt.push_front_target(BASE::T);
 				break;
 			case 'T':
-			case 't':
 				m_melt.push_front_target(BASE::A);
 				break;
 			case 'G':
-			case 'g':
 				m_melt.push_front_target(BASE::C);
 				break;
 			case 'C':
-			case 'c':
 				m_melt.push_front_target(BASE::G);
 				break;
+			case 'I':
+				m_melt.push_front_target(BASE::I);
+				break;
+			// IUPAC degenerate bases
+			case 'M': // A or C
+				m_melt.push_front_target(BASE::K);
+				break;
+			case 'R': // G or A
+				m_melt.push_front_target(BASE::Y);
+				break;
+			case 'S': // G or C
+				m_melt.push_front_target(BASE::S);
+				break;
+			case 'V': // G or C or A
+				m_melt.push_front_target(BASE::B);
+				break;
+			case 'W': // A or T
+				m_melt.push_front_target(BASE::W);
+				break;
+			case 'Y': // T or C
+				m_melt.push_front_target(BASE::R);
+				break;
+			case 'H': // A or C or T
+				m_melt.push_front_target(BASE::D);
+				break;
+			case 'K': // G or T
+				m_melt.push_front_target(BASE::M);
+				break;
+			case 'D': // G or A or T
+				m_melt.push_front_target(BASE::H);
+				break;
+			case 'B': // G or T or C
+				m_melt.push_front_target(BASE::V);
+				break;
+			case 'N': // A or T or G or C
+				m_melt.push_front_target(BASE::N);
+				break;
 			case '-':
-				// Skip any terminal gap symbols added to pad the amplicon
+				// Count any terminal gap symbols added to pad the amplicon
+				++gap_offset;
 				break;
 			default:
 				// Stop adding bases if we encounter a bad base
@@ -207,9 +242,14 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	// maximum range is [0, oligo_len].
 	pair<unsigned int, unsigned int> range = m_melt.alignment_range_target();
 	
-	range.first = target_len - range.first - 1;
-	range.second = target_len - range.second - 1;
-			
+	// DEBUG
+	//cerr << "\npre range.first = " << range.first<< endl;
+	//cerr << "pre range.second = " << range.second<< endl;
+	//cerr << "amp: " << m_amp << endl;
+
+	range.first = gap_offset + target_len - range.first - 1;
+	range.second = gap_offset + target_len - range.second - 1;
+	
 	if(m_replace){
 		
 		// Append the primer sequence to the 5' tail of the amplicon
@@ -224,6 +264,13 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	}
 	else{
 		if(m_mask){
+			
+			// DEBUG
+			//cerr << "post range.first = " << range.first<< endl;
+			//cerr << "post range.second = " << range.second<< endl;
+			//cerr << "gap_offset = " << gap_offset << endl;
+			//cerr << "target_len = " << target_len << endl;
+			//cerr << "amp len = " << len << endl;
 			
 			// Mask this region of the amplicon
 			for(int j = (int)range.second;j <= (int)range.first;j++){
@@ -243,7 +290,7 @@ void mask_primer_3(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	
 	const size_t len = m_amp.size();
 	const size_t oligo_len = m_oligo.size();
-		
+
 	// If the oligo sequence binds to the amplicon, mask the binding site with lower
 	// case letters
 	m_melt.set_query(m_oligo);
@@ -252,33 +299,68 @@ void mask_primer_3(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 
 	size_t i;
 
+	unsigned int gap_offset = 0;
+
 	// Load the target (while avoiding any illegal bases)
 	for(i = len - oligo_len;i < len;i++){
 		
-		switch(m_amp[i]){
+		switch( toupper(m_amp[i]) ){
 			case 'A':
-			case 'a':
 				m_melt.push_back_target(BASE::A);
 				break;
 			case 'T':
-			case 't':
 				m_melt.push_back_target(BASE::T);
 				break;
 			case 'G':
-			case 'g':
 				m_melt.push_back_target(BASE::G);
 				break;
 			case 'C':
-			case 'c':
 				m_melt.push_back_target(BASE::C);
 				break;
+			case 'I':
+				m_melt.push_back_target(BASE::I);
+				break;
+			// IUPAC degenerate bases
+			case 'M': // A or C
+				m_melt.push_back_target(BASE::K);
+				break;
+			case 'R': // G or A
+				m_melt.push_back_target(BASE::Y);
+				break;
+			case 'S': // G or C
+				m_melt.push_back_target(BASE::S);
+				break;
+			case 'V': // G or C or A
+				m_melt.push_back_target(BASE::B);
+				break;
+			case 'W': // A or T
+				m_melt.push_back_target(BASE::W);
+				break;
+			case 'Y': // T or C
+				m_melt.push_back_target(BASE::R);
+				break;
+			case 'H': // A or C or T
+				m_melt.push_back_target(BASE::D);
+				break;
+			case 'K': // G or T
+				m_melt.push_back_target(BASE::M);
+				break;
+			case 'D': // G or A or T
+				m_melt.push_back_target(BASE::H);
+				break;
+			case 'B': // G or T or C
+				m_melt.push_back_target(BASE::V);
+				break;
+			case 'N': // A or T or G or C
+				m_melt.push_back_target(BASE::N);
+				break;
 			case '-':
-				// Skip any terminal gap symbols added to pad the amplicon
+				// Count any terminal gap symbols added to pad the amplicon
+				++gap_offset;
 				break;
 			default:
 				m_melt.clear_target();
 				break;
-				
 		};
 	}
 	
@@ -288,8 +370,11 @@ void mask_primer_3(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	
 	// What is the range of target bases that have been bound? The 
 	// maximum range is [0, oligo_len].
-	pair<unsigned int, unsigned int> range = m_melt.alignment_range_target();
-			
+	pair<int, int> range = m_melt.alignment_range_target();
+	
+	range.first -= gap_offset;
+	range.second -= gap_offset;
+
 	if(m_replace){
 		
 		// Compute the reverse complement of m_oligo
@@ -319,7 +404,7 @@ void mask_primer_3(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 			
 			// Mask this region of the amplicon
 			const size_t stop = (len + range.second + 1) - target_len;
-			
+
 			for(size_t j = len - target_len + range.first;j < stop;j++){
 				m_amp[j] = tolower(m_amp[j]);
 			}
@@ -345,22 +430,55 @@ void mask_probe(string &m_amp, const string &m_oligo, NucCruc &m_melt, const flo
 	// Test the oligo against the plus strand of the amplicon
 	for(i = 0;i < len;i++){
 	
-		switch(m_amp[i]){
+		switch(toupper(m_amp[i])){
 			case 'A':
-			case 'a':
 				m_melt.push_back_target(BASE::A);
 				break;
 			case 'T':
-			case 't':
 				m_melt.push_back_target(BASE::T);
 				break;
-			case'G':
-			case'g':
+			case 'G':
 				m_melt.push_back_target(BASE::G);
 				break;
 			case 'C':
-			case 'c':
 				m_melt.push_back_target(BASE::C);
+				break;
+			case 'I':
+				m_melt.push_back_target(BASE::I);
+				break;
+			// IUPAC degenerate bases
+			case 'M': // A or C
+				m_melt.push_back_target(BASE::K);
+				break;
+			case 'R': // G or A
+				m_melt.push_back_target(BASE::Y);
+				break;
+			case 'S': // G or C
+				m_melt.push_back_target(BASE::S);
+				break;
+			case 'V': // G or C or A
+				m_melt.push_back_target(BASE::B);
+				break;
+			case 'W': // A or T
+				m_melt.push_back_target(BASE::W);
+				break;
+			case 'Y': // T or C
+				m_melt.push_back_target(BASE::R);
+				break;
+			case 'H': // A or C or T
+				m_melt.push_back_target(BASE::D);
+				break;
+			case 'K': // G or T
+				m_melt.push_back_target(BASE::M);
+				break;
+			case 'D': // G or A or T
+				m_melt.push_back_target(BASE::H);
+				break;
+			case 'B': // G or T or C
+				m_melt.push_back_target(BASE::V);
+				break;
+			case 'N': // A or T or G or C
+				m_melt.push_back_target(BASE::N);
 				break;
 			default:
 				// We have encountered a gap or unknown base
@@ -400,22 +518,55 @@ void mask_probe(string &m_amp, const string &m_oligo, NucCruc &m_melt, const flo
 	// Test the oligo against the minus strand of the amplicon
 	for(i = 0;i < len;i++){
 
-		switch(m_amp[i]){
+		switch( toupper(m_amp[i]) ){
 			case 'A':
-			case 'a':
 				m_melt.push_front_target(BASE::T);
 				break;
 			case 'T':
-			case 't':
 				m_melt.push_front_target(BASE::A);
 				break;
-			case'G':
-			case'g':
+			case 'G':
 				m_melt.push_front_target(BASE::C);
 				break;
 			case 'C':
-			case 'c':
 				m_melt.push_front_target(BASE::G);
+				break;
+			case 'I':
+				m_melt.push_front_target(BASE::I);
+				break;
+			// IUPAC degenerate bases
+			case 'M': // A or C
+				m_melt.push_front_target(BASE::K);
+				break;
+			case 'R': // G or A
+				m_melt.push_front_target(BASE::Y);
+				break;
+			case 'S': // G or C
+				m_melt.push_front_target(BASE::S);
+				break;
+			case 'V': // G or C or A
+				m_melt.push_front_target(BASE::B);
+				break;
+			case 'W': // A or T
+				m_melt.push_front_target(BASE::W);
+				break;
+			case 'Y': // T or C
+				m_melt.push_front_target(BASE::R);
+				break;
+			case 'H': // A or C or T
+				m_melt.push_front_target(BASE::D);
+				break;
+			case 'K': // G or T
+				m_melt.push_front_target(BASE::M);
+				break;
+			case 'D': // G or A or T
+				m_melt.push_front_target(BASE::H);
+				break;
+			case 'B': // G or T or C
+				m_melt.push_front_target(BASE::V);
+				break;
+			case 'N': // A or T or G or C
+				m_melt.push_front_target(BASE::N);
 				break;
 			default:
 				// We have encountered a gap or unknown base
@@ -712,18 +863,14 @@ string primer_heuristics(const string &m_primer)
 
 char base_complement(const char &m_base)
 {
-	switch(m_base){
+	switch( toupper(m_base) ){
 		case 'A':
-		case 'a':
 			return 'T';
 		case 'T':
-		case 't':
 			return 'A';
 		case 'G':
-		case 'g':
 			return 'C';
 		case 'C':
-		case 'c':
 			return 'G';
 	};
 

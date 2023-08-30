@@ -410,76 +410,75 @@ void Options::parse_command_line(int argc, char *argv[])
 	if(print_usage){
 	
 		cerr << "thermonucleotideBLAST v." << TNTBLAST_VERSION << endl;
-		cerr << "J. D. Gans Los Alamos National Laboratory" << endl;
 		cerr << "Options:" << endl;
-		cerr << "-i <input file of query oligos>" << endl;
-		cerr << "-o <output file> (default is stdout)" << endl;
-		cerr << "-d <database of target sequences to search against>" << endl;
-		cerr << "-D <local database of target sequences to search against>" << endl;
-		cerr << "-l <maximum amplicon length> (default is " << DEFAULT_MAX_LEN << " bases)" << endl;
-		cerr << "-e <minimum primer Tm>" << endl;
-		cerr << "-E <minimum probe Tm>" << endl;
-		cerr << "-z <minimum primer delta G (in Kcal/Mol)> (default is no limit)" << endl;
-		cerr << "-Z <minimum probe delta G (in Kcal/Mol)> (default is no limit)" << endl;
-		cerr << "-x <maximum primer Tm> (default is no limit)" << endl;
-		cerr << "-X <maximum probe Tm> (default is no limit)" << endl;
-		cerr << "-g <maximum primer delta G (in Kcal/Mol)> (default is no limit)" << endl;
-		cerr << "-G <maximum probe delta G(in Kcal/Mol)> (default is no limit)" << endl;
-		cerr << "-s <salt concentration (in MOL)> (default is " << DEFAULT_SALT << " M)" << endl;
-		cerr << "-t <primer strand concentration (in MOL)> (default is " << DEFAULT_PRIMER_STRAND << " M)" << endl;
-		cerr << "-T <Probe strand concentration (in MOL)> (default is " << DEFAULT_PROBE_STRAND << " M)" << endl;
-		cerr << "-y <ratio of forward/reverse strand concentrations> (default is 1, i.e. symmetric PCR)" << endl;
-		cerr << "-A <PCR | PROBE | PADLOCK | AFFY> (assay format, default is PCR)" << endl;
-		cerr << "-W <2-8> (hash word length, default is " << DEFAULT_HASH_WORD_SIZE << ")" << endl;
-		cerr << "-m <output format> " << endl;
-		cerr << "\t0 = verbose output file (default)" << endl;
-		cerr << "\t1 = fasta output file" << endl;
-		cerr << "\t2 = network output files (*.atr and *.sif)" << endl;
-		cerr << "\t3 = \"inverse target\" (targets that *don't* match any query)" << endl;
-		cerr << "\t4 = \"inverse query\" (queries that *don't* match any target)" << endl;
-		cerr << "-a <T|F> (show alignments, default is T)" << endl;
-		cerr << "-M <T|F> (show matching sequence, default is T)" << endl;
-		cerr << "-k <T|F> (Mask primer binding sites, default is F)" << endl;
-		cerr << "-K <T|F> (Mask probe binding sites, default is F)" << endl;
-		cerr << "-r <T|F> (Replace primer binding sites w/ primer sequence, default is F)" << endl;
-		cerr << "-v <T|F> (Disable verbose terminal output, default is T)" << endl;
-		cerr << "-p <T|F> (Ignore all probe oligos in inputfile, default is F)" << endl;
-		cerr << "-n <T|F>(One output file per query, default is F)" << endl;
-		cerr << "-L <T|F> (Append assay name to output defline, default is F)" << endl;
-		cerr << "-S <T|F> (Ouput assay summary after searching, default is F)" << endl;
-		cerr << "-h|-? (Command-line usage)" << endl;
-		cerr << "--primer-clamp <number of exact 3' primer matches requried> (default is " 
+		cerr << "\t-i <input file of query oligos>" << endl;
+		cerr << "\t-o <output file> (default is stdout)" << endl;
+		cerr << "\t-d <database of target sequences to search against>" << endl;
+		cerr << "\t[-D <local database of target sequences to search against>]" << endl;
+		cerr << "\t[-l <maximum amplicon length> (default is " << DEFAULT_MAX_LEN << " bases)" << endl;
+		cerr << "\t-e <minimum primer Tm>" << endl;
+		cerr << "\t-E <minimum probe Tm>" << endl;
+		cerr << "\t[-z <minimum primer delta G (in Kcal/Mol)>] (default is no limit)" << endl;
+		cerr << "\t[-Z <minimum probe delta G (in Kcal/Mol)>] (default is no limit)" << endl;
+		cerr << "\t[-x <maximum primer Tm>] (default is no limit)" << endl;
+		cerr << "\t[-X <maximum probe Tm>] (default is no limit)" << endl;
+		cerr << "\t[-g <maximum primer delta G (in Kcal/Mol)>] (default is no limit)" << endl;
+		cerr << "\t[-G <maximum probe delta G(in Kcal/Mol)>] (default is no limit)" << endl;
+		cerr << "\t[-s <salt concentration (in MOL)>] (default is " << DEFAULT_SALT << " M)" << endl;
+		cerr << "\t[-t <primer strand concentration (in MOL)>] (default is " << DEFAULT_PRIMER_STRAND << " M)" << endl;
+		cerr << "\t[-T <Probe strand concentration (in MOL)>] (default is " << DEFAULT_PROBE_STRAND << " M)" << endl;
+		cerr << "\t[-y <ratio of forward/reverse strand concentrations>] (default is 1, i.e. symmetric PCR)" << endl;
+		cerr << "\t[-A <PCR | PROBE | PADLOCK | AFFY>] (assay format, default is PCR)" << endl;
+		cerr << "\t[-W <2-8>] (hash word length, default is " << DEFAULT_HASH_WORD_SIZE << ")" << endl;
+		cerr << "\t[-m <output format>] " << endl;
+		cerr << "\t\t0 = verbose output file (default)" << endl;
+		cerr << "\t\t1 = fasta output file" << endl;
+		cerr << "\t\t2 = network output files (*.atr and *.sif)" << endl;
+		cerr << "\t\t3 = \"inverse target\" (targets that *don't* match any query)" << endl;
+		cerr << "\t\t4 = \"inverse query\" (queries that *don't* match any target)" << endl;
+		cerr << "\t[-a <T|F>] (show alignments, default is T)" << endl;
+		cerr << "\t[-M <T|F>] (show matching sequence, default is T)" << endl;
+		cerr << "\t[-k <T|F>] (Mask primer binding sites, default is F)" << endl;
+		cerr << "\t[-K <T|F>] (Mask probe binding sites, default is F)" << endl;
+		cerr << "\t[-r <T|F>] (Replace primer binding sites w/ primer sequence, default is F)" << endl;
+		cerr << "\t[-v <T|F>] (Disable verbose terminal output, default is T)" << endl;
+		cerr << "\t[-p <T|F>] (Ignore all probe oligos in inputfile, default is F)" << endl;
+		cerr << "\t[-n <T|F>] (One output file per query, default is F)" << endl;
+		cerr << "\t[-L <T|F>] (Append assay name to output defline, default is F)" << endl;
+		cerr << "\t[-S <T|F>] (Ouput assay summary after searching, default is F)" << endl;
+		cerr << "\t[-h|-?] (Command-line usage)" << endl;
+		cerr << "\t[--primer-clamp <number of exact 3' primer matches requried>] (default is " 
 			<< DEFAULT_PRIMER_CLAMP << " bases)" << endl;
-		cerr << "--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried> (default is no limit)" << endl;
-		cerr << "--probe-clamp5 <number of exact 5' probe matches requried> (default is " 
+		cerr << "\t[--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried>] (default is no limit)" << endl;
+		cerr << "\t[--probe-clamp5 <number of exact 5' probe matches requried>] (default is " 
 			<< DEFAULT_PROBE_CLAMP_5 << " bases)" << endl;
-		cerr << "--probe-clamp3 <number of exact 3' probe matches requried> (default is " 
+		cerr << "\t[--probe-clamp3 <number of exact 3' probe matches requried>] (default is " 
 			<< DEFAULT_PROBE_CLAMP_3 << " bases)" << endl;
-		cerr << "--dangle5 <T|F> (Allow dangling bases on the 5' query side of an alignment, default is "
+		cerr << "\t[--dangle5 <T|F>] (Allow dangling bases on the 5' query side of an alignment, default is "
 			<< (DEFAULT_DANGLE_5 ? "T" : "F") << ")" << endl;
-		cerr << "--dangle3 <T|F> (Allow dangling bases on the 3' query side of an alignment, default is "
+		cerr << "\t[--dangle3 <T|F>] (Allow dangling bases on the 3' query side of an alignment, default is "
 			 << (DEFAULT_DANGLE_3 ? "T" : "F") << ")" << endl;
-		cerr << "--plex <T|F> (All input assays in a single multiple reaction, default is F)" << endl;
-		cerr << "--temperature <temperature for computing Delta G (in Kelvin)> (default is " 
-			<< DEFAULT_TARGET_T << " C)" << endl;
-		cerr << "--single-primer-pcr <T|F> (Allow amplicons produced by a single PCR primer binding in both forward and reverse orientation, default is T)" << endl;
-		cerr << "--target-strand <plus|minus|both> (which strand to target with probes, default is \"both\")" << endl;
-		cerr << "--max-target-len <max len> (max sequence length before targets are split, default is " 
+		cerr << "\t[--plex <T|F>] (All input assays in a single multiple reaction, default is F)" << endl;
+		cerr << "\t[--temperature <temperature for computing Delta G (in Kelvin)>] (default is " 
+			<< DEFAULT_TARGET_T << " K)" << endl;
+		cerr << "\t[--single-primer-pcr <T|F>] (Allow amplicons produced by a single PCR primer binding in both forward and reverse orientation, default is T)" << endl;
+		cerr << "\t[--target-strand <plus|minus|both>] (which strand to target with probes, default is \"both\")" << endl;
+		cerr << "\t[--max-target-len <max len>] (max sequence length before targets are split, default is " 
 			<< DEFAULT_FRAGMENT_TARGET_LENGTH << " bases)" << endl;
-		cerr << "--query-seg <always | never | adaptive> (query segmentation algorithm, default is \"adaptive\")" << endl;
-		cerr << "--dump-query <T|F> (write queries to stdout, default is F)" << endl;
-		cerr << "--dinkelbach <T|F> (Use the Dinkelbach fractional programming algorithm, default is F)" << endl;
-		cerr << "--max-gap <number of gaps> (Max number of allowed gaps in a DNA duplex, default is " 
+		cerr << "\t[--query-seg <always | never | adaptive>] (query segmentation algorithm, default is \"adaptive\")" << endl;
+		cerr << "\t[--dump-query <T|F>] (write queries to stdout, default is F)" << endl;
+		cerr << "\t[--dinkelbach <T|F>] (Use the Dinkelbach fractional programming algorithm, default is F)" << endl;
+		cerr << "\t[--max-gap <number of gaps>] (Max number of allowed gaps in a DNA duplex, default is " 
 			<< DEFAULT_MAX_GAP << ")" << endl;
-		cerr << "--max-mismatch <number of mismatches> (Max number of allowed mismatches in a DNA duplex, default is "
+		cerr << "\t[--max-mismatch <number of mismatches>] (Max number of allowed mismatches in a DNA duplex, default is "
 			<< DEFAULT_MAX_MISMATCH << ")" << endl;
-		cerr << "--rescale-ct <T|F> (Use of degenerate bases results in rescaling of oligo concentration, default is "
+		cerr << "\t[--rescale-ct <T|F>] (Use of degenerate bases results in rescaling of oligo concentration, default is "
 			<< (DEFAULT_RESCALE_CT ? "T" : "F") << ")" << endl;
-		cerr << "--best-match (Only save the best match, in Tm, between a query and target)" << endl;
+		cerr << "\t[--best-match] (Only save the best match, in Tm, between a query and target)" << endl;
 
 		#ifdef USE_BLAST_DB
-		cerr << "--blast-include <Limit search to include accessions or NCBI TaxIds from a BLAST database> (may be repeated)" << endl;
-		cerr << "--blast-exclude <Limit search to exclude accessions or NCBI TaxId from a BLAST database> (may be repeated)" << endl;
+		cerr << "\t[--blast-include <Limit search to include accessions or NCBI TaxIds from a BLAST database>] (may be repeated)" << endl;
+		cerr << "\t[--blast-exclude <Limit search to exclude accessions or NCBI TaxId from a BLAST database>] (may be repeated)" << endl;
 		#endif // USE_BLAST_DB
 	}
 }

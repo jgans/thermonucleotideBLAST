@@ -72,8 +72,6 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 		s << "\nhairpin";
 	}
 	else{ // m_melt.tm_mode != NucCruc::HAIRPIN
-	
-		s << "5' ";
 
 		deque<BASE::nucleic_acid>::const_iterator q_iter, t_iter;
 
@@ -95,8 +93,10 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 		const int suffix_len = max( 0, min(query_len - 1 - m_melt.curr_align.last_match.first, 
 			m_melt.curr_align.last_match.second) );
 
+		s << "5' ";
+
 		for(int i = 0;i < prefix_len;++i){
-			s << base_map[ m_melt.query[i] ];
+			s << base_map[ m_melt.query[m_melt.curr_align.first_match.first - prefix_len + i] ];
 		}
 
 		for(q_iter = m_melt.curr_align.query_align.begin();q_iter != m_melt.curr_align.query_align.end();q_iter++){
@@ -114,9 +114,12 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 		// The prefix is formally unaligned. However, there may be complementary
 		// bases between the query and target (that were not thermodynamically favorable, and hence
 		// not aligned). Indicate complementary, but unaigned, bases with a ':'.
+
 		for(int i = 0;i < prefix_len;++i){
 
-			if( is_complemetary_base(m_melt.query[i], m_melt.target[m_melt.curr_align.first_match.second + prefix_len - i]) ){
+			//if( is_complemetary_base(m_melt.query[i], m_melt.target[m_melt.curr_align.first_match.second + prefix_len - i]) ){
+			if( is_complemetary_base(m_melt.query[m_melt.curr_align.first_match.first - prefix_len + i], 
+									 m_melt.target[m_melt.curr_align.first_match.second + prefix_len - i]) ){
 				s << ':';
 			}
 			else{

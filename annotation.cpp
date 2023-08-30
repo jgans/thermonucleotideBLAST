@@ -294,6 +294,7 @@ bool DNAMol::import(const DNAMol &m_mol, const unsigned int &m_type)
 
 int file_type(const std::string &m_filename)
 {
+	
 	// Open the file and read until we can determine the file type
 	gzFile fin = gzopen(m_filename.c_str(), "r");
 
@@ -307,20 +308,22 @@ int file_type(const std::string &m_filename)
 	char buffer[buffer_size];
 
 	// Clear the array of bytes
-	memset(buffer, 0, buffer_size);
+	memset(buffer, '\0', buffer_size);
 
-	if(gzread(fin, buffer, buffer_size) < 0){
+	// Read buffer_size - 1 bytes to make sure that the resulting buffer is a 
+	// valid '\0' terminated C-string
+	if(gzread(fin, buffer, buffer_size - 1) < 0){
 		return ret;
 	}
 
 	gzclose(fin);
-	
+
 	bool GBK_hint = false;
 	
 	int first_non_space_char = -1;
 
 	for(unsigned int i = 0;i < buffer_size;i++){
-	
+		
 		if( isspace(buffer[i]) ){
 			continue;
 		}
@@ -353,7 +356,7 @@ int file_type(const std::string &m_filename)
 	if(buffer[first_non_space_char] == '@'){
 		return DNAMol::FASTQ;
 	}
-	
+
 	// Quick test for GBK file
 	if( strstr(buffer, "LOCUS") && strstr(buffer, "DEFINITION") ){
 		return DNAMol::GBK;

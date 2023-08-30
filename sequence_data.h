@@ -98,8 +98,6 @@ class sequence_data
 	
 	gzFile fasta_in;
 	
-	file_index buffer_size;
-	
 	bool _verbose;
 		
 	void load_fasta(const std::string &m_filename);
@@ -118,8 +116,6 @@ class sequence_data
 		#endif // USE_BLAST_DB
 		
 		fasta_in = NULL;
-		
-		buffer_size = 0;
 		
 		_verbose = true;
 	};
@@ -144,13 +140,6 @@ class sequence_data
 		#endif // USE_BLAST_DB
 		
 		if(fasta_in != NULL){
-
-			//if(buffer != NULL){
-			//	munmap(buffer, buffer_size);
-			//}
-			
-			//buffer = NULL;
-			buffer_size = 0;
 			
 			gzclose(fasta_in);
 			fasta_in = NULL;

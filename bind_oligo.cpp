@@ -262,7 +262,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				// Add this partial result to the cache
 				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0 /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -272,9 +272,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 					
 				continue;
 			}
@@ -284,9 +284,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			if(anchor_5 < m_clamp_5){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -296,9 +296,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			if(anchor_3 < m_clamp_3){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -308,9 +308,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			if(num_mismatch > m_max_mismatch){
 				
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -320,9 +320,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			if(num_gap > m_max_gap){
 				
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, num_gap, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -331,14 +331,14 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			// Since degenerate bases get turned into 'N' by the hash function, we can
 			// end up with spurious matches to poly-N sequences. Require that at least
 			// half of the query can be aligned to real (ATGCI) bases
-			const unsigned int num_real_base = m_melt.num_real_base();
+			const float fraction_real_base_pairs = m_melt.fraction_aligned_real_base_pairs();
 
-			if(num_real_base < window/2){
+			if(fraction_real_base_pairs < 0.5f){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, num_real_base, string() /*align*/);
+					num_mismatch, num_gap, fraction_real_base_pairs, string() /*align*/);
 
 				continue;
 			}
@@ -373,7 +373,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			// Add this result to the cache
 			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
 				anchor_5, anchor_3, target_5, target_3,
-				num_mismatch, num_gap, num_real_base, align);
+				num_mismatch, num_gap, fraction_real_base_pairs, align);
 		}
 		else{ // Cache hit
 
@@ -397,7 +397,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				continue;
 			}
 
-			if(cache_iter->second.num_real_base < window/2){
+			if(cache_iter->second.fraction_real_base_pairs < 0.5f){
 				continue;
 			}
 
@@ -453,7 +453,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 	const unsigned int flanking_bases_3 = NUM_FLANK_BASE;
 	
 	const unsigned int target_length = window + flanking_bases_5 + flanking_bases_3;	
-	
+
 	// Extract the target oligos into a separate list
 	list<oligo_info> curr_oligo;
 	
@@ -484,7 +484,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			0);
 		
 		unsigned int target_stop = min( target_start + target_length, SEQ_SIZE(m_seq) );
-		
+
 		// Is there a result already in the cache?
 		BindCacheKey key(m_oligo, target_start, target_stop);
 		
@@ -497,7 +497,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			
 			// The first valid base of the target
 			SEQPTR seq_ptr = SEQ_START(m_seq) + target_start;
-		
+
 			// Attempt to extract target_length bases from the start
 			for(unsigned int i = target_start;i < target_stop;i++, seq_ptr++){
 				
@@ -575,15 +575,15 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			#endif // PROFILE
 			
 			const float tm = m_melt.approximate_tm_heterodimer();
-			
+
 			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
 
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, 0.0f /*dg*/, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -595,9 +595,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -609,9 +609,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -623,9 +623,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -637,9 +637,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -651,9 +651,9 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, num_gap, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -662,16 +662,16 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			// Since degenerate bases get turned into 'N' by the hash function, we can
 			// end up with spurious matches to poly-N sequences. Require that at least
 			// half of the query can be aligned to real (ATGCI) bases
-			const unsigned int num_real_base = m_melt.num_real_base();
+			const float fraction_real_base_pairs = m_melt.fraction_aligned_real_base_pairs();
 
-			if(num_real_base < window/2){
+			if(fraction_real_base_pairs < 0.5f){
 
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, num_real_base, string() /*align*/);
+					num_mismatch, num_gap, fraction_real_base_pairs, string() /*align*/);
 
 				continue;
 			}
@@ -696,7 +696,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			// Save the alignment
 			stringstream ss_align;
 			ss_align << m_melt;
-			
+
 			const string align = ss_align.str();
 
 			match_iter->loc_5 = target_5;
@@ -713,7 +713,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			// Add this result to the cache
 			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
 				anchor_5, anchor_3, target_5, target_3,
-				num_mismatch, num_gap, num_real_base, align);
+				num_mismatch, num_gap, fraction_real_base_pairs, align);
 		}
 		else{ // Cache hit
 
@@ -747,7 +747,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 				continue;
 			}
 
-			if(cache_iter->second.num_real_base < window/2){
+			if(cache_iter->second.fraction_real_base_pairs < 0.5f){
 
 				curr_oligo.pop_front();
 				continue;
@@ -928,9 +928,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, 0.0f /*dg*/, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -940,9 +940,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			if( (dg < m_min_oligo_dg) || (dg > m_max_oligo_dg) ){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -952,9 +952,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			if(anchor_5 < m_clamp_5){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -964,9 +964,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			if(anchor_3 < m_clamp_3){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -976,9 +976,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			if(num_mismatch > m_max_mismatch){
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -990,7 +990,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				// Add this partial result to the cache
 				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, num_gap, 0.0 /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -999,14 +999,14 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			// Since degenerate bases get turned into 'N' by the hash function, we can
 			// end up with spurious matches to poly-N sequences. Require that at least
 			// half of the query can be aligned to real (ATGCI) bases
-			const unsigned int num_real_base = m_melt.num_real_base();
+			const float fraction_real_base_pairs = m_melt.fraction_aligned_real_base_pairs();
 
-			if(num_real_base < window/2){
+			if(fraction_real_base_pairs < 0.5f){
 
 				// Add this partial result to the cache
 				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, num_real_base, string() /*align*/);
+					num_mismatch, num_gap, fraction_real_base_pairs, string() /*align*/);
 
 				continue;
 			}
@@ -1041,7 +1041,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			// Add this result to the cache
 			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
 				anchor_5, anchor_3, target_5, target_3,
-				num_mismatch, num_gap, num_real_base, align);
+				num_mismatch, num_gap, fraction_real_base_pairs, align);
 		}
 		else{ // Cache hit
 
@@ -1065,7 +1065,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				continue;
 			}
 
-			if(cache_iter->second.num_real_base < window/2){
+			if(cache_iter->second.fraction_real_base_pairs < 0.5f){
 				continue;
 			}
 
@@ -1248,9 +1248,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, 0.0 /*dg*/, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, 0.0f /*dg*/, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1262,9 +1262,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					0 /*anchor_5*/, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1276,9 +1276,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, 0 /*anchor_3*/, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1290,9 +1290,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					0 /*num_mismatch*/, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					0 /*num_mismatch*/, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1304,9 +1304,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, 0 /*num_gap*/, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, 0 /*num_gap*/, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1318,9 +1318,9 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
-				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
+				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0f /*dH*/, 0.0f /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, 0 /*num_real_base*/, string() /*align*/);
+					num_mismatch, num_gap, 0.0f /*fraction_real_base_pairs*/, string() /*align*/);
 
 				continue;
 			}
@@ -1329,16 +1329,16 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			// Since degenerate bases get turned into 'N' by the hash function, we can
 			// end up with spurious matches to poly-N sequences. Require that at least
 			// half of the query can be aligned to real (ATGCI) bases
-			const unsigned int num_real_base = m_melt.num_real_base();
+			const float fraction_real_base_pairs = m_melt.fraction_aligned_real_base_pairs();
 
-			if(num_real_base < window/2){
+			if(fraction_real_base_pairs < 0.5f){
 
 				curr_oligo.pop_front();
 
 				// Add this partial result to the cache
 				m_melt_cache[key] = BindCacheValue(tm, dg, 0.0 /*dH*/, 0.0 /*dS*/,
 					anchor_5, anchor_3, 0 /*target_5*/, 0 /*target_3*/,
-					num_mismatch, num_gap, num_real_base, string() /*align*/);
+					num_mismatch, num_gap, fraction_real_base_pairs, string() /*align*/);
 
 				continue;
 			}
@@ -1380,7 +1380,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 			// Add this result to the cache
 			m_melt_cache[key] = BindCacheValue(tm, dg, m_melt.delta_H(), m_melt.delta_S(),
 				anchor_5, anchor_3, target_5, target_3,
-				num_mismatch, num_gap, num_real_base, align);
+				num_mismatch, num_gap, fraction_real_base_pairs, align);
 		}
 		else{ // Cache miss
 
@@ -1414,7 +1414,7 @@ void bind_oligo_to_plus_strand(list<oligo_info> &info_list,
 				continue;
 			}
 
-			if(cache_iter->second.num_real_base < window/2){
+			if(cache_iter->second.fraction_real_base_pairs < 0.5f){
 
 				curr_oligo.pop_front();
 				continue;

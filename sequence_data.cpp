@@ -239,7 +239,7 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 		// This is either *not* a BLAST database, or there is an error in the BLAST database
 	}
 	#endif // USE_BLAST_DB
-	
+
 	// Is this file a recognized annotation file (i.e. GBK, EMBL, etc.)?
 	switch( file_type(m_filename) ){
 	
@@ -359,21 +359,21 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	
 	MPI_Probe(0 /* master */, SEQ_REQUEST, MPI_COMM_WORLD, &status);
 
-	int buffer_size;
+	int local_buffer_size;
 
-	MPI_Get_count(&status, MPI_BYTE, &buffer_size);
+	MPI_Get_count(&status, MPI_BYTE, &local_buffer_size);
 
-	if(buffer_size == 0){
+	if(local_buffer_size == 0){
 		throw __FILE__ ":read_bio_seq_remote: Error buffer size is 0";
 	}
 
-	unsigned char* buffer = new unsigned char [buffer_size];
+	unsigned char* buffer = new unsigned char [local_buffer_size];
 
 	if(buffer == NULL){
 		throw __FILE__ ":read_bio_seq_remote: Error allocating receive buffer";
 	}
 
-	if(MPI_Recv(buffer, buffer_size, MPI_BYTE, 0 /* master */, 
+	if(MPI_Recv(buffer, local_buffer_size, MPI_BYTE, 0 /* master */, 
 		SEQ_REQUEST, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
 		throw __FILE__ ":read_bio_seq_remote: Error receiving buffer";
@@ -388,7 +388,7 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	
 	ptr += defline_size;
 	
-	const unsigned int seq_size = buffer_size - defline_size;
+	const unsigned int seq_size = local_buffer_size - defline_size;
 	
 	m_seq.second = new SEQBASE [seq_size];
 
@@ -680,7 +680,9 @@ size_t sequence_data::size() const
 	switch(format){
 		case FASTA_SLOW:
 		case FASTQ_SLOW:
-			return seq_index.size();
+			// If we have read any data, |seq_index| = num_seq + 1.
+			// If have have yet to read data, then |seq_index| == 0.
+			return seq_index.empty() ? 0 : seq_index.size() - 1;
 		case NCBI:
 			return seq_length.size();
 		case REMOTE:

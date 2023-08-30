@@ -586,10 +586,10 @@ int local_main(int argc, char *argv[])
 							opt.target_strand);
 					}
 				}
-				
+
 				// Merge the results of this local calculation into the global list
 				if(local_results.empty() == false){
-					
+
 					list< list<hybrid_sig>::iterator > reaper;
 					
 					// Before we add the local_results to the main results list, add the 

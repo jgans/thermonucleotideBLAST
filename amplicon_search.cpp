@@ -103,7 +103,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	match_oligo_to_plus_strand(match_list, m_hash, m_sig.reverse_oligo, oligo_info::R);
 	
 	const unsigned int num_plus_match = match_list.size();
-	
+
 	// If the number of matches has not increased, then we did not match any oligos to the plus strand
 	if(num_plus_match == num_minus_match){
 		return sig_list;
@@ -122,7 +122,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 
 	const pair<unsigned int, unsigned int> strand_count = 
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
-	
+
 	if(strand_count.first < strand_count.second){ // num minus < num plus
 		
 		m_melt.set_query(m_sig.forward_oligo);
@@ -208,10 +208,10 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);	
+			m_max_gap, m_max_mismatch);
 	}
 	else{ // num plus >= num minus
-	
+
 		m_melt.set_query(m_sig.forward_oligo);
 		
 		// Assume that the primer oligos are in vast excess to the target strands
@@ -302,7 +302,6 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_max_gap, m_max_mismatch);
 	}
 
-	
 	// Reuse the melting engine for binding a probe (if present)
 	if( m_sig.has_probe() ){
 		
@@ -363,7 +362,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		r++;
 		
 		for(;r != match_list.end();r++){
-			
+
 			// Exclude probes and primers that bind to the minus strand
 			if( r->mask & (oligo_info::MINUS_STRAND | oligo_info::P) ){
 				continue;
@@ -398,9 +397,9 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 				p++;
 				
 				for(;p != r;p++){
-					
+
 					if(p->mask & oligo_info::P){
-					
+
 						// If we get here, we have a primer pair and probe!
 						const int amp_start = f->loc_5;
 						const int amp_stop = r->loc_3;
@@ -523,7 +522,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 
 							tmp.amplicon = string(amp_len, '-');
 
-							for(unsigned int i = 0;i < amp_len;i++, ptr--){
+							for(unsigned int i = max(0, int(amp_stop) - (int)SEQ_SIZE(m_seq.second) + 1);i < amp_len;i++, ptr--){
 
 								// Don't run past the end of the sequence
 								if( ptr < SEQ_START(m_seq.second) ){
@@ -549,6 +548,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 				}
 			}
 			else{
+
 				// If we get here, we have a valid primer pair!
 				const int amp_start = f->loc_5;
 				const int amp_stop = r->loc_3;
@@ -594,7 +594,6 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 
 					// Swap. The match order is *not* the output order
 					swap(f_output, r_output);
-
 				}
 
 				tmp.forward_tm = f_output->tm;
@@ -637,12 +636,13 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 					}
 				}
 				else{
+
 					// Taking the complement of the amplicon
 					SEQPTR ptr = SEQ_START(m_seq.second) + min(amp_stop, (int)SEQ_SIZE(m_seq.second) - 1);
 
 					tmp.amplicon = string(amp_len, '-');
 
-					for(unsigned int i = 0;i < amp_len;i++, ptr--){
+					for(unsigned int i = max(0, int(amp_stop) - (int)SEQ_SIZE(m_seq.second) + 1);i < amp_len;i++, ptr--){
 
 						// Don't run past the end of the sequence
 						if( ptr < SEQ_START(m_seq.second) ){

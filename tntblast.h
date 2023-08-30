@@ -90,7 +90,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.4 (October 25, 2021)"
+#define		TNTBLAST_VERSION		"2.6 (August 4, 2023)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
@@ -292,7 +292,7 @@ struct BindCacheValue
 	unsigned int target_3;
 	unsigned int num_mismatch;
 	unsigned int num_gap;
-	unsigned int num_real_base;
+	float fraction_real_base_pairs;
 	std::string seq_align;
 
 	BindCacheValue()
@@ -310,11 +310,11 @@ struct BindCacheValue
 		const unsigned int &m_target_3,
 		const unsigned int &m_num_mismatch,
 		const unsigned int &m_num_gap,
-		const unsigned int &m_num_real_base,
+		const float &m_fraction_real_base_pairs,
 		const std::string &m_seq_align) :
 			tm(m_tm), dg(m_dg), dH(m_dH), dS(m_dS), anchor_5(m_anchor_5),
 			anchor_3(m_anchor_3), target_5(m_target_5), target_3(m_target_3),
-			num_mismatch(m_num_mismatch), num_gap(m_num_gap), num_real_base(m_num_real_base),
+			num_mismatch(m_num_mismatch), num_gap(m_num_gap), fraction_real_base_pairs(m_fraction_real_base_pairs),
 			seq_align(m_seq_align)
 	{
 

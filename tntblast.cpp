@@ -43,16 +43,17 @@ int main(int argc, char *argv[])
 		cout << "Running on local machine (1 thread)" << endl;
 		#endif // _OPENMP
 
-		return local_main(argc, argv);
+		ret_value = local_main(argc, argv);
 	}
-
-	if(mpi_rank == 0){ // Master
-		ret_value = master(argc, argv);
+	else{
+		if(mpi_rank == 0){ // Master
+			ret_value = master(argc, argv);
+		}
+		else{ // Worker
+			ret_value = worker(argc, argv);
+		}
 	}
-	else{ // Worker
-		ret_value = worker(argc, argv);
-	}
-
+	
 	MPI_Finalize();
 	#else // USE_MPI not defined
 	
