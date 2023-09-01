@@ -1,3 +1,6 @@
+# Version 2.61 (September 1, 2023)
+- Fixed a multi-threading race condition when reading BLAST-formatted databases (thanks to Steven Higgins for pointing this out!).
+
 # Version 2.6 (August 4, 2023)
 - Updated command line options output to indicate optional arguments
 - Fixed algorithm that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
