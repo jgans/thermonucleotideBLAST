@@ -427,184 +427,184 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 	m_index = seq_length[m_index].second;
 
 	unsigned int seq_len = 0;
+	
+	if(blast_db_ptr == NULL){
+		throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer";
+	}
 
-	// Read this sequence from the database file. The "omp critical"
-	// is needed to prevent multiple openMP threads from encountering
-	// a race condition in the NCBI toolbox
-	//#pragma omp critical (NcbiToolbox)
-	//{
-		if(blast_db_ptr == NULL){
-			throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer";
-		}
-
-		ncbi::CRef<ncbi::objects::CBioseq> bs;
-		
+	// Read this sequence from the database file. The "omp critical" is needed to prevent multiple openMP threads 
+	// from encountering a race condition in the NCBI toolbox
+	// Update August 31, 2023: This race condition may be related to the NCBI toolbox race condition mentioned in 
+	// https://www.repeatmasker.org/ (see RMBlast 2.6.0 BUGFIX). Rather than requiring users to patch the NCBI toolbox
+	// code, it is easier to protect access with an OpenMP critical section (as long as most of the compute time is spent
+	// aligning sequences).
+	#pragma omp critical (NcbiToolbox)
+	{
 		// There is at least one example of a blast 'nt' database (from May 10, 2021) for which at least
 		// one sequence index throws an error when we attempt to load the CBioseq. If this happens, return
 		// a zero length sequence.
 		try{
-			bs = blast_db_ptr->GetBioseqNoData(m_index);
+
+			ncbi::CRef<ncbi::objects::CBioseq> bs = blast_db_ptr->GetBioseqNoData(m_index);
+
+			string title;
+			string accession;
+
+			const list< ncbi::CRef< ncbi::CSeq_id > >& seqIds = bs->GetId();
+			
+			for (list< ncbi::CRef< ncbi::CSeq_id > >::const_iterator cit = seqIds.begin();cit != seqIds.end(); cit++)
+			{
+				const ncbi::CTextseq_id* textId = (*cit)->GetTextseq_Id();
+
+				if(textId && textId->CanGetAccession() ){
+
+					if( textId->CanGetAccession() ){
+						accession = textId->GetAccession();
+					}
+
+					if( !accession.empty() ){
+						break;
+					}
+				}
+			}
+
+			ITERATE( ncbi::CSeq_descr::Tdata, desc, bs->GetDescr().Get() ) {
+				if( (*desc)->Which() == ncbi::CSeqdesc::e_Title ) {
+					title = (*desc)->GetTitle();
+					break;
+				}
+			}
+
+			if( accession.empty() ){
+				m_seq.first = title;
+			}
+			else{
+
+				if( title.empty() ){
+					m_seq.first = accession;
+				}
+				else{
+					m_seq.first = accession + " " + title;
+				}
+			}
+
+			// Extract the sequence data
+			const char* seq_buffer = NULL;
+			const int start = m_start;
+
+			// The stop value that we pass to GetAmbigSeq is not
+			// included in the extracted bases, i.e. [start, stop).
+			int stop = min( m_stop + 1, blast_db_ptr->GetSeqLength(m_index) );
+			
+			if(start > stop){
+
+				stop = blast_db_ptr->GetAmbigSeq(m_index,
+					&seq_buffer,
+					ncbi::kSeqDBNuclNcbiNA8);
+			}
+			else{
+				blast_db_ptr->GetAmbigSeq(m_index,
+					&seq_buffer,
+					ncbi::kSeqDBNuclNcbiNA8,
+					start, stop);
+			}
+
+			seq_len = stop - start;
+
+			// Allocate space to hold the sub-sequence
+			m_seq.second = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
+			
+			if(m_seq.second == NULL){
+				throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
+			}
+			
+			SEQPTR out_ptr = m_seq.second;
+			
+			// Initialize the sequence header
+			memcpy( out_ptr, &seq_len, sizeof(unsigned int) );
+			out_ptr += sizeof(unsigned int);
+			
+			const char *in_ptr = seq_buffer;
+
+			for(int i = start;i < stop;++i,++out_ptr,++in_ptr){
+
+				// kSeqDBNuclNcbiNA8
+				#define BLAST_DB_A	1
+				#define BLAST_DB_C 	2
+				#define BLAST_DB_G	4
+				#define BLAST_DB_T	8
+
+				switch(*in_ptr){
+					case BLAST_DB_A:
+						*out_ptr = DB_A;
+						break;
+					case BLAST_DB_T:
+						*out_ptr = DB_T;
+						break;
+					case BLAST_DB_G:
+						*out_ptr = DB_G;
+						break;
+					case BLAST_DB_C:
+						*out_ptr = DB_C;
+						break;
+					// G or T or C
+					case (BLAST_DB_G | BLAST_DB_T | BLAST_DB_C):
+						*out_ptr = DB_B;
+						break;
+					// G or A or T
+					case (BLAST_DB_G | BLAST_DB_A | BLAST_DB_T):
+						*out_ptr = DB_D;
+						break;
+					// A or C or T
+					case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_T):
+						*out_ptr = DB_H;
+						break;
+					// G or T
+					case (BLAST_DB_G | BLAST_DB_T):
+						*out_ptr = DB_K;
+						break;
+					// A or C
+					case (BLAST_DB_A | BLAST_DB_C):
+						*out_ptr = DB_M;
+						break;
+					// A or C or G or T
+					case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_G | BLAST_DB_T):
+						*out_ptr = DB_N;
+						break;
+					// G or A
+					case (BLAST_DB_G | BLAST_DB_A):
+						*out_ptr = DB_R;
+						break;
+					// G or C
+					case (BLAST_DB_G | BLAST_DB_C):
+						*out_ptr = DB_S;
+						break;
+					// G or C or A
+					case (BLAST_DB_G | BLAST_DB_C | BLAST_DB_A):
+						*out_ptr = DB_V;
+						break;
+					// A or T
+					case (BLAST_DB_A | BLAST_DB_T):
+						*out_ptr = DB_W;
+						break;
+					// T or C
+					case (BLAST_DB_T | BLAST_DB_C):
+						*out_ptr = DB_Y;
+						break;
+					default:
+						*out_ptr = DB_UNKNOWN;
+						break;
+				};
+			}
+
+			blast_db_ptr->RetAmbigSeq(&seq_buffer);
 		}
 		catch(...){
 
 			m_seq.first = "Invalid";
 			m_seq.second = NULL;
-
-			return 0; // The sequence length is zero
 		}
-
-		string title;
-		string accession;
-
-		const list< ncbi::CRef< ncbi::CSeq_id > >& seqIds = bs->GetId();
-     	
-		for (list< ncbi::CRef< ncbi::CSeq_id > >::const_iterator cit = seqIds.begin();cit != seqIds.end(); cit++)
-     	{
-			const ncbi::CTextseq_id* textId = (*cit)->GetTextseq_Id();
-
-         	if(textId && textId->CanGetAccession() ){
-
-            	if( textId->CanGetAccession() ){
-                 	accession = textId->GetAccession();
-				}
-
-				if( !accession.empty() ){
-					break;
-				}
-			}
-		}
-
-		ITERATE( ncbi::CSeq_descr::Tdata, desc, bs->GetDescr().Get() ) {
-        	if( (*desc)->Which() == ncbi::CSeqdesc::e_Title ) {
-            	title = (*desc)->GetTitle();
-				break;
-        	}
-    	}
-
-		if( accession.empty() ){
-			m_seq.first = title;
-		}
-		else{
-
-			if( title.empty() ){
-				m_seq.first = accession;
-			}
-			else{
-				m_seq.first = accession + " " + title;
-			}
-		}
-
-		// Extract the sequence data
-		const char* seq_buffer = NULL;
-		const int start = m_start;
-
-		// The stop value that we pass to GetAmbigSeq is not
-		// included in the extracted bases, i.e. [start, stop).
-		int stop = min( m_stop + 1, blast_db_ptr->GetSeqLength(m_index) );
-		
-		if(start > stop){
-
-			stop = blast_db_ptr->GetAmbigSeq(m_index,
-				&seq_buffer,
-				ncbi::kSeqDBNuclNcbiNA8);
-		}
-		else{
-			blast_db_ptr->GetAmbigSeq(m_index,
-				&seq_buffer,
-				ncbi::kSeqDBNuclNcbiNA8,
-				start, stop);
-		}
-
-		seq_len = stop - start;
-
-		// Allocate space to hold the sub-sequence
-		m_seq.second = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
-		
-		if(m_seq.second == NULL){
-			throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
-		}
-		
-		SEQPTR out_ptr = m_seq.second;
-		
-		// Initialize the sequence header
-		memcpy( out_ptr, &seq_len, sizeof(unsigned int) );
-		out_ptr += sizeof(unsigned int);
-		
-		const char *in_ptr = seq_buffer;
-
-		for(int i = start;i < stop;++i,++out_ptr,++in_ptr){
-
-			// kSeqDBNuclNcbiNA8
-			#define BLAST_DB_A	1
-			#define BLAST_DB_C 	2
-			#define BLAST_DB_G	4
-			#define BLAST_DB_T	8
-
-			switch(*in_ptr){
-				case BLAST_DB_A:
-					*out_ptr = DB_A;
-					break;
-				case BLAST_DB_T:
-					*out_ptr = DB_T;
-					break;
-				case BLAST_DB_G:
-					*out_ptr = DB_G;
-					break;
-				case BLAST_DB_C:
-					*out_ptr = DB_C;
-					break;
-				// G or T or C
-				case (BLAST_DB_G | BLAST_DB_T | BLAST_DB_C):
-					*out_ptr = DB_B;
-					break;
-				// G or A or T
-				case (BLAST_DB_G | BLAST_DB_A | BLAST_DB_T):
-					*out_ptr = DB_D;
-					break;
-				// A or C or T
-				case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_T):
-					*out_ptr = DB_H;
-					break;
-				// G or T
-				case (BLAST_DB_G | BLAST_DB_T):
-					*out_ptr = DB_K;
-					break;
-				// A or C
-				case (BLAST_DB_A | BLAST_DB_C):
-					*out_ptr = DB_M;
-					break;
-				// A or C or G or T
-				case (BLAST_DB_A | BLAST_DB_C | BLAST_DB_G | BLAST_DB_T):
-					*out_ptr = DB_N;
-					break;
-				// G or A
-				case (BLAST_DB_G | BLAST_DB_A):
-					*out_ptr = DB_R;
-					break;
-				// G or C
-				case (BLAST_DB_G | BLAST_DB_C):
-					*out_ptr = DB_S;
-					break;
-				// G or C or A
-				case (BLAST_DB_G | BLAST_DB_C | BLAST_DB_A):
-					*out_ptr = DB_V;
-					break;
-				// A or T
-				case (BLAST_DB_A | BLAST_DB_T):
-					*out_ptr = DB_W;
-					break;
-				// T or C
-				case (BLAST_DB_T | BLAST_DB_C):
-					*out_ptr = DB_Y;
-					break;
-				default:
-					*out_ptr = DB_UNKNOWN;
-					break;
-			};
-		}
-
-		blast_db_ptr->RetAmbigSeq(&seq_buffer);
-	//}
+	}
 	
 	return seq_len;
 }
