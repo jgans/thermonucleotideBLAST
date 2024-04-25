@@ -50,9 +50,9 @@ void Options::parse_command_line(int argc, char *argv[])
 	// -? help
 	// -h help
 	// --help
-	// --primer-clamp <number of exact 3' primer matches requried>
-	// --probe-clamp5 <number of exact 5' probe matches requried>
-	// --probe-clamp3 <number of exact 3' probe matches requried>
+	// --primer-clamp <number of exact 3' primer matches required>
+	// --probe-clamp5 <number of exact 5' probe matches required>
+	// --probe-clamp3 <number of exact 3' probe matches required>
 	// --dangle5 <T|F> (Allow dangling bases on the 5' query side of an alignment)
 	// --dangle3 <T|F> (Allow dangling bases on the 3' query side of an alignment)
 	// --target-strand <sense|antisense|both>
@@ -447,12 +447,12 @@ void Options::parse_command_line(int argc, char *argv[])
 		cerr << "\t[-L <T|F>] (Append assay name to output defline, default is F)" << endl;
 		cerr << "\t[-S <T|F>] (Ouput assay summary after searching, default is F)" << endl;
 		cerr << "\t[-h|-?] (Command-line usage)" << endl;
-		cerr << "\t[--primer-clamp <number of exact 3' primer matches requried>] (default is " 
+		cerr << "\t[--primer-clamp <number of exact 3' primer matches required>] (default is " 
 			<< DEFAULT_PRIMER_CLAMP << " bases)" << endl;
-		cerr << "\t[--min-max-primer-clamp <the minimum max number of exact 3' primer matches requried>] (default is no limit)" << endl;
-		cerr << "\t[--probe-clamp5 <number of exact 5' probe matches requried>] (default is " 
+		cerr << "\t[--min-max-primer-clamp <the minimum max number of exact 3' primer matches required>] (default is no limit)" << endl;
+		cerr << "\t[--probe-clamp5 <number of exact 5' probe matches required>] (default is " 
 			<< DEFAULT_PROBE_CLAMP_5 << " bases)" << endl;
-		cerr << "\t[--probe-clamp3 <number of exact 3' probe matches requried>] (default is " 
+		cerr << "\t[--probe-clamp3 <number of exact 3' probe matches required>] (default is " 
 			<< DEFAULT_PROBE_CLAMP_3 << " bases)" << endl;
 		cerr << "\t[--dangle5 <T|F>] (Allow dangling bases on the 5' query side of an alignment, default is "
 			<< (DEFAULT_DANGLE_5 ? "T" : "F") << ")" << endl;
@@ -465,7 +465,7 @@ void Options::parse_command_line(int argc, char *argv[])
 		cerr << "\t[--target-strand <plus|minus|both>] (which strand to target with probes, default is \"both\")" << endl;
 		cerr << "\t[--max-target-len <max len>] (max sequence length before targets are split, default is " 
 			<< DEFAULT_FRAGMENT_TARGET_LENGTH << " bases)" << endl;
-		cerr << "\t[--query-seg <always | never | adaptive>] (query segmentation algorithm, default is \"adaptive\")" << endl;
+		cerr << "\t[--query-seg <always | never | adaptive>] (query segmentation algorithm, default is \"never\")" << endl;
 		cerr << "\t[--dump-query <T|F>] (write queries to stdout, default is F)" << endl;
 		cerr << "\t[--dinkelbach <T|F>] (Use the Dinkelbach fractional programming algorithm, default is F)" << endl;
 		cerr << "\t[--max-gap <number of gaps>] (Max number of allowed gaps in a DNA duplex, default is " 
@@ -772,15 +772,16 @@ int Options::parse_query_seg(string m_opt)
 
 }
 
-size_t Options::max_product_length() const
+size_t Options::max_product_length(const vector<string> &m_oligo_table) const
 {
 	size_t ret = 0;
 	
+	#define STRING(VAR) \
+		index_to_str(VAR, m_oligo_table)
+
 	if(assay_format == ASSAY_PCR){
 	
-		vector<hybrid_sig>::const_iterator iter;
-	
-		for(iter = sig_list.begin();iter != sig_list.end();iter++){
+		for(vector<hybrid_sig>::const_iterator iter = sig_list.begin();iter != sig_list.end();iter++){
 		
 			if(iter->has_primers() == true){
 			
@@ -788,7 +789,7 @@ size_t Options::max_product_length() const
 				break;
 			}
 			
-			ret = max( ret, iter->probe_oligo.size() );
+			ret = max( ret, STRING(iter->probe_oligo_str_index).size() );
 		}
 		
 		return ret;
@@ -796,22 +797,20 @@ size_t Options::max_product_length() const
 	
 	if(assay_format == ASSAY_PADLOCK){
 		
-		vector<hybrid_sig>::const_iterator iter;
-	
-		for(iter = sig_list.begin();iter != sig_list.end();iter++){
+		for(vector<hybrid_sig>::const_iterator iter = sig_list.begin();iter != sig_list.end();iter++){
 			
-			ret = max( ret, iter->forward_oligo.size() + iter->reverse_oligo.size() );
+			ret = max( ret, STRING(iter->forward_oligo_str_index).size() + STRING(iter->reverse_oligo_str_index).size() );
 		}
 		
 		return ret;
 	}
 	
-	vector<hybrid_sig>::const_iterator iter;
-	
-	for(iter = sig_list.begin();iter != sig_list.end();iter++){
+	for(vector<hybrid_sig>::const_iterator iter = sig_list.begin();iter != sig_list.end();iter++){
 
-		ret = max( ret, iter->probe_oligo.size() );
+		ret = max( ret, STRING(iter->probe_oligo_str_index).size() );
 	}
+
+	#undef STRING
 
 	return ret;
 }
@@ -876,26 +875,29 @@ void Options::validate_search_threshold()
 	};
 }
 
-void Options::write_queries(std::ostream &s)
+void Options::write_queries(std::ostream &s, const vector<string> &m_str_table)
 {
 
-	vector<hybrid_sig>::const_iterator iter;
-	
-	for(iter = sig_list.begin();iter != sig_list.end();iter ++){
+	#define STRING(VAR) \
+		index_to_str(VAR, m_str_table)
+
+	for(vector<hybrid_sig>::const_iterator iter = sig_list.begin();iter != sig_list.end();iter ++){
 		
-		s << iter->name;
+		s << STRING(iter->name_str_index);
 		
 		if(iter->has_primers() == true){
 			
-			s << '\t' << iter->forward_oligo << '\t' << iter->reverse_oligo;
+			s << '\t' << STRING(iter->forward_oligo_str_index) << '\t' << STRING(iter->reverse_oligo_str_index);
 		}
 			
 		if(iter->has_probe() == true){
-			s << '\t' << iter->probe_oligo;
+			s << '\t' << STRING(iter->probe_oligo_str_index);
 		}
 		
 		s << endl;
 	}
+
+	#undef STRING
 }
 
 ostream& operator << (ostream &s, const Options &m_opt)

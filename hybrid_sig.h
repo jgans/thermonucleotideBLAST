@@ -21,6 +21,8 @@ enum {ASSAY_PCR, ASSAY_PROBE, ASSAY_PADLOCK, ASSAY_AFFYMETRIX, ASSAY_NONE};
 // if we are going to combine them with X Macros
 #define SINGLE_ARG(...) __VA_ARGS__
 
+#define		INVALID_INDEX		0xFFFFFFFFFFFFFFFF
+
 // A class for storing hybridization signatures
 class hybrid_sig {
 
@@ -48,6 +50,64 @@ class hybrid_sig {
 			return atoi( m_defline.substr(start, stop - start).c_str() );
 		};
 
+		inline void init()
+		{
+			id = degen_id = -1;
+			seq_index = -1;
+			
+			name_str_index = INVALID_INDEX;
+			forward_oligo_str_index = INVALID_INDEX;
+			reverse_oligo_str_index = INVALID_INDEX;
+			probe_oligo_str_index = INVALID_INDEX;
+			amplicon_def_str_index = INVALID_INDEX;
+			amplicon_str_index = INVALID_INDEX;
+			forward_align_str_index = INVALID_INDEX;
+			reverse_align_str_index = INVALID_INDEX;
+			probe_align_str_index = INVALID_INDEX;
+
+			amplicon_range = std::make_pair(0, 0);
+			probe_range = std::make_pair(0, 0);
+			
+			forward_tm = -1.0f;
+			reverse_tm = -1.0f;
+			probe_tm = -1.0f;
+			
+			forward_hairpin_tm = -1.0f;
+			reverse_hairpin_tm = -1.0f;
+			forward_dimer_tm = -1.0f;
+			reverse_dimer_tm = -1.0f;
+			primer_dimer_tm = -1.0f;
+		
+			probe_hairpin_tm = -1.0f;
+			probe_dimer_tm = -1.0f;
+		
+			forward_dH = 100.0f;
+			forward_dS = 0.0f;
+		
+			reverse_dH = 100.0f;
+			reverse_dS = 0.0f;
+		
+			probe_dH = 100.0f;
+			probe_dS = 0.0f;
+		
+			primer_strand = PLUS;
+			probe_strand = PLUS;
+
+			forward_primer_clamp = -1;
+			reverse_primer_clamp = -1;
+
+			forward_degen = 1;
+			reverse_degen = 1;
+			probe_degen = 1;
+			
+			forward_mm = -1;
+			forward_gap = -1;
+			reverse_mm = -1;
+			reverse_gap = -1;
+			probe_mm = -1;
+			probe_gap = -1;
+		};
+
 	public:
 		// Enumerate the DNA strand orientation
 		// A value of PLUS for probe_strand means the probe binds to the 
@@ -58,15 +118,15 @@ class hybrid_sig {
 		// Use X Macros (https://en.wikipedia.org/wiki/X_Macro) to 
 		// ensure that structure variable are correctly serialized.
 		#define HYBRID_SIG_MEMBERS \
-			VARIABLE(std::string, name) \
-			VARIABLE(std::string, forward_oligo) \
-			VARIABLE(std::string, reverse_oligo) \
-			VARIABLE(std::string, probe_oligo) \
-			VARIABLE(std::string, amplicon_def) \
-			VARIABLE(std::string, amplicon) \
-			VARIABLE(std::string, forward_align) \
-			VARIABLE(std::string, reverse_align) \
-			VARIABLE(std::string, probe_align) \
+			VARIABLE(size_t, name_str_index) \
+			VARIABLE(size_t, forward_oligo_str_index) \
+			VARIABLE(size_t, reverse_oligo_str_index) \
+			VARIABLE(size_t, probe_oligo_str_index) \
+			VARIABLE(size_t, amplicon_def_str_index) \
+			VARIABLE(size_t, amplicon_str_index) \
+			VARIABLE(size_t, forward_align_str_index) \
+			VARIABLE(size_t, reverse_align_str_index) \
+			VARIABLE(size_t, probe_align_str_index) \
 			VARIABLE(SINGLE_ARG(std::pair<int, int>), amplicon_range) \
 			VARIABLE(SINGLE_ARG(std::pair<int, int>), probe_range) \
 			VARIABLE(int, id) \
@@ -88,20 +148,19 @@ class hybrid_sig {
 			VARIABLE(float, reverse_dS) \
 			VARIABLE(float, probe_dH) \
 			VARIABLE(float, probe_dS) \
-			VARIABLE(int, primer_strand) \
-			VARIABLE(int, probe_strand) \
-			VARIABLE(int, forward_primer_clamp) \
-			VARIABLE(int, reverse_primer_clamp) \
+			VARIABLE(int8_t, primer_strand) \
+			VARIABLE(int8_t, probe_strand) \
+			VARIABLE(int8_t, forward_primer_clamp) \
+			VARIABLE(int8_t, reverse_primer_clamp) \
 			VARIABLE(int, forward_degen) \
 			VARIABLE(int, reverse_degen) \
 			VARIABLE(int, probe_degen) \
-			VARIABLE(int, forward_mm) \
-			VARIABLE(int, forward_gap) \
-			VARIABLE(int, reverse_mm) \
-			VARIABLE(int, reverse_gap) \
-			VARIABLE(int, probe_mm) \
-			VARIABLE(int, probe_gap) \
-			VARIABLE(float, ct)
+			VARIABLE(int8_t, forward_mm) \
+			VARIABLE(int8_t, forward_gap) \
+			VARIABLE(int8_t, reverse_mm) \
+			VARIABLE(int8_t, reverse_gap) \
+			VARIABLE(int8_t, probe_mm) \
+			VARIABLE(int8_t, probe_gap)
 
 		#define VARIABLE(A, B) A B;
 			HYBRID_SIG_MEMBERS
@@ -109,225 +168,49 @@ class hybrid_sig {
 
 		hybrid_sig() // default constructor
 		{
-			id = degen_id = -1;
-			seq_index = -1;
-			
-			amplicon_range = std::make_pair(0, 0);
-			probe_range = std::make_pair(0, 0);
-			
-			forward_tm = -1.0f;
-			reverse_tm = -1.0f;
-			probe_tm = -1.0f;
-			
-			forward_hairpin_tm = -1.0f;
-			reverse_hairpin_tm = -1.0f;
-			forward_dimer_tm = -1.0f;
-			reverse_dimer_tm = -1.0f;
-			primer_dimer_tm = -1.0f;
-		
-			probe_hairpin_tm = -1.0f;
-			probe_dimer_tm = -1.0f;
-		
-			forward_dH = 100.0f;
-			forward_dS = 0.0f;
-		
-			reverse_dH = 100.0f;
-			reverse_dS = 0.0f;
-		
-			probe_dH = 100.0f;
-			probe_dS = 0.0f;
-		
-			primer_strand = PLUS;
-			probe_strand = PLUS;
-
-			forward_degen = 1;
-			reverse_degen = 1;
-			probe_degen = 1;
-			
-			forward_mm = -1;
-			forward_gap = -1;
-			reverse_mm = -1;
-			reverse_gap = -1;
-			probe_mm = -1;
-			probe_gap = -1;
-			
-			ct = -1.0f;
+			init();
 		};
 		
 		// forward + reverse + probe
-		hybrid_sig(const std::string &m_name, const std::string &m_forward, 
-			const std::string &m_reverse, const std::string &m_probe, 
+		hybrid_sig(const size_t &m_name_str_index, const size_t &m_forward_str_index, 
+			const size_t &m_reverse_str_index, const size_t &m_probe_str_index, 
 			const unsigned int &m_id)
 		{
-			id = degen_id = m_id;
-			seq_index = -1;
-			
-			name = m_name;
-			forward_oligo = m_forward;
-			reverse_oligo = m_reverse;
-			probe_oligo = m_probe;
-			
-			amplicon_range = std::make_pair(0, 0);
-			probe_range = std::make_pair(0, 0);
-			
-			forward_tm = -1.0f;
-			reverse_tm = -1.0f;
-			probe_tm = -1.0f;
-			
-			forward_hairpin_tm = -1.0f;
-			reverse_hairpin_tm = -1.0f;
-			forward_dimer_tm = -1.0f;
-			reverse_dimer_tm = -1.0f;
-			primer_dimer_tm = -1.0f;
-		
-			probe_hairpin_tm = -1.0f;
-			probe_dimer_tm = -1.0f;
-			
-			forward_dH = 100.0f;
-			forward_dS = 0.0f;
-		
-			reverse_dH = 100.0f;
-			reverse_dS = 0.0f;
-		
-			probe_dH = 100.0f;
-			probe_dS = 0.0f;
-			
-			primer_strand = PLUS;
-			probe_strand = PLUS;
-			
-			forward_primer_clamp = -1;
-			reverse_primer_clamp = -1;
+			init();
 
-			forward_degen = 1;
-			reverse_degen = 1;
-			probe_degen = 1;
+			id = degen_id = m_id;
 			
-			forward_mm = -1;
-			forward_gap = -1;
-			reverse_mm = -1;
-			reverse_gap = -1;
-			probe_mm = -1;
-			probe_gap = -1;
-			
-			ct = -1.0f;
+			name_str_index = m_name_str_index;
+			forward_oligo_str_index = m_forward_str_index;
+			reverse_oligo_str_index = m_reverse_str_index;
+			probe_oligo_str_index = m_probe_str_index;
 		}
 		
 		// forward + reverse
-		hybrid_sig(const std::string &m_name, const std::string &m_forward, 
-			const std::string &m_reverse, const unsigned int &m_id)
+		hybrid_sig(const size_t &m_name_str_index, const size_t &m_forward_str_index, 
+			const size_t &m_reverse_str_index, const unsigned int &m_id)
 		{
-			id = degen_id = m_id;
-			seq_index = -1;
-			
-			name = m_name;
-			forward_oligo = m_forward;
-			reverse_oligo = m_reverse;
-			
-			amplicon_range = std::make_pair(0, 0);
-			probe_range = std::make_pair(0, 0);
-			
-			forward_tm = -1.0f;
-			reverse_tm = -1.0f;
-			probe_tm = -1.0f;
-			
-			forward_hairpin_tm = -1.0f;
-			reverse_hairpin_tm = -1.0f;
-			forward_dimer_tm = -1.0f;
-			reverse_dimer_tm = -1.0f;
-			primer_dimer_tm = -1.0f;
-		
-			probe_hairpin_tm = -1.0f;
-			probe_dimer_tm = -1.0f;
-			
-			forward_dH = 100.0f;
-			forward_dS = 0.0f;
-		
-			reverse_dH = 100.0f;
-			reverse_dS = 0.0f;
-		
-			probe_dH = 100.0f;
-			probe_dS = 0.0f;
-			
-			primer_strand = PLUS;
-			probe_strand = PLUS;
-			
-			forward_primer_clamp = -1;
-			reverse_primer_clamp = -1;
+			init();
 
-			forward_degen = 1;
-			reverse_degen = 1;
-			probe_degen = 1;
+			id = degen_id = m_id;
 			
-			forward_mm = -1;
-			forward_gap = -1;
-			reverse_mm = -1;
-			reverse_gap = -1;
-			probe_mm = -1;
-			probe_gap = -1;
-			
-			ct = -1.0f;
+			name_str_index = m_name_str_index;
+			forward_oligo_str_index = m_forward_str_index;
+			reverse_oligo_str_index = m_reverse_str_index;
 		}
 		
 		// probe
-		hybrid_sig(const std::string &m_name, const std::string &m_probe, 
+		hybrid_sig(const size_t &m_name_str_index, const size_t &m_probe_str_index, 
 			const unsigned int &m_id)
 		{
-			id = degen_id = m_id;
-			seq_index = -1;
-			
-			name = m_name;
-			probe_oligo = m_probe;
-			
-			amplicon_range = std::make_pair(0, 0);
-			probe_range = std::make_pair(0, 0);
-			
-			forward_tm = -1.0f;
-			reverse_tm = -1.0f;
-			probe_tm = -1.0f;
-			
-			forward_hairpin_tm = -1.0f;
-			reverse_hairpin_tm = -1.0f;
-			forward_dimer_tm = -1.0f;
-			reverse_dimer_tm = -1.0f;
-			primer_dimer_tm = -1.0f;
-		
-			probe_hairpin_tm = -1.0f;
-			probe_dimer_tm = -1.0f;
-			
-			forward_dH = 100.0f;
-			forward_dS = 0.0f;
-		
-			reverse_dH = 100.0f;
-			reverse_dS = 0.0f;
-		
-			probe_dH = 100.0f;
-			probe_dS = 0.0f;
-			
-			primer_strand = PLUS;
-			probe_strand = PLUS;
-			
-			forward_primer_clamp = -1;
-			reverse_primer_clamp = -1;
+			init();
 
-			forward_degen = 1;
-			reverse_degen = 1;
-			probe_degen = 1;
+			id = degen_id = m_id;
 			
-			forward_mm = -1;
-			forward_gap = -1;
-			reverse_mm = -1;
-			reverse_gap = -1;
-			probe_mm = -1;
-			probe_gap = -1;
-			
-			ct = -1.0f;
+			name_str_index = m_name_str_index;
+			probe_oligo_str_index = m_probe_str_index;
 		}
-		
-		~hybrid_sig()
-		{
-			// Do nothing!
-		};
-		
+				
 		inline int my_id() const
 		{
 			return id;
@@ -370,12 +253,12 @@ class hybrid_sig {
 		
 		inline bool has_primers() const
 		{
-			return ( !forward_oligo.empty() && !reverse_oligo.empty() );
+			return ( (forward_oligo_str_index != INVALID_INDEX) && (reverse_oligo_str_index != INVALID_INDEX) );
 		};
 		
 		inline bool has_probe() const
 		{
-			return ( !probe_oligo.empty() );
+			return (probe_oligo_str_index != INVALID_INDEX);
 		};
 		
 		inline bool probe_overlap(const hybrid_sig &m_sig) const
@@ -533,27 +416,31 @@ class hybrid_sig {
 			}
 		};
 		
-		inline std::string assay_string() const
+		inline size_t assay_string_index() const
 		{
-			return name;
-			
-			//std::stringstream ssout;
-			//
-			//ssout << name << '\t';
-			//
-			//if(forward_oligo.empty() == false){
-			//	ssout << forward_oligo << '\t';
-			//}
-			//
-			//if(reverse_oligo.empty() == false){
-			//	ssout << reverse_oligo << '\t';
-			//}
-			//
-			//if(probe_oligo.empty() == false){
-			//	ssout << probe_oligo << '\t';
-			//}
-			//
-			//return ssout.str();
+			return name_str_index;
+		};
+
+		void reindex_str(const std::unordered_map<size_t, size_t> &m_old_to_new)
+		{
+			std::unordered_map<size_t, size_t>::const_iterator iter;
+
+			#define REINDEX(VAR) \
+				iter = m_old_to_new.find(VAR); \
+				if(iter == m_old_to_new.end()){ \
+					throw __FILE__ ":hybrid_sig::reindex_str: Unable to reindex " # VAR; \
+				} \
+				VAR = iter->second;
+
+			REINDEX(name_str_index);
+			REINDEX(forward_oligo_str_index);
+			REINDEX(reverse_oligo_str_index);
+			REINDEX(probe_oligo_str_index);
+			REINDEX(amplicon_def_str_index);
+			REINDEX(amplicon_str_index);
+			REINDEX(forward_align_str_index);
+			REINDEX(reverse_align_str_index);
+			REINDEX(probe_align_str_index);
 		};
 };
 
@@ -643,7 +530,61 @@ class unique_by_loc{
 		};
 };
 
+#include <iostream>
+
+inline std::string index_to_str(const size_t &m_index, const std::vector<std::string> &m_str_table)
+{
+	if(m_index == INVALID_INDEX){
+		// For backwards compatibility with the original codebase, return an empty string()
+		return std::string();
+	}
+
+	if(m_index >= m_str_table.size() ){
+
+		// DEBUG
+		std::cerr << "m_index = " << m_index << std::endl;
+		std::cerr << "|table| = " << m_str_table.size() << std::endl;
+
+		throw __FILE__ ":index_to_str: Index out of bounds";
+	}
+
+	return m_str_table[m_index];
+}
+
+inline size_t str_to_index(const std::string &m_str, std::unordered_map<std::string, size_t> &m_str_table)
+{
+	std::unordered_map<std::string, size_t>::const_iterator iter = m_str_table.find(m_str);
+
+	if(iter == m_str_table.end()){
+
+		// Add the string to the database
+		const size_t ret = m_str_table.size();
+		
+		m_str_table[m_str] = ret;
+
+		return ret;
+	}
+
+	return iter->second;
+}
+
+inline std::vector<std::string> ordered_keys(const std::unordered_map<std::string, size_t> &m_str_table)
+{
+	std::vector<std::string> ret( m_str_table.size() );
+
+	for(std::unordered_map<std::string, size_t>::const_iterator i = m_str_table.begin();i != m_str_table.end();++i){
+		
+		if( i->second >= ret.size() ){
+			throw __FILE__ ":ordered_keys: Key index is out of bounds";
+		}
+
+		ret[i->second] = i->first;
+	}
+
+	return ret;
+}
+
 size_t read_input_file(const std::string &m_file, std::vector<hybrid_sig> &m_sig_list, 
-	const bool &m_ignore_probe, const bool &m_force_probe);
+	const bool &m_ignore_probe, const bool &m_force_probe, std::unordered_map<std::string, size_t> &m_str_table);
 
 #endif // __SIGNATURE_CLASS

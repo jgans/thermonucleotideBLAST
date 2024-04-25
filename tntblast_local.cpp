@@ -32,6 +32,9 @@ int local_main(int argc, char *argv[])
 		ofstream fout_atr;
 		ofstream fout_sif;
 		
+		unordered_map<string, size_t> str_table;
+		vector<string> index_table;
+
 		Options opt;
 		
 		try{
@@ -61,7 +64,8 @@ int local_main(int argc, char *argv[])
 			}
 			
 			read_input_file(opt.input_filename, opt.sig_list, 
-				opt.ignore_probe, (opt.assay_format == ASSAY_PROBE) );
+				opt.ignore_probe, (opt.assay_format == ASSAY_PROBE),
+				str_table);
 		}
 		
 		// Bind either stdout of fout to ptr_out
@@ -128,18 +132,27 @@ int local_main(int argc, char *argv[])
 			ptr_out = &fout;
 		}
 		
+		index_table = ordered_keys(str_table);
+
 		// Consider all multiplex combinations of primers and probes
 		if(opt.multiplex){
-			opt.sig_list = multiplex_expansion(opt.sig_list, opt.assay_format);
+
+			// Expand multiplex assays and update index_table and str_table as needed
+			opt.sig_list = multiplex_expansion(opt.sig_list, opt.assay_format, 
+				index_table, str_table);
 		}
 		
 		// Expand the primers/probes (if needed);
-		opt.sig_list = expand_degenerate_signatures(opt.sig_list, opt.degen_rescale_ct);
+		opt.sig_list = expand_degenerate_signatures(opt.sig_list, opt.degen_rescale_ct,
+			index_table, str_table);
 		
+		// Every time we potentially create new strings, we must update the index_table
+		index_table = ordered_keys(str_table);
+
 		if(opt.dump_query){
 			
 			// Write all queries to stdout
-			opt.write_queries(cout);
+			opt.write_queries(cout, index_table);
 		}
 		
 		// Make sure that the user has provided the search contraints (in Tm or Delta G)
@@ -155,7 +168,7 @@ int local_main(int argc, char *argv[])
 		// Count the number of probe only queries in the list of queries
 		const unsigned int num_probes = probe_only_count(opt.sig_list);
 		
-		const unsigned int max_product_length = opt.max_product_length() + 2; // Room for dangling end bases
+		const unsigned int max_product_length = opt.max_product_length(index_table) + 2; // Room for dangling end bases
 		
 		// Read the sequence data base
 		sequence_data seq_file;
@@ -188,7 +201,7 @@ int local_main(int argc, char *argv[])
 		
 		// If we take into account target sequence fragmentation, how many sequences
 		// are there?
-		unsigned long int effective_num_seq = seq_file.effective_size(opt.fragment_target_threshold);
+		size_t effective_num_seq = seq_file.effective_size(opt.fragment_target_threshold);
 		
 		if(opt.verbose){
 		
@@ -283,7 +296,7 @@ int local_main(int argc, char *argv[])
 		// Track the ratio of time spent searching an individual query against a target
 		// sequence to the time spent loading and hashing a target sequence
 		float total_QT = 0.0f;
-		unsigned int QT_count = 0;
+		size_t QT_count = 0;
 		
 		// To estimate the cost of query seqmentation we need the ratio of query search 
 		// time to target sequence load and hash time. Scale the defined value according to
@@ -297,11 +310,8 @@ int local_main(int argc, char *argv[])
 			(num_sig - num_probes)*4.0f
 			)/num_sig;
 			
-#pragma omp parallel \
-	shared(search_results, cur_target, cur_target_len, cur_target_max_stop, cur_target_delta, cur_target_start, \
-		cur_target_stop, fragment_target, cur_query, segment_queries, effective_num_seq, total_QT, QT_count)
+#pragma omp parallel
 {
-		
 		// Parallelization strategy: 
 		// 1) Always segment the database targets
 		// 2) Segment the assay queries if the number of
@@ -353,8 +363,14 @@ int local_main(int argc, char *argv[])
 		melt.dangle(opt.allow_dangle_5, opt.allow_dangle_3);
 		melt.dinkelbach(opt.use_dinkelbach);
 		
+		vector< list<hybrid_sig> > local_search_results(num_sig);
+
 		unordered_map<BindCacheKey, BindCacheValue> plus_strand_melt_cache;
 		unordered_map<BindCacheKey, BindCacheValue> minus_strand_melt_cache;
+
+		// Each worker maintains a separate string table. These will be merged at the end
+		unordered_map<string, size_t> local_str_table(str_table);
+		const vector<string> local_index_table = index_table;
 
 		pair<string, SEQPTR> bio_seq = make_pair("", SEQPTR(NULL) );
 		long int last_target = -1;
@@ -390,7 +406,7 @@ int local_main(int argc, char *argv[])
 				
 					// In order to minimize network load, the assay queries are the 
 					// inner-loop, while the database targets are the outer-loop
-					cur_query ++;
+					++cur_query;
 
 					if(cur_query == num_sig){
 						
@@ -479,7 +495,7 @@ int local_main(int argc, char *argv[])
 				
 				// Free any existing cached binding data (which is only valid for a single target sequence).
 				// There is no guarentee that unordered_map will free memory when calling unordered_map::clear().
-				// To be on the same size, use the swap trick
+				// Use the swap trick to force memory to be released.
 				unordered_map<BindCacheKey, BindCacheValue>().swap(plus_strand_melt_cache);
 				unordered_map<BindCacheKey, BindCacheValue>().swap(minus_strand_melt_cache);
 
@@ -527,7 +543,7 @@ int local_main(int argc, char *argv[])
 				local_query = 0;
 			}
 			
-			tnt_time Q_time = get_time();
+			const tnt_time Q_time = get_time();
 			
 			while(true){
 			
@@ -552,11 +568,8 @@ int local_main(int argc, char *argv[])
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
 								opt.max_len,
-								opt.single_primer_pcr);
-
-							mask_binding_sites(local_results, opt.mask_options,
-								opt.min_primer_tm, opt.min_probe_tm, melt,
-								forward_primer_strand, reverse_primer_strand, opt.probe_strand);
+								opt.single_primer_pcr, opt.mask_options,
+								local_index_table, local_str_table);
 
 							break;
 						case ASSAY_PADLOCK:
@@ -568,7 +581,8 @@ int local_main(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
-								opt.target_strand);
+								opt.target_strand, 
+								local_index_table, local_str_table);
 
 							break;
 					};
@@ -583,7 +597,8 @@ int local_main(int argc, char *argv[])
 							opt.min_probe_dg, opt.max_probe_dg, 
 							opt.probe_clamp_5, opt.probe_clamp_3, 
 							opt.max_gap, opt.max_mismatch,
-							opt.target_strand);
+							opt.target_strand,
+							local_index_table, local_str_table);
 					}
 				}
 
@@ -594,9 +609,7 @@ int local_main(int argc, char *argv[])
 					
 					// Before we add the local_results to the main results list, add the 
 					// sequence id so we know which sequence produced this match
-					list<hybrid_sig>::iterator local_iter;
-
-					for(local_iter = local_results.begin();local_iter != local_results.end();local_iter++){
+					for(list<hybrid_sig>::iterator local_iter = local_results.begin();local_iter != local_results.end();local_iter++){
 					
 						// Is this match truncated due to target sequence fragmentation?
 						if( (local_target_start != 0) && local_iter->start_overlap(0) ){
@@ -620,20 +633,20 @@ int local_main(int argc, char *argv[])
 						// Compute the dimer and hairpin temperatures for this assay
 						if(local_iter->has_primers() == true){
 
-							melt.set_duplex(local_iter->forward_oligo);
+							melt.set_duplex(index_to_str(local_iter->forward_oligo_str_index, local_index_table));
 							melt.strand(forward_primer_strand, forward_primer_strand);
 
 							local_iter->forward_hairpin_tm = melt.approximate_tm_hairpin();
 							local_iter->forward_dimer_tm = melt.approximate_tm_homodimer();
 
-							melt.set_duplex(local_iter->reverse_oligo);
+							melt.set_duplex(index_to_str(local_iter->reverse_oligo_str_index, local_index_table));
 							melt.strand(reverse_primer_strand, reverse_primer_strand);
 
 							local_iter->reverse_hairpin_tm = melt.approximate_tm_hairpin();
 							local_iter->reverse_dimer_tm = melt.approximate_tm_homodimer();
 
-							melt.set_query(local_iter->forward_oligo);
-							melt.set_target(local_iter->reverse_oligo);
+							melt.set_query(index_to_str(local_iter->forward_oligo_str_index, local_index_table));
+							melt.set_target(index_to_str(local_iter->reverse_oligo_str_index, local_index_table));
 
 							melt.strand(forward_primer_strand, reverse_primer_strand);
 							local_iter->primer_dimer_tm = melt.approximate_tm_heterodimer();
@@ -641,7 +654,7 @@ int local_main(int argc, char *argv[])
 
 						if(local_iter->has_probe() == true){
 
-							melt.set_duplex(local_iter->probe_oligo);
+							melt.set_duplex(index_to_str(local_iter->probe_oligo_str_index, local_index_table));
 
 							melt.strand(opt.probe_strand, opt.probe_strand);
 
@@ -660,10 +673,15 @@ int local_main(int argc, char *argv[])
 				
 				// Update the local_query here so we can test for exit conditions in
 				// the critical section below (for updating Q_time).
-				local_query ++;
+				++local_query;
 				
-				// Use a omp critical section to avoid a race condition when modifying
-				// the search_results vector.
+				if( !(opt.output_format & OUTPUT_INVERSE_QUERY) ){
+					
+					list<hybrid_sig> &results_ref = local_search_results[sig_ref.my_id()];
+
+					results_ref.splice(results_ref.begin(), local_results);
+				}
+
 				#pragma omp critical (SpliceResults)
 				{
 					// If the user has selected OUTPUT_INVERSE_QUERY for their output format,
@@ -675,32 +693,25 @@ int local_main(int argc, char *argv[])
 							query_matches[sig_ref.my_id()] = true;
 						}
 					}
-					else{
-					
-						list<hybrid_sig> &results_ref = search_results[sig_ref.my_id()];
-
-						results_ref.splice(results_ref.begin(), local_results);
-					}
 					
 					if(local_query >= num_sig){
 						
 						// The time required to search a single query
-						Q_time = get_time() - Q_time;
+						const tnt_time delta_Q_time = get_time() - Q_time;
 						
 						// Always normalize by num_sig (if we're already in single_query
 						// mode we don't care about Q_time any more!).
-						const float Q_tmp = Q_time.seconds()/num_sig;
+						const float Q_tmp = max(0.0f, delta_Q_time.seconds())/num_sig;
 						const float T_tmp = T_time.seconds();
 						
 						if(T_tmp > 0.0f){
-						
 							total_QT += Q_tmp/T_tmp;
-							QT_count ++;
 						}
+
+						++QT_count;
 					}
 				}
 
-				
 				if(single_query || (local_query >= num_sig) ){
 					break;
 				}
@@ -757,13 +768,65 @@ int local_main(int argc, char *argv[])
 				}
 			}
 		}
+
+		// Merge the string tables
+		#pragma omp critical (MergeStringTable)
+		{
+			for(unordered_map<string, size_t>::const_iterator i = local_str_table.begin();i != local_str_table.end();++i){
+				str_to_index(i->first, str_table);
+			}
+		}
+
+		#pragma omp barrier // Wait for all threads to finish modifying the string table
+
+		#pragma omp single // Only a single thread updates the index table, with an implicit barrier afterwards
+		index_table = synchronize_keys(str_table);
+
+		// Reindex the local results before merging
+		unordered_map<size_t, size_t> old_to_new;
+
+		// Invalid indicies are still invalid indicies
+		old_to_new[INVALID_INDEX] = INVALID_INDEX;
+
+		for(unordered_map<string, size_t>::const_iterator i = local_str_table.begin();i != local_str_table.end();++i){
+
+			vector<string>::const_iterator iter = lower_bound(index_table.begin(), index_table.end(), i->first);
+
+			if( ( iter == index_table.end() ) || (*iter != i->first) ){
+				throw __FILE__ ":Unable to look up string for reindexing";
+			}
+
+			old_to_new[i->second] = iter - index_table.begin();
+		}
+
+		// Free the local_str_table before we merge results
+		unordered_map<string, size_t>().swap(local_str_table);
+
+		// Reindex all of the assay results
+		for(vector< list<hybrid_sig> >::iterator i = local_search_results.begin();i != local_search_results.end();++i){
+			for(list<hybrid_sig>::iterator j = i->begin();j != i->end();++j){
+				j->reindex_str(old_to_new);
+			}
+		}
+
+		// Merge the search results
+		#pragma omp critical (MergeResults)
+		{
+			for(size_t i = 0;i < num_sig;++i){
+				
+				list<hybrid_sig> &results_ref = search_results[i];
+
+                results_ref.splice(results_ref.begin(), local_search_results[i]);
+
+			}
+		}
 } // pragma omp parallel
 
 		if(opt.verbose){
 			
 			stringstream ssout;
 
-			ssout << setprecision(3) << 100 << '%';
+			ssout << "100%";
 
 			int i;
 
@@ -792,10 +855,10 @@ int local_main(int argc, char *argv[])
 			// Write the name of all queries that did *not* match any targets
 			for(unsigned int i = 0;i < num_sig;i++){
 				
-				query_set.insert( opt.sig_list[i].assay_string() );
+				query_set.insert( index_to_str(opt.sig_list[i].assay_string_index(), index_table) );
 				
 				if(query_matches[i] == true){
-					match_set.insert( opt.sig_list[i].assay_string() );
+					match_set.insert( index_to_str(opt.sig_list[i].assay_string_index(), index_table) );
 				}
 			}
 			
@@ -832,7 +895,7 @@ int local_main(int argc, char *argv[])
 			
 				// Make the output unique (since different workers can be sent overlapping
 				// target sequences) and save only the highest scoring exactly overlapping matches.
-				uniquify_results(tmp);
+				uniquify_results(tmp, index_table);
 			}
 			
 			// Sort the output by the lowest melting temperature
@@ -840,7 +903,7 @@ int local_main(int argc, char *argv[])
 			
 			if(opt.one_output_file_per_query == true){
 			
-				const string filename = opt.output_filename + "." + tmp.front().name;
+				const string filename = opt.output_filename + "." + index_to_str(tmp.front().name_str_index, index_table);
 				
 				if( (opt.output_format & OUTPUT_STANDARD) || 
 				    (opt.output_format & OUTPUT_FASTA) ){
@@ -880,18 +943,18 @@ int local_main(int argc, char *argv[])
 			
 			set<string> unique_targets;
 			
-			list<hybrid_sig>::const_iterator iter;
-			
-			for(iter = tmp.begin();iter != tmp.end();iter++){
+			for(list<hybrid_sig>::const_iterator iter = tmp.begin();iter != tmp.end();iter++){
 			
 				if(opt.output_format & OUTPUT_STANDARD){
-					(*ptr_out) << "name = " << iter->name << endl;
+					(*ptr_out) << "name = " << index_to_str(iter->name_str_index, index_table) << endl;
 				}
 				
 				// What should we call the primers (if present)?
 				string fp;
 				string rp;
 				
+				const string amplicon_seq = inflate_dna_seq( index_to_str(iter->amplicon_str_index, index_table) );
+
 				if(iter->has_primers() == true){
 				
 					// Print the actual primers used (since this will catch the cases when
@@ -902,11 +965,13 @@ int local_main(int argc, char *argv[])
 					// What should we call the primers?
 					fp = (opt.assay_format == ASSAY_PCR) ? "forward primer" : "5' probe";
 					rp = (opt.assay_format == ASSAY_PCR) ? "reverse primer" : "3' probe";
-					
+
 					if(opt.output_format & OUTPUT_STANDARD){
 					
-						(*ptr_out) << fp << " = 5' " << iter->forward_oligo << " 3'" << endl;
-						(*ptr_out) << rp << " = 5' " << iter->reverse_oligo << " 3'" << endl;
+						(*ptr_out) << fp << " = 5' " 
+							<< index_to_str(iter->forward_oligo_str_index, index_table) << " 3'" << endl;
+						(*ptr_out) << rp << " = 5' " 
+							<< index_to_str(iter->reverse_oligo_str_index, index_table) << " 3'" << endl;
 					}
 					
 					const float forward_dg = iter->forward_dH - opt.target_t*iter->forward_dS;
@@ -948,11 +1013,11 @@ int local_main(int argc, char *argv[])
 							<< "dH[" << iter->reverse_dH << "] - T*dS[" 
 							<< iter->reverse_dS << "]" << endl;	
 						
-						(*ptr_out) << fp << " mismatches = " << iter->forward_mm << endl;
-						(*ptr_out) << rp << " mismatches = " << iter->reverse_mm << endl;
+						(*ptr_out) << fp << " mismatches = " << int(iter->forward_mm) << endl;
+						(*ptr_out) << rp << " mismatches = " << int(iter->reverse_mm) << endl;
 						
-						(*ptr_out) << fp << " gaps = " << iter->forward_gap << endl;
-						(*ptr_out) << rp << " gaps = " << iter->reverse_gap << endl;
+						(*ptr_out) << fp << " gaps = " << int(iter->forward_gap) << endl;
+						(*ptr_out) << rp << " gaps = " << int(iter->reverse_gap) << endl;
 						
 						if(opt.assay_format == ASSAY_PCR){
 						
@@ -962,21 +1027,21 @@ int local_main(int argc, char *argv[])
 						
 						if(opt.assay_format == ASSAY_PADLOCK){
 								
-							(*ptr_out) << "5' probe 3' ligation clamp = " << iter->forward_primer_clamp 
+							(*ptr_out) << "5' probe 3' ligation clamp = " << int(iter->forward_primer_clamp)
 								<< endl;
-							(*ptr_out) << "3' probe 5' ligation clamp = " << iter->reverse_primer_clamp 
+							(*ptr_out) << "3' probe 5' ligation clamp = " << int(iter->reverse_primer_clamp) 
 								<< endl;
 						}
 					}
 					
-					size_t len = iter->forward_oligo.size();
+					size_t len = index_to_str(iter->forward_oligo_str_index, index_table).size();
 					
 					forward_size_range.first = 
 						min(forward_size_range.first, (unsigned int)len);
 					forward_size_range.second = 
 						max(forward_size_range.second, (unsigned int)len);
 					
-					len = iter->reverse_oligo.size();
+					len = index_to_str(iter->reverse_oligo_str_index, index_table).size();
 					 
 					reverse_size_range.first = 
 						min(reverse_size_range.first, (unsigned int)len);
@@ -1003,7 +1068,7 @@ int local_main(int argc, char *argv[])
 					reverse_dg_range.second = 
 						max(reverse_dg_range.second, reverse_dg);
 						
-					float gc = 100.0f*gc_content(iter->forward_oligo);
+					float gc = 100.0f*gc_content(index_to_str(iter->forward_oligo_str_index, index_table));
 					
 					if(opt.output_format & OUTPUT_STANDARD){
 					
@@ -1016,7 +1081,7 @@ int local_main(int argc, char *argv[])
 					forward_gc_range.second = 
 						max(forward_gc_range.second, gc);
 						
-					gc = 100.0f*gc_content(iter->reverse_oligo);
+					gc = 100.0f*gc_content(index_to_str(iter->reverse_oligo_str_index, index_table));
 					
 					if(opt.output_format & OUTPUT_STANDARD){
 					
@@ -1028,26 +1093,26 @@ int local_main(int argc, char *argv[])
 						min(reverse_gc_range.first, gc);
 					reverse_gc_range.second = 
 						max(reverse_gc_range.second, gc);
-					
+
 					if(opt.output_format & OUTPUT_STANDARD){
 					
 						(*ptr_out) << fp << " heuristics = " 
-							<< primer_heuristics(iter->forward_oligo) << endl;
+							<< primer_heuristics(index_to_str(iter->forward_oligo_str_index, index_table)) << endl;
 						(*ptr_out) << rp << " heuristics = " 
-							<< primer_heuristics(iter->reverse_oligo) << endl;
+							<< primer_heuristics(index_to_str(iter->reverse_oligo_str_index, index_table)) << endl;
 
 						if(opt.assay_format == ASSAY_PCR){
 						
 							(*ptr_out) << "amplicon range = " << iter->amplicon_range.first 
 								<< " .. " << iter->amplicon_range.second  << endl;
-							(*ptr_out) << "amplicon length = " << iter->amplicon.size() << endl;
+							(*ptr_out) << "amplicon length = " << amplicon_seq.size() << endl;
 						}
 						else{
 							
 							if(opt.assay_format == ASSAY_PADLOCK){
 								(*ptr_out) << "product range = " << iter->amplicon_range.first 
 									<< " .. " << iter->amplicon_range.second  << endl;
-								(*ptr_out) << "product length = " << iter->amplicon.size() << endl;
+								(*ptr_out) << "product length = " << amplicon_seq.size() << endl;
 							}
 						}
 						
@@ -1060,17 +1125,17 @@ int local_main(int argc, char *argv[])
 					}
 					
 					amplicon_size_range.first = (unsigned int)min( (size_t)amplicon_size_range.first, 
-						iter->amplicon.size() );
+						amplicon_seq.size() );
 						 
 					amplicon_size_range.second = (unsigned int)max( (size_t)amplicon_size_range.second, 
-						iter->amplicon.size() );
+						amplicon_seq.size() );
 				}
 				
 				if(iter->has_probe() == true){
 				
 					num_probe ++;
 					
-					const float gc = 100.0f*gc_content(iter->probe_oligo);
+					const float gc = 100.0f*gc_content(index_to_str(iter->probe_oligo_str_index, index_table));
 					
 					probe_gc_range.first = 
 						min(probe_gc_range.first, gc);
@@ -1084,7 +1149,7 @@ int local_main(int argc, char *argv[])
 
 					if(opt.output_format & OUTPUT_STANDARD){
 					
-						(*ptr_out) << "probe = 5' " << iter->probe_oligo << " 3'" << endl;
+						(*ptr_out) << "probe = 5' " << index_to_str(iter->probe_oligo_str_index, index_table) << " 3'" << endl;
 						(*ptr_out) << "probe tm = " << iter->probe_tm << endl;
 						
 						(*ptr_out) << "probe hairpin tm = " << iter->probe_hairpin_tm << endl;
@@ -1094,8 +1159,8 @@ int local_main(int argc, char *argv[])
 							<< "dH[" << iter->probe_dH << "] - T*dS[" 
 							<< iter->probe_dS << "]" << endl;	
 						
-						(*ptr_out) << "probe mismatches = " << iter->probe_mm << endl;
-						(*ptr_out) << "probe gaps = " << iter->probe_gap << endl;
+						(*ptr_out) << "probe mismatches = " << int(iter->probe_mm) << endl;
+						(*ptr_out) << "probe gaps = " << int(iter->probe_gap) << endl;
 						
 						(*ptr_out) << "probe %GC = " 
 							<< gc << endl;
@@ -1121,22 +1186,24 @@ int local_main(int argc, char *argv[])
 					probe_dg_range.second = 
 						max(probe_dg_range.second, probe_dg);
 						
-					size_t len = iter->probe_oligo.size();
+					size_t len = index_to_str(iter->probe_oligo_str_index, index_table).size();
 					
 					probe_size_range.first = 
 						min(probe_size_range.first, (unsigned int)len);
 					probe_size_range.second = 
 						max(probe_size_range.second, (unsigned int)len);
-						
 				}
 				
 				if(opt.output_format & OUTPUT_STANDARD){
 				    
 				    if(opt.output_format & OUTPUT_ALIGNMENTS){
 						
-						write_alignment(*ptr_out, fp + " align ", iter->forward_align);
-						write_alignment(*ptr_out, rp + " align ", iter->reverse_align);
-						write_alignment(*ptr_out, "probe align ", iter->probe_align);
+						write_alignment(*ptr_out, fp + " align ", 
+							inflate_dna_seq( index_to_str(iter->forward_align_str_index, index_table) ) );
+						write_alignment(*ptr_out, rp + " align ", 
+							inflate_dna_seq( index_to_str(iter->reverse_align_str_index, index_table) ) );
+						write_alignment(*ptr_out, "probe align ", 
+							inflate_dna_seq( index_to_str(iter->probe_align_str_index, index_table) ) );
 					}
 					
 					if( seq_file.is_annot_format() ){
@@ -1147,19 +1214,19 @@ int local_main(int argc, char *argv[])
 				if( (opt.output_format & OUTPUT_STANDARD) || 
 				    (opt.output_format & OUTPUT_FASTA) ){
 					
-					(*ptr_out) << '>' << iter->amplicon_def;
+					(*ptr_out) << '>' << index_to_str(iter->amplicon_def_str_index, index_table);
 
 					if(opt.append_name_to_defline){
 
 						// The user has request that the assay name
 						// be appended to the defline
-						(*ptr_out) << ' ' << iter->name;
+						(*ptr_out) << ' ' << index_to_str(iter->name_str_index, index_table);
 					}
 
 					(*ptr_out) << endl;
 					
 					if(opt.output_format & OUTPUT_SEQ_MATCH){
-						(*ptr_out) << iter->amplicon << endl;
+						(*ptr_out) << amplicon_seq << endl;
 					}
 				}
 				
@@ -1169,15 +1236,15 @@ int local_main(int argc, char *argv[])
 				
 				if(opt.output_format & OUTPUT_NETWORK){
 					
-					fout_sif << mask_white_space(iter->name) << " binds " 
-						    << mask_white_space(iter->amplicon_def) << endl;
+					fout_sif << mask_white_space( index_to_str(iter->name_str_index, index_table)) << " binds " 
+						    << mask_white_space( index_to_str(iter->amplicon_def_str_index, index_table)) << endl;
 				}
 				
 				// Track the number of unique targets (for the current signature)
-				unique_targets.insert(iter->amplicon_def);
+				unique_targets.insert( index_to_str(iter->amplicon_def_str_index, index_table));
 				
 				// Track the number of unique targets
-				total_unique_targets.insert(iter->amplicon_def);
+				total_unique_targets.insert( index_to_str(iter->amplicon_def_str_index, index_table));
 			}
 			
 			match_count[result_iter - search_results.begin()] = unique_targets.size();
@@ -1186,16 +1253,12 @@ int local_main(int argc, char *argv[])
 		if(opt.output_format & OUTPUT_NETWORK){
 			
 			// All of the assays listed in opt.sig_list are parents
-			vector<hybrid_sig>::const_iterator p_iter;
-
-			for(p_iter = opt.sig_list.begin();p_iter != opt.sig_list.end();p_iter++){
+			for(vector<hybrid_sig>::const_iterator p_iter = opt.sig_list.begin();p_iter != opt.sig_list.end();p_iter++){
 				
-				fout_atr << mask_white_space(p_iter->name) << " = parent" << endl;
+				fout_atr << mask_white_space( index_to_str(p_iter->name_str_index, index_table)) << " = parent" << endl;
 			}
 			
-			set<string>::const_iterator c_iter;
-
-			for(c_iter = total_unique_targets.begin();c_iter != total_unique_targets.end();c_iter++){
+			for(set<string>::const_iterator c_iter = total_unique_targets.begin();c_iter != total_unique_targets.end();c_iter++){
 
 				fout_atr << mask_white_space(*c_iter) << " = child" << endl;
 			}
@@ -1259,15 +1322,16 @@ int local_main(int argc, char *argv[])
 			// Print the number of matches found for each assay
 			for(vector<hybrid_sig>::const_iterator i = opt.sig_list.begin();i != opt.sig_list.end();i++){
 				
-				cout  << i->name << " matched " << match_count[ i->my_id() ] << " sequences" << endl;
+				cout << index_to_str(i->name_str_index, index_table) << " matched " 
+					<< match_count[ i->my_id() ] << " sequences" << endl;
 				
-				if( (i->forward_oligo != "") && (i->reverse_oligo != "") ){
-					cout << "\tF::R = " << i->forward_oligo << " :: " 
-						<< i->reverse_oligo <<  endl;
+				if( (i->forward_oligo_str_index != INVALID_INDEX) && (i->reverse_oligo_str_index != INVALID_INDEX) ){
+					cout << "\tF::R = " << index_to_str(i->forward_oligo_str_index, index_table) << " :: " 
+						<< index_to_str(i->reverse_oligo_str_index, index_table) <<  endl;
 				}
 								
-				if(i->probe_oligo != ""){
-					cout << "\tP = " << i->probe_oligo << endl;
+				if(i->probe_oligo_str_index != INVALID_INDEX){
+					cout << "\tP = " << index_to_str(i->probe_oligo_str_index, index_table) << endl;
 				}
 			}
 		}

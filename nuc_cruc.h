@@ -2,97 +2,6 @@
 // J. D. Gans
 // Los Alamos National Laboratory
 // 6/9/2006
-
-// version 2.1
-// - integer DP matrix score for fast alignments
-// - Added is_watson_and_crick(); does the computed alignment
-//   contain one or more non-watson and crick base alignments?
-// version 2.2
-// - Fixed anchor computation and added target anchor functions
-// version 2.3
-// - Added debug code to dump parameter tables (#define MELT_DEBUG to turn on)
-// - Added functions to output the internal query and target buffers
-// - The following perl script can be used to generate paramter entries for the
-//	nearest neighbor parameter sets:
-// version 2.4
-// - Changed the way dangling end virtual bases are handled:
-//		Old version: pushed and popped on to and off of the query and target stacks
-//		New version: Virtual bases are stored separately and manipulated with dedicated
-//				   member functions.
-// version 2.5
-// - Added gapless alignment
-// version 2.6
-// - Moved NC_Elem into the NucCruc class (private).
-// - MAX_SEQUENCE_LENGTH can now be specified via the makefile
-// - Added near-neighbor dynamic programming (woot!). This is only approximate and
-//   does not take into account:
-//		1) Base pair dependent initiation terms
-//		2) Length dependance of bulges and loops
-//		3) Asymmetric loop term
-// - Todo: Allow the user to specify a variable folding temperature (rather than the default T = 37.0C).
-//
-// version 2.7
-// - Added a set_query_reverse_complement (similar to the set_target_reverse_complement)
-// - Added boolean flags to indicate whether dangling base parameters have been incorporated into 
-//   the alignment.
-// - Added a #undef for _I, which is a predefined macro for OSX
-//
-// version 2.8 
-// - Modified is_watson_and_crick() to require that 
-//		1) all bases in the target and query are contained in
-//		   the alignment
-//		2) Gaps in the alignment cause the function to return false
-// - The anchor functions now count from the ends of the query and
-//   target oligos, not from the first aligned base of the query and
-//   target oligos.
-// - Added functions to test for exact matches at the 5' and 3 terminal bases
-//   of the query and target oligos.
-//
-// version 2.9
-// - Increased the sizes of MAX_LOOP_LENGTH, MAX_BULGE_LENGTH and MAX_HAIRPIN_LENGTH.
-//
-// version 3.0
-// - Added functions to provide \delta G, \delta H and \delta S from the most recent Tm calculation.
-// - Added a default constructor that defaults to SANTA_LUCIA melting parameters
-//
-// version 5.0
-// - Almost complete re-write implementing the near neighbor dynamic programming algorithm of Leber et. al.
-//
-// version 5.1
-// - Fixed the specification and definition of strand concentration!
-//
-// version 5.2
-// - Added a function for computing fast (no gap, diagonal only) alignments.
-// 
-// version 5.3
-// - Fixed the hairpin closure term. We now use the unpublished param_hairpin_terminal values from Santa Lucia 
-//  (extracted from the unafold program) when computing hairpin structures, melting temperatures and other
-//  parameters.
-// - Added the parameters from the unafold tstackh.DHD file.
-// - Fixed the estimation of the loop entropies. Now using interpolation between known values and 
-//   Jacobson-Stockmayer entropy extrapolation for values greater than 30. Fixed the sign error in the
-//   Jacobson-Stockmayer extrapolation implementation.
-// - Added additional steps to the hairpin evaluation code to test a larger number of potential structures. This adds
-//   computational complexity, but improves the agreement with unafold.
-//
-// version 5.4 (April 13, 2020)
-//	- Added the ability to match target sequences that have degenerate nucleotides (finally)! We assume the most
-//	  optimistic base pairing (i.e. that, when possible, the degenerate nucleotide is perfect match to the assay
-//	  nucleotide).
-//		-- Please note that we still require short, perfect, non-degenerate matches to "seed" longer alignments.
-//		   If degenerate nucleotides are spaced close-enough together (i.e a long run of poly-N), then we will
-//		   *not* initiate an alignment due to the absence of a perfect match seed k-mer to anchor an alignment.
-//	- Removed some legacy code.
-//	- Cleaned-up and stream-lined several parts of the code, including:
-//		-- Handling conversions from different nucleotide encoding schemes.
-//		-- Display of pairwise sequence alignments (alignments are no longer trimmed to remove dangling mismatches).
-//	- Added an explicit version string in the NUC_CRUC_VERSION macro
-//
-// version 5.5 (August 4, 2023)
-//	- Fixed test that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
-//    This poorly implemented test had the side effect of removing matches to primers with more than 50% unalignable bases.
-//    This test has been fixed and the `num_read_bases()` member function in `nuc_cruc.h` has been replaced by the 
-//    `fraction_aligned_real_base_pairs()` member function.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef __NUC_CRUC
@@ -107,7 +16,7 @@
 
 #include "circle_buffer.h"
 
-#define	NUC_CRUC_VERSION	"5.5"
+#define	NUC_CRUC_VERSION	"5.6"
 
 // Define ENUMERATE_PATH to enable enumeration of multiple, equally high scoring
 //  paths through the dynamic programming matrix
@@ -122,6 +31,11 @@
 #define	NC_DEFAULT_T	(NC_ZERO_C + 37.0f)		// 37 C
 #define	NC_R		(1.9872e-3f) 			// Kcal/(Mol . K) -- McQuarrie Stat. Mech.
 
+// old version NUM_BASE_PAIR = |{A, C, G, T, E, GAP}|*|{A, C, G, T, E, GAP}| = 36
+// NUM_BASE_PAIR = |{A, C, G, T, I, E, GAP}|*|{A, C, G, T, I, E, GAP}| = 49
+#define	NUM_BASE				7 // The number of real (5) and virtual (2) bases
+#define	NUM_BASE_PAIR			(NUM_BASE*NUM_BASE)
+#define	SCORE_INDEX(X, Y)		(X)*NUM_BASE_PAIR + (Y)
 
 // Compute the entropy from the free energy, enthalpy @ 37.0 C
 #define	ENTROPY(DG, DH)		( ( (DH) - (DG) )/(310.15f) )
@@ -165,11 +79,6 @@
 #define	MAX_SEQUENCE_LENGTH		1024
 
 #endif // MAX_SEQUENCE_LENGTH
-
-// old version NUM_BASE_PAIR = |{A, C, G, T, E, GAP}|*|{A, C, G, T, E, GAP}| = 36
-// NUM_BASE_PAIR = |{A, C, G, T, I, E, GAP}|*|{A, C, G, T, I, E, GAP}| = 49
-#define	NUM_BASE				7 // The number of real (5) and virtual (2) bases
-#define	NUM_BASE_PAIR			(NUM_BASE*NUM_BASE)
 
 // The orginial maximum loop, buldge and hairpin lengths were 30.
 // The new lengths are set from the MAX_SEQUENCE_LENGTH but must
@@ -531,7 +440,7 @@ struct alignment {
 	};
 
 	// Count the fraction of real base pairs in the alignment
-	inline unsigned int fraction_aligned_real_base_pairs() const
+	inline float fraction_aligned_real_base_pairs() const
 	{
 		std::deque<BASE::nucleic_acid>::const_iterator q = query_align.begin();
 		std::deque<BASE::nucleic_acid>::const_iterator t = target_align.begin();
@@ -674,10 +583,10 @@ class NucCruc{
 		
 		// Pre-compute the delta G values corresponding to the current temperature
 		// and parameter set
-		NC_Score delta_g[NUM_BASE_PAIR][NUM_BASE_PAIR];
+		NC_Score delta_g[NUM_BASE_PAIR*NUM_BASE_PAIR];
 		
-		float param_H[NUM_BASE_PAIR][NUM_BASE_PAIR];
-		float param_S[NUM_BASE_PAIR][NUM_BASE_PAIR];
+		float param_H[NUM_BASE_PAIR*NUM_BASE_PAIR];
+		float param_S[NUM_BASE_PAIR*NUM_BASE_PAIR];
 		
 		float param_init_H;
 		float param_init_S;
@@ -685,11 +594,11 @@ class NucCruc{
 		float param_loop_S[MAX_LOOP_LENGTH + 1];
 		float param_asymmetric_loop_dS;
 		
-		float param_loop_terminal_H[NUM_BASE_PAIR][NUM_BASE_PAIR];
-		float param_loop_terminal_S[NUM_BASE_PAIR][NUM_BASE_PAIR];
+		float param_loop_terminal_H[NUM_BASE_PAIR*NUM_BASE_PAIR];
+		float param_loop_terminal_S[NUM_BASE_PAIR*NUM_BASE_PAIR];
 		
-		float param_hairpin_terminal_H[NUM_BASE_PAIR][NUM_BASE_PAIR];
-		float param_hairpin_terminal_S[NUM_BASE_PAIR][NUM_BASE_PAIR];
+		float param_hairpin_terminal_H[NUM_BASE_PAIR*NUM_BASE_PAIR];
+		float param_hairpin_terminal_S[NUM_BASE_PAIR*NUM_BASE_PAIR];
 		
 		float param_bulge_S[MAX_BULGE_LENGTH + 1];
 		float param_bulge_AT_closing_S;
@@ -1242,7 +1151,7 @@ class NucCruc{
 			return curr_align.num_mismatch_by_query( query.size() );
 		};
 		
-		inline unsigned int fraction_aligned_real_base_pairs() const
+		inline float fraction_aligned_real_base_pairs() const
 		{
 			return curr_align.fraction_aligned_real_base_pairs();
 		};

@@ -38,6 +38,11 @@ int master(int argc, char *argv[])
 		
 		Options opt;
 		
+		// Reduce the memory consumption for assays that match a large number of database sequences
+		// (e.g., SARS-CoV-2 specific assays, degenerate 16S assays, etc.)
+		unordered_map<string, size_t> str_table;
+		vector<string> index_table;
+
 		try{
 			opt.parse(argc, argv);
 		}
@@ -83,8 +88,8 @@ int master(int argc, char *argv[])
 			
 			// Note that using the assay format ASSAY_PROBE forces all oligos to be 
 			// treated as probes!
-			read_input_file( opt.input_filename, opt.sig_list, 
-				opt.ignore_probe, (opt.assay_format == ASSAY_PROBE) );
+			read_input_file(opt.input_filename, opt.sig_list, 
+				opt.ignore_probe, (opt.assay_format == ASSAY_PROBE), str_table);
 		}
 		
 		// Bind either stdout of fout to ptr_out
@@ -108,7 +113,7 @@ int master(int argc, char *argv[])
 				
 				if(opt.output_format & OUTPUT_NETWORK){
 				    
-				    	const string filename_sif =  opt.output_filename + ".sif";
+				    const string filename_sif =  opt.output_filename + ".sif";
 				    
 					fout_sif.open( filename_sif.c_str() );
 
@@ -152,18 +157,27 @@ int master(int argc, char *argv[])
 			ptr_out = &fout;
 		}
 		
+		// Extract keys for string lookup
+		index_table = ordered_keys(str_table);
+
 		// Consider all multiplex combinations of primers and probes
 		if(opt.multiplex){
-			opt.sig_list = multiplex_expansion(opt.sig_list, opt.assay_format);
+
+			opt.sig_list = multiplex_expansion(opt.sig_list, opt.assay_format,
+				index_table, str_table);
 		}
 
 		// Expand the primers/probes (if needed);
-		opt.sig_list = expand_degenerate_signatures(opt.sig_list, opt.degen_rescale_ct);
+		opt.sig_list = expand_degenerate_signatures(opt.sig_list, opt.degen_rescale_ct, 
+			index_table, str_table);
 		
+		// Every time we create new strings, we need to extract keys for string lookup
+		index_table = ordered_keys(str_table);
+
 		if(opt.dump_query){
 			
 			// Write all queries to stdout
-			opt.write_queries(cout);
+			opt.write_queries(cout, index_table);
 		}
 		
 		// Make sure that the user has provided the search contraints (in Tm or Delta G)
@@ -179,7 +193,7 @@ int master(int argc, char *argv[])
 		// Count the number of probe only queries in the list of queries
 		const unsigned int num_probes = probe_only_count(opt.sig_list);
 		
-		const unsigned int max_product_length = opt.max_product_length() + 2; // Room for dangling end bases
+		const unsigned int max_product_length = opt.max_product_length(index_table) + 2; // Room for dangling end bases
 				
 		const unsigned int num_worker = (unsigned int)(mpi_numtasks - 1);
 		
@@ -232,10 +246,8 @@ int master(int argc, char *argv[])
 			cout << opt;
 		}
 		
-		#ifdef PROFILE
 		// Track the total time required to perform the search
 		double profile = MPI_Wtime();
-		#endif // PROFILE
 		
 		// Broadcast the command line options to the worker nodes
 		broadcast(opt, mpi_rank, 0);
@@ -255,15 +267,19 @@ int master(int argc, char *argv[])
 		
 		int sequence_file_format = seq_file.file_format();
 		
-		MPI_Bcast(&sequence_file_format, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		
 		// Send the format of the data base file to the workers. If the format
 		// is sequence_data::FASTA_SLOW, then the master will send the fasta
 		// record indicies to the workers (so we don't have to parse the fasta
 		// file multiple times)
+
+		MPI_Bcast(&sequence_file_format, 1, MPI_INT, 0, MPI_COMM_WORLD);
 				
 		// Distribute the signature queries
 		distribute_queries(opt.sig_list);
+		
+		// Since the signature queries no longer store the actual sequence strings, we need to send
+		// the associated string table to the workers.
+		distribute_string_table(str_table);
 		
 		// Do we need to send indicies to the workers?
 		if( (opt.dbase_filename != "") && seq_file.wants_indicies(sequence_file_format) ){
@@ -355,7 +371,7 @@ int master(int argc, char *argv[])
 		// Track the ratio of time spent searching an individual query against a target
 		// sequence to the time spent loading and hashing a target sequence
 		float total_QT = 0.0f;
-		unsigned int QT_count = 0;
+		size_t QT_count = 0;
 				
 		// To estimate the cost of query seqmentation we need the ratio of query search 
 		// time to target sequence load and hash time. Scale the defined value according to
@@ -503,7 +519,7 @@ int master(int argc, char *argv[])
 			if(status.MPI_TAG == STATUS_UPDATE){
 				
 				total_QT += ret.float_value;
-				QT_count ++;
+				++QT_count;
 				
 				if(opt.verbose){
 				
@@ -646,6 +662,14 @@ int master(int argc, char *argv[])
 		
 		#endif // PROFILE
 		
+		// Collect the string table information from the workers. This is needed to allow each worker to update
+		// the index-to-string mapping used to store the assay results so that all workers (and the master) are
+		// using the same string table.
+		index_table = synchronize_keys(str_table);
+
+		// We no longer need the string table
+		unordered_map<string, size_t>().swap(str_table); // Force the memory to be deallocated
+
 		unsigned int query_chunck_size = 0;
 		int num_chunck = 0;
 		
@@ -688,10 +712,10 @@ int master(int argc, char *argv[])
 			// Write the name of all queries that did *not* match any targets
 			for(unsigned int i = 0;i < num_sig;i++){
 				
-				query_set.insert( opt.sig_list[i].assay_string() );
+				query_set.insert( index_to_str(opt.sig_list[i].assay_string_index(), index_table) );
 				
 				if(query_matches[i] == true){
-					match_set.insert( opt.sig_list[i].assay_string() );
+					match_set.insert( index_to_str(opt.sig_list[i].assay_string_index(), index_table) );
 				}
 			}
 						
@@ -817,7 +841,7 @@ int master(int argc, char *argv[])
 			
 				// Make the output unique (since different workers can be sent overlapping
 				// target sequences) and save only the highest scoring exactly overlapping matches.
-				uniquify_results(search_results);
+				uniquify_results(search_results, index_table);
 			}
 			
 			// Sort the output by the lowest melting temperature
@@ -825,17 +849,16 @@ int master(int argc, char *argv[])
 			
 			set<string> unique_targets;
 
-			list<hybrid_sig>::const_iterator iter;
-
 			int last_id = -1;
 			
-			for(iter = search_results.begin();iter != search_results.end();iter++){
+			for(list<hybrid_sig>::const_iterator iter = search_results.begin();iter != search_results.end();iter++){
 
 				if( last_id != iter->my_id() ){
 				
 					if(opt.one_output_file_per_query == true){
 
-						const string filename = opt.output_filename + "." + search_results.front().name;
+						const string filename = opt.output_filename + "." + 
+							index_to_str(search_results.front().name_str_index, index_table);
 
 						if( (opt.output_format & OUTPUT_STANDARD) || 
 						    (opt.output_format & OUTPUT_FASTA) ){
@@ -875,12 +898,14 @@ int master(int argc, char *argv[])
 				}
 				
 				if(opt.output_format & OUTPUT_STANDARD){
-					(*ptr_out) << "name = " << iter->name << endl;
+					(*ptr_out) << "name = " << index_to_str(iter->name_str_index, index_table) << endl;
 				}
 
 				// What should we call the primers (if present)?
 				string fp;
 				string rp;
+
+				const string amplicon_seq = inflate_dna_seq( index_to_str(iter->amplicon_str_index, index_table) );
 
 				if(iter->has_primers() == true){
 
@@ -895,8 +920,8 @@ int master(int argc, char *argv[])
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
-						(*ptr_out) << fp << " = 5' " << iter->forward_oligo << " 3'" << endl;
-						(*ptr_out) << rp << " = 5' " << iter->reverse_oligo << " 3'" << endl;
+						(*ptr_out) << fp << " = 5' " << index_to_str(iter->forward_oligo_str_index, index_table) << " 3'" << endl;
+						(*ptr_out) << rp << " = 5' " << index_to_str(iter->reverse_oligo_str_index, index_table) << " 3'" << endl;
 					}
 
 					// Track Tm and delta G bounds for final summary to the user
@@ -937,11 +962,11 @@ int master(int argc, char *argv[])
 							<< "dH[" << iter->reverse_dH << "] - T*dS[" 
 							<< iter->reverse_dS << "]" << endl;	
 						
-						(*ptr_out) << fp << " mismatches = " << iter->forward_mm << endl;
-						(*ptr_out) << rp << " mismatches = " << iter->reverse_mm << endl;
+						(*ptr_out) << fp << " mismatches = " << int(iter->forward_mm) << endl;
+						(*ptr_out) << rp << " mismatches = " << int(iter->reverse_mm) << endl;
 						
-						(*ptr_out) << fp << " gaps = " << iter->forward_gap << endl;
-						(*ptr_out) << rp << " gaps = " << iter->reverse_gap << endl;
+						(*ptr_out) << fp << " gaps = " << int(iter->forward_gap) << endl;
+						(*ptr_out) << rp << " gaps = " << int(iter->reverse_gap) << endl;
 						
 						if(opt.assay_format == ASSAY_PCR){
 
@@ -951,21 +976,21 @@ int master(int argc, char *argv[])
 
 						if(opt.assay_format == ASSAY_PADLOCK){
 
-							(*ptr_out) << "5' probe 3' ligation clamp = " << iter->forward_primer_clamp 
+							(*ptr_out) << "5' probe 3' ligation clamp = " << int(iter->forward_primer_clamp)
 								<< endl;
-							(*ptr_out) << "3' probe 5' ligation clamp = " << iter->reverse_primer_clamp 
+							(*ptr_out) << "3' probe 5' ligation clamp = " << int(iter->reverse_primer_clamp) 
 								<< endl;
 						}
 					}
 
-					unsigned int len = iter->forward_oligo.size();
+					unsigned int len = index_to_str(iter->forward_oligo_str_index, index_table).size();
 
 					forward_size_range.first = 
 						min(forward_size_range.first, len);
 					forward_size_range.second = 
 						max(forward_size_range.second, len);
 
-					len = iter->reverse_oligo.size();
+					len = index_to_str(iter->reverse_oligo_str_index, index_table).size();
 
 					reverse_size_range.first = 
 						min(reverse_size_range.first, len);
@@ -992,7 +1017,7 @@ int master(int argc, char *argv[])
 					reverse_dg_range.second = 
 						max(reverse_dg_range.second, reverse_dg);
 
-					float gc = 100.0f*gc_content(iter->forward_oligo);
+					float gc = 100.0f*gc_content( index_to_str(iter->forward_oligo_str_index, index_table) );
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
@@ -1005,7 +1030,7 @@ int master(int argc, char *argv[])
 					forward_gc_range.second = 
 						max(forward_gc_range.second, gc);
 
-					gc = 100.0f*gc_content(iter->reverse_oligo);
+					gc = 100.0f*gc_content( index_to_str(iter->reverse_oligo_str_index, index_table) );
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
@@ -1021,22 +1046,22 @@ int master(int argc, char *argv[])
 					if(opt.output_format & OUTPUT_STANDARD){
 
 						(*ptr_out) << fp << " heuristics = " 
-							<< primer_heuristics(iter->forward_oligo) << endl;
+							<< primer_heuristics( index_to_str(iter->forward_oligo_str_index, index_table) ) << endl;
 						(*ptr_out) << rp << " heuristics = " 
-							<< primer_heuristics(iter->reverse_oligo) << endl;
+							<< primer_heuristics( index_to_str(iter->reverse_oligo_str_index, index_table) ) << endl;
 						
 						if(opt.assay_format == ASSAY_PCR){
 						
 							(*ptr_out) << "amplicon range = " << iter->amplicon_range.first 
 								<< " .. " << iter->amplicon_range.second  << endl;
-							(*ptr_out) << "amplicon length = " << iter->amplicon.size() << endl;
+							(*ptr_out) << "amplicon length = " << amplicon_seq.size() << endl;
 						}
 						else{
 							
 							if(opt.assay_format == ASSAY_PADLOCK){
 								(*ptr_out) << "product range = " << iter->amplicon_range.first 
 									<< " .. " << iter->amplicon_range.second  << endl;
-								(*ptr_out) << "product length = " << iter->amplicon.size() << endl;
+								(*ptr_out) << "product length = " << amplicon_seq.size() << endl;
 							}
 						}
 						
@@ -1049,17 +1074,17 @@ int master(int argc, char *argv[])
 					}
 
 					amplicon_size_range.first = min( (size_t)amplicon_size_range.first, 
-						iter->amplicon.size() );
+						amplicon_seq.size() );
 
 					amplicon_size_range.second = max( (size_t)amplicon_size_range.second, 
-						iter->amplicon.size() );
+						amplicon_seq.size() );
 				}
 
 				if(iter->has_probe() == true){
 
 					num_probe ++;
 
-					const float gc = 100.0f*gc_content(iter->probe_oligo);
+					const float gc = 100.0f*gc_content( index_to_str(iter->probe_oligo_str_index, index_table) );
 
 					probe_gc_range.first = 
 						min(probe_gc_range.first, gc);
@@ -1073,7 +1098,7 @@ int master(int argc, char *argv[])
 
 					if(opt.output_format & OUTPUT_STANDARD){
 
-						(*ptr_out) << "probe = 5' " << iter->probe_oligo << " 3'" << endl;
+						(*ptr_out) << "probe = 5' " << index_to_str(iter->probe_oligo_str_index, index_table) << " 3'" << endl;
 						(*ptr_out) << "probe tm = " << iter->probe_tm << endl;
 
 						(*ptr_out) << "probe hairpin tm = " << iter->probe_hairpin_tm << endl;
@@ -1083,8 +1108,8 @@ int master(int argc, char *argv[])
 							<< "dH[" << iter->probe_dH << "] - T*dS[" 
 							<< iter->probe_dS << "]" << endl;	
 						
-						(*ptr_out) << "probe mismatches = " << iter->probe_mm << endl;
-						(*ptr_out) << "probe gaps = " << iter->probe_gap << endl;
+						(*ptr_out) << "probe mismatches = " << int(iter->probe_mm) << endl;
+						(*ptr_out) << "probe gaps = " << int(iter->probe_gap) << endl;
 						
 						(*ptr_out) << "probe %GC = " 
 							<< gc << endl;
@@ -1110,26 +1135,27 @@ int master(int argc, char *argv[])
 					probe_dg_range.second = 
 						max(probe_dg_range.second, probe_dg);
 
-					unsigned int len = iter->probe_oligo.size();
+					unsigned int len = index_to_str(iter->probe_oligo_str_index, index_table).size();
 
 					probe_size_range.first = 
 						min(probe_size_range.first, len);
 					probe_size_range.second = 
 						max(probe_size_range.second, len);
-
 				}
 				
 				if(opt.output_format & OUTPUT_STANDARD){
 				    
 				    if(opt.output_format & OUTPUT_ALIGNMENTS){
 						
-						write_alignment(*ptr_out, fp + " align ", iter->forward_align);
-						write_alignment(*ptr_out, rp + " align ", iter->reverse_align);
-						write_alignment(*ptr_out, "probe align ", iter->probe_align);
+						write_alignment(*ptr_out, fp + " align ", 
+							inflate_dna_seq( index_to_str( iter->forward_align_str_index, index_table) ) );
+						write_alignment(*ptr_out, rp + " align ", 
+							inflate_dna_seq( index_to_str(iter->reverse_align_str_index, index_table) ) );
+						write_alignment(*ptr_out, "probe align ", 
+							inflate_dna_seq( index_to_str(iter->probe_align_str_index, index_table) ) );
 					}
 					
 					if( seq_file.is_annot_format() ){
-						
 						write_annotation(*ptr_out, *iter, seq_file);
 					}
 				}
@@ -1137,19 +1163,19 @@ int master(int argc, char *argv[])
 				if( (opt.output_format & OUTPUT_STANDARD) || 
 				    (opt.output_format & OUTPUT_FASTA) ){
 
-					(*ptr_out) << '>' << iter->amplicon_def;
+					(*ptr_out) << '>' << index_to_str(iter->amplicon_def_str_index, index_table);
 
 					if(opt.append_name_to_defline){
 
 						// The user has request that the assay name
 						// be appended to the defline
-						(*ptr_out) << ' ' << iter->name;
+						(*ptr_out) << ' ' << index_to_str(iter->name_str_index, index_table);
 					}
 
 					(*ptr_out) << endl;
 					
 					if(opt.output_format & OUTPUT_SEQ_MATCH){
-						(*ptr_out) << iter->amplicon << endl;
+						(*ptr_out) << amplicon_seq << endl;
 					}
 				}
 
@@ -1159,8 +1185,8 @@ int master(int argc, char *argv[])
 
 				if(opt.output_format & OUTPUT_NETWORK){
 
-					fout_sif << mask_white_space(iter->name) << " binds " 
-						    << mask_white_space(iter->amplicon_def) << endl;
+					fout_sif << mask_white_space( index_to_str(iter->name_str_index, index_table) ) << " binds " 
+						    << mask_white_space( index_to_str(iter->amplicon_def_str_index, index_table) ) << endl;
 				}
 				
 				if( last_id != iter->my_id() ){
@@ -1175,10 +1201,10 @@ int master(int argc, char *argv[])
 				}
 				
 				// Track the number of unique targets (for the current signature)
-				unique_targets.insert(iter->amplicon_def);
+				unique_targets.insert( index_to_str(iter->amplicon_def_str_index, index_table) );
 				
 				// Track the number of unique targets
-				total_unique_targets.insert(iter->amplicon_def);
+				total_unique_targets.insert( index_to_str(iter->amplicon_def_str_index, index_table) );
 				
 				last_id = iter->my_id();
 			}
@@ -1205,7 +1231,7 @@ int master(int argc, char *argv[])
 			// All of the assays listed in opt.sig_list are parents
 			for(vector<hybrid_sig>::const_iterator i = opt.sig_list.begin();i != opt.sig_list.end();i++){
 
-				fout_atr << mask_white_space(i->name) << " = parent" << endl;
+				fout_atr << mask_white_space( index_to_str(i->name_str_index, index_table) ) << " = parent" << endl;
 			}
 
 			for(set<string>::const_iterator i = total_unique_targets.begin();
@@ -1273,22 +1299,23 @@ int master(int argc, char *argv[])
 			// Print the number of matches found for each assay
 			for(vector<hybrid_sig>::const_iterator i = opt.sig_list.begin();i != opt.sig_list.end();i++){
 				
-				cout  << i->name << " matched " << match_count[ i->my_id() ] 
+				cout  << index_to_str(i->name_str_index, index_table) << " matched " << match_count[ i->my_id() ] 
 					<< " sequences" << endl;
 				
-				if( (i->forward_oligo != "") && (i->reverse_oligo != "") ){
-					cout << "\tF::R = " << i->forward_oligo << " :: " 
-						<< i->reverse_oligo <<  endl;
+				if( (i->forward_oligo_str_index != INVALID_INDEX) && (i->reverse_oligo_str_index != INVALID_INDEX) ){
+					cout << "\tF::R = " << index_to_str(i->forward_oligo_str_index, index_table) << " :: " 
+						<< index_to_str(i->reverse_oligo_str_index, index_table) <<  endl;
 				}
 								
-				if(i->probe_oligo != ""){
-					cout << "\tP = " << i->probe_oligo << endl;
+				if(i->probe_oligo_str_index != INVALID_INDEX){
+					cout << "\tP = " << index_to_str(i->probe_oligo_str_index, index_table) << endl;
 				}
 			}
 		}
 		
-		#ifdef PROFILE
 		profile = MPI_Wtime() - profile;
+
+		#ifdef PROFILE
 		output_time = MPI_Wtime() - output_time;
 		#endif // PROFILE
 		
@@ -1340,6 +1367,8 @@ int master(int argc, char *argv[])
 				//cout << "scaled <query search time to target sequence load and hash time> = " 
 				//	<< benchmark_qt << endl;
 			}
+			#else
+			cout << "Search completed in " << profile << " sec" << endl;
 			#endif // PROFILE
 		}
 		

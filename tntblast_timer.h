@@ -53,9 +53,9 @@ struct tnt_time{
 	{
 	};
 	
-	tnt_time operator-(const tnt_time &m_rhs)
+	tnt_time operator-(const tnt_time &m_rhs) const
 	{
-		return tnt_time(sec - m_rhs.sec,msec - m_rhs.msec,usec - m_rhs.usec);
+		return tnt_time(sec - m_rhs.sec, msec - m_rhs.msec, usec - m_rhs.usec);
 	}
 	
 	float seconds() const

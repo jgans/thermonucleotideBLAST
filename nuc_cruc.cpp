@@ -333,60 +333,7 @@ NucCruc::NucCruc(const unsigned int &m_param_set /*= SANTA_LUCIA*/, const float 
 	dp_matrix = new NC_Elem [(MAX_SEQUENCE_LENGTH + 1)*(MAX_SEQUENCE_LENGTH + 1)];
 	
 	// There is *no* current valid alignment
-	tm_mode = INVALID;	
-	
-	//////////////////////////////////////////////////////////////////////////////
-	// DEBUG -- make sure that all thermodynamic parameters are symmetric
-	#ifdef __DEBUG
-	for(char i = A;i <= GAP;i++){
-		for(char j = A;j <= GAP;j++){
-			for(char k = A;k <= GAP;k++){
-				
-				for(char l = A;l <= GAP;l++){
-				
-					const int curr = BASE_PAIR(i, j);
-					const int prev = BASE_PAIR(k, l);
-					
-					const int _curr = BASE_PAIR(l, k);
-					const int _prev = BASE_PAIR(j, i);
-					
-					if(param_H[prev][curr] != param_H[_prev][_curr]){
-						cerr << "i = " << int(i) << endl;
-						cerr << "j = " << int(j) << endl;
-						
-						cerr << "k = " << int(k) << endl;
-						cerr << "l = " << int(l) << endl;
-						
-						cerr << "param_H[" << bp[prev] << "][" << bp[curr] << "] = " 
-							<< param_H[prev][curr] << endl;
-						cerr << "param_H[" << bp[_prev] << "][" << bp[_curr] << "] = " 
-							<< param_H[_prev][_curr] << endl;
-						
-						cerr << "curr = " << bp[curr] << endl;
-						cerr << "_curr = " << bp[_curr] << endl;
-						
-						cerr << "prev = " << bp[prev] << endl;
-						cerr << "_prev = " << bp[_prev] << endl;
-						
-						throw "H error";
-					}
-					
-					if(param_S[prev][curr] != param_S[_prev][_curr]){
-						throw "S error";
-					}
-					
-					//if(param_loop_terminal_H[prev][curr] != param_loop_terminal_H[_prev][_curr]){
-					//	throw "loop terminal H";
-					//}
-					
-					//if(param_loop_terminal_S[prev][curr] != param_loop_terminal_S[_prev][_curr]){
-					//	throw "loop terminal S";
-					//}
-				}
-			}
-		}
-	}
-	#endif // __DEBUG
+	tm_mode = INVALID;
 };
 
 void NucCruc::update_dp_param()
@@ -413,16 +360,13 @@ void NucCruc::update_dp_param()
 	const float term_match_sc = salt_correction*param_supp_salt[TERMINAL_MATCH_SALT];
 	const float term_mismatch_sc = salt_correction*param_supp_salt[TERMINAL_MISMATCH_SALT];
 	
-	for(unsigned int i = 0;i < NUM_BASE_PAIR;i++){
-		for(unsigned int j = 0;j < NUM_BASE_PAIR;j++){
+	for(unsigned int i = 0;i < NUM_BASE_PAIR*NUM_BASE_PAIR;i++){
 			
-			// For these pairs, assume that all four bases receive a salt
-			// correction (the pairs for which this is not true are handled below).
-			// Since each pair of bound bases is counted twice in the NN model,
-			// only apply a single pair salt correction to each set of NN terms.
-			delta_g[i][j] = NC_SCORE_SCALE(param_H[i][j] - 
-				target_T*(param_S[i][j] + salt_correction) );
-		}
+		// For these pairs, assume that all four bases receive a salt
+		// correction (the pairs for which this is not true are handled below).
+		// Since each pair of bound bases is counted twice in the NN model,
+		// only apply a single pair salt correction to each set of NN terms.
+		delta_g[i] = NC_SCORE_SCALE(param_H[i] - target_T*(param_S[i] + salt_correction) );
 	}
 	
 	///////////////////////////////////////////////////////////////////////////////////
@@ -451,8 +395,8 @@ void NucCruc::update_dp_param()
 								target_T*(param_supp[TERMINAL_MATCH_AT_S] + 
 								term_match_sc) );
 								
-						delta_g[curr][prev1] = delta_g[prev1][curr] = 
-						delta_g[curr][prev2] = delta_g[prev2][curr] = 
+						delta_g[SCORE_INDEX(curr, prev1)] = delta_g[SCORE_INDEX(prev1, curr)] = 
+						delta_g[SCORE_INDEX(curr, prev2)] = delta_g[SCORE_INDEX(prev2, curr)] = 
 							max(0, tmp_dg);
 					}
 					else{ 
@@ -464,8 +408,8 @@ void NucCruc::update_dp_param()
 									target_T*(param_supp[TERMINAL_MATCH_GC_S] +
 									term_match_sc) );
 									
-							delta_g[curr][prev1] = delta_g[prev1][curr] = 
-							delta_g[curr][prev2] = delta_g[prev2][curr] = 
+							delta_g[SCORE_INDEX(curr, prev1)] = delta_g[SCORE_INDEX(prev1, curr)] = 
+							delta_g[SCORE_INDEX(curr, prev2)] = delta_g[SCORE_INDEX(prev2, curr)] = 
 								max(0, tmp_dg);
 						}
 						else{ // curr contains inosine
@@ -475,8 +419,8 @@ void NucCruc::update_dp_param()
 									target_T*(param_supp[TERMINAL_MATCH_I_S] + 
 									term_match_sc) );
 									
-							delta_g[curr][prev1] = delta_g[prev1][curr] = 
-							delta_g[curr][prev2] = delta_g[prev2][curr] = 
+							delta_g[SCORE_INDEX(curr, prev1)] = delta_g[SCORE_INDEX(prev1, curr)] = 
+							delta_g[SCORE_INDEX(curr, prev2)] = delta_g[SCORE_INDEX(prev2, curr)] = 
 								max(0, tmp_dg);
 						}
 					}
@@ -490,8 +434,8 @@ void NucCruc::update_dp_param()
 							target_T*(param_supp[TERMINAL_MISMATCH_S] + 
 							term_mismatch_sc) );
 							
-					delta_g[curr][prev1] = delta_g[prev1][curr] = 
-					delta_g[curr][prev2] = delta_g[prev2][curr] = 
+					delta_g[SCORE_INDEX(curr, prev1)] = delta_g[SCORE_INDEX(prev1, curr)] = 
+					delta_g[SCORE_INDEX(curr, prev2)] = delta_g[SCORE_INDEX(prev2, curr)] = 
 						max(0, tmp_dg);
 				}
 			}
@@ -510,8 +454,7 @@ void NucCruc::update_dp_param()
 							NC_SCORE_SCALE(param_supp[LOOP_H] - 
 								target_T*(param_supp[LOOP_S] + loop_sc) );
 
-						delta_g[curr][prev] =
-							max(0, tmp_dg);
+						delta_g[SCORE_INDEX(curr, prev)] = max(0, tmp_dg);
 					}
 					
 				}
@@ -529,7 +472,7 @@ void NucCruc::update_dp_param()
 				NC_SCORE_SCALE(param_supp[BULGE_H] - 
 					target_T*(param_supp[BULGE_S] + bulge_sc) );
 			
-			delta_g[curr][prev] = max(0, tmp_dg);
+			delta_g[SCORE_INDEX(curr, prev)] = max(0, tmp_dg);
 										
 			curr = BASE_PAIR(BASE::GAP, i);
 			prev = BASE_PAIR(BASE::GAP, j);
@@ -537,7 +480,7 @@ void NucCruc::update_dp_param()
 			tmp_dg = NC_SCORE_SCALE(param_supp[BULGE_H] - 
 				target_T*(param_supp[BULGE_S] + bulge_sc) );
 			
-			delta_g[curr][prev] = max(0, tmp_dg);
+			delta_g[SCORE_INDEX(curr, prev)] = max(0, tmp_dg);
 		}
 	}
 }
@@ -587,21 +530,24 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 			// Match or mismatch
 			int prev_base_pair = best_base_pair(prev_target_base, prev_query_base);
 			
-			const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
-			
+			//const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg1 = max(NC_Score(0), A_ptr->M) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			// gap the query
 			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
-			const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
-			
+			//const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg2 = max(NC_Score(0), A_ptr->I_query) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			// gap the target
 			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
-			const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
-			
+			//const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg3 = max(NC_Score(0), A_ptr->I_target) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			if(dg1 >= dg2){
 				
 				if(dg1 >= dg3){
@@ -652,14 +598,18 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 			cur_base_pair = best_base_pair(target_base, GAP);
 			prev_base_pair = best_base_pair(prev_target_base, query_base);
 			
-			NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			//NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
 			
+			NC_Score insert_gap = max(NC_Score(0), C_ptr->M) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
-			NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
-						
+			//NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
+			
+			NC_Score extend_gap = max(NC_Score(0), C_ptr->I_query) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			if(insert_gap >= extend_gap){
 			
 				X_ptr->I_query = insert_gap;
@@ -683,14 +633,17 @@ NC_Score NucCruc::align_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENG
 			cur_base_pair = best_base_pair(GAP, query_base);
 			prev_base_pair = best_base_pair(target_base, prev_query_base);
 			
-			insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			//insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
+			insert_gap = max(NC_Score(0), B_ptr->M) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
-			extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			//extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
+			//	- delta_g[prev_base_pair][cur_base_pair];
 			
+			extend_gap = max(NC_Score(0), B_ptr->I_target) - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
+
 			if(insert_gap >= extend_gap){
 
 				X_ptr->I_target = insert_gap;
@@ -778,8 +731,8 @@ NC_Score NucCruc::align_dimer_diagonal(const CircleBuffer<nucleic_acid, MAX_SEQU
 		cur_base_pair = best_base_pair(target_buffer[i - 1], m_q[query_len - i]);
 			
 		// Match or mismatch
-		X_ptr->M = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-			- delta_g[prev_base_pair][cur_base_pair];
+		X_ptr->M = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+			- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 		X_ptr->M_trace = im1_jm1;
 					
@@ -824,7 +777,7 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 	max_ptr.clear();
 	
 	// The smallest sterically allowed hairpin loop + a 1 base anchor
-	const unsigned int steric_limit = 3u + 1u;  
+	const unsigned int steric_limit = 3u + 1u;
 	const unsigned int query_len = m_q.size();
 	
 	if(query_len == 0){
@@ -864,20 +817,20 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 			// Match or mismatch
 			int prev_base_pair = best_base_pair(prev_target_base, prev_query_base);
 			
-			const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg1 = (NC_Score(0) < A_ptr->M) ? A_ptr->M - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			// gap the query
 			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
-			const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg2 = (NC_Score(0) < A_ptr->I_query) ? A_ptr->I_query - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			// gap the target
 			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
-			const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			const NC_Score dg3 = (NC_Score(0) < A_ptr->I_target) ? A_ptr->I_target - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			if(dg1 >= dg2){
 				
@@ -930,13 +883,13 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 			cur_base_pair = best_base_pair(target_base, GAP);
 			prev_base_pair = best_base_pair(prev_target_base, query_base);
 			
-			NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			NC_Score insert_gap = (NC_Score(0) < C_ptr->M) ? C_ptr->M - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			prev_base_pair = best_base_pair(prev_target_base, GAP);
 			
-			NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			NC_Score extend_gap = (NC_Score(0) < C_ptr->I_query) ? C_ptr->I_query - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			if(insert_gap >= extend_gap){
 			
@@ -959,13 +912,13 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 			cur_base_pair = best_base_pair(GAP, query_base);
 			prev_base_pair = best_base_pair(target_base, prev_query_base);
 			
-			insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			insert_gap = (NC_Score(0) < B_ptr->M) ? B_ptr->M - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			prev_base_pair = best_base_pair(GAP, prev_query_base);
 			
-			extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[prev_base_pair][cur_base_pair] :
-				- delta_g[prev_base_pair][cur_base_pair];
+			extend_gap = (NC_Score(0) < B_ptr->I_target) ? B_ptr->I_target - delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)] :
+				- delta_g[SCORE_INDEX(prev_base_pair, cur_base_pair)];
 			
 			if(insert_gap >= extend_gap){
 
@@ -1777,13 +1730,13 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 				
 				int tmp_pair = best_base_pair(tmp_q, E);
 				
-				local_align.dH += param_H[tmp_pair][cur_base_pair];
-				local_align.dS += param_S[tmp_pair][cur_base_pair];
+				local_align.dH += param_H[SCORE_INDEX(tmp_pair, cur_base_pair)];
+				local_align.dS += param_S[SCORE_INDEX(tmp_pair, cur_base_pair)];
 				
 				tmp_pair = best_base_pair(E, tmp_t);
 				
-				local_align.dH += param_H[tmp_pair][cur_base_pair];
-				local_align.dS += param_S[tmp_pair][cur_base_pair];
+				local_align.dH += param_H[SCORE_INDEX(tmp_pair, cur_base_pair)];
+				local_align.dS += param_S[SCORE_INDEX(tmp_pair, cur_base_pair)];
 				
 				#ifdef TRACK_ENERGY
 				cout << "\tfrayed start" << endl;
@@ -1795,25 +1748,25 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 					// Frayed-end at the end of the alignment
 					int tmp_pair = best_base_pair(*q_iter, E);
 				
-					local_align.dH += param_H[last_base_pair][tmp_pair];
-					local_align.dS += param_S[last_base_pair][tmp_pair];
+					local_align.dH += param_H[SCORE_INDEX(last_base_pair, tmp_pair)];
+					local_align.dS += param_S[SCORE_INDEX(last_base_pair, tmp_pair)];
 
 					tmp_pair = best_base_pair(E, *t_iter);
 
-					local_align.dH += param_H[last_base_pair][tmp_pair];
-					local_align.dS += param_S[last_base_pair][tmp_pair];
+					local_align.dH += param_H[SCORE_INDEX(last_base_pair, tmp_pair)];
+					local_align.dS += param_S[SCORE_INDEX(last_base_pair, tmp_pair)];
 					
 					#ifdef TRACK_ENERGY
 					cout << "\tfrayed stop" << endl;
 					#endif // TRACK_ENERGY
 				}
 				else{
-					local_align.dH += param_H[last_base_pair][cur_base_pair];
-					local_align.dS += param_S[last_base_pair][cur_base_pair];
+					local_align.dH += param_H[SCORE_INDEX(last_base_pair, cur_base_pair)];
+					local_align.dS += param_S[SCORE_INDEX(last_base_pair, cur_base_pair)];
 					
 					#ifdef TRACK_ENERGY
 					cout << "\tnormal pair = " 
-						<< param_H[last_base_pair][cur_base_pair] - target_T*param_S[last_base_pair][cur_base_pair]
+						<< param_H[SCORE_INDEX(last_base_pair, cur_base_pair)] - target_T*param_S[SCORE_INDEX(last_base_pair, cur_base_pair)]
 						<< endl;
 					#endif // TRACK_ENERGY
 				}
@@ -1883,8 +1836,8 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 				    ( (last_base_pair == GT) || (last_base_pair == TG) ) &&
 				    ( (last_last_base_pair == GT) || (last_last_base_pair == TG) ) ){
 
-					local_align.dH += param_H[last_last_base_pair][last_base_pair];
-					local_align.dS += param_S[last_last_base_pair][last_base_pair];
+					local_align.dH += param_H[SCORE_INDEX(last_last_base_pair, last_base_pair)];
+					local_align.dS += param_S[SCORE_INDEX(last_last_base_pair, last_base_pair)];
 
 					// Increment the number of bases to account for the terminal TG or GT pair
 					// that were
@@ -1936,8 +1889,8 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 					//***********************************************************************
 					// Apply the correction here by first removing the previous contribution
 					// from the right hand terminal base that we added above
-					local_align.dH -= param_H[last_base_pair][cur_base_pair];
-					local_align.dS -= param_S[last_base_pair][cur_base_pair];
+					local_align.dH -= param_H[SCORE_INDEX(last_base_pair, cur_base_pair)];
+					local_align.dS -= param_S[SCORE_INDEX(last_base_pair, cur_base_pair)];
 					//***********************************************************************
 					
 					//local_align.dH += param_loop_terminal_H[last_base_pair][cur_base_pair] - 
@@ -1946,23 +1899,23 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 					//	param_S[last_base_pair][cur_base_pair];
 					
 					#ifdef TRACK_ENERGY
-					cout << "\tremoving dg = " << param_H[last_base_pair][cur_base_pair] - 
-						target_T*param_S[last_base_pair][cur_base_pair]
+					cout << "\tremoving dg = " << param_H[SCORE_INDEX(last_base_pair, cur_base_pair)] - 
+						target_T*param_S[SCORE_INDEX(last_base_pair, cur_base_pair)]
 						<< endl;
-					cout << "\tadding dg = " << param_loop_terminal_H[last_base_pair][cur_base_pair] - 
-						target_T*param_loop_terminal_S[last_base_pair][cur_base_pair]
+					cout << "\tadding dg = " << param_loop_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)] - 
+						target_T*param_loop_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)]
 						<< endl;
 					
-					cout << "\tparam_loop_terminal_H = " << param_loop_terminal_H[last_base_pair][cur_base_pair] << endl;
-					cout << "\tparam_loop_terminal_S = " << param_loop_terminal_S[last_base_pair][cur_base_pair] << endl;
+					cout << "\tparam_loop_terminal_H = " << param_loop_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
+					cout << "\tparam_loop_terminal_S = " << param_loop_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
 					
-					cout << "\tparam_H = " << param_H[last_base_pair][cur_base_pair] << endl;
-					cout << "\tparam_S = " << param_S[last_base_pair][cur_base_pair] << endl;
+					cout << "\tparam_H = " << param_H[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
+					cout << "\tparam_S = " << param_S[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
 					
-					loop_dH += param_loop_terminal_H[last_base_pair][cur_base_pair] - 
-						param_H[last_base_pair][cur_base_pair];
-					loop_dS += param_loop_terminal_S[last_base_pair][cur_base_pair] - 
-						param_S[last_base_pair][cur_base_pair];
+					loop_dH += param_loop_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)] - 
+						param_H[SCORE_INDEX(last_base_pair, cur_base_pair)];
+					loop_dS += param_loop_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)] - 
+						param_S[SCORE_INDEX(last_base_pair, cur_base_pair)];
 					#endif // TRACK_ENERGY
 						
 					// The right terminal mistmatch. 
@@ -1970,13 +1923,13 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 						
 						// We've already subtracted off the contribution that was added before
 						// we know that this was a terminal pair (see comment surrounded by **** above)
-						local_align.dH += param_loop_terminal_H[last_base_pair][cur_base_pair];
-						local_align.dS += param_loop_terminal_S[last_base_pair][cur_base_pair];
+						local_align.dH += param_loop_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)];
+						local_align.dS += param_loop_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)];
 						
 						#ifdef TRACK_ENERGY
 						cout << "\tHAS_GAP(last_base_pair) == false"<< endl;
-						cout << "\tAdded dH = " << param_loop_terminal_H[last_base_pair][cur_base_pair] << endl;
-						cout << "\tAdded dS = " << param_loop_terminal_S[last_base_pair][cur_base_pair] << endl;
+						cout << "\tAdded dH = " << param_loop_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
+						cout << "\tAdded dS = " << param_loop_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)] << endl;
 						#endif // TRACK_ENERGY
 					}
 					else{ // There is a gap in the right hand terminal pair
@@ -2024,15 +1977,15 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 							}
 						}
 
-						local_align.dH += param_loop_terminal_H[mm_base_pair][cur_base_pair];
-						local_align.dS += param_loop_terminal_S[mm_base_pair][cur_base_pair];
+						local_align.dH += param_loop_terminal_H[SCORE_INDEX(mm_base_pair, cur_base_pair)];
+						local_align.dS += param_loop_terminal_S[SCORE_INDEX(mm_base_pair, cur_base_pair)];
 						
 						#ifdef TRACK_ENERGY
 						cout << "\tright terminal mismatch = " 
-							<< param_H[mm_base_pair][cur_base_pair] - target_T*param_S[mm_base_pair][cur_base_pair]
+							<< param_H[SCORE_INDEX(mm_base_pair, cur_base_pair)] - target_T*param_S[SCORE_INDEX(mm_base_pair, cur_base_pair)]
 							<< endl;
-						loop_dH += param_loop_terminal_H[mm_base_pair][cur_base_pair];
-						loop_dS += param_loop_terminal_S[mm_base_pair][cur_base_pair];
+						loop_dH += param_loop_terminal_H[SCORE_INDEX(mm_base_pair, cur_base_pair)];
+						loop_dS += param_loop_terminal_S[SCORE_INDEX(mm_base_pair, cur_base_pair)];
 						#endif // TRACK_ENERGY
 					
 					}
@@ -2069,16 +2022,16 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 								// contribution now
 								const int mm_base_pair = best_base_pair(*lhs_q_iter, *lhs_t_iter);
 								
-								local_align.dH -= param_H[pm_base_pair][mm_base_pair];
-								local_align.dS -= param_S[pm_base_pair][mm_base_pair];
+								local_align.dH -= param_H[SCORE_INDEX(pm_base_pair, mm_base_pair)];
+								local_align.dS -= param_S[SCORE_INDEX(pm_base_pair, mm_base_pair)];
 								
 								#ifdef TRACK_ENERGY
-								loop_dH -= param_H[pm_base_pair][mm_base_pair];
-								loop_dS -= param_S[pm_base_pair][mm_base_pair];
+								loop_dH -= param_H[SCORE_INDEX(pm_base_pair, mm_base_pair)];
+								loop_dS -= param_S[SCORE_INDEX(pm_base_pair, mm_base_pair)];
 								
 								cout << "\tRemoved left terminal mismatch dG = "
-									<< param_H[pm_base_pair][mm_base_pair] + 
-									target_T*param_S[pm_base_pair][mm_base_pair] << endl;
+									<< param_H[SCORE_INDEX(pm_base_pair, mm_base_pair)] + 
+									target_T*param_S[SCORE_INDEX(pm_base_pair, mm_base_pair)] << endl;
 								#endif // TRACK_ENERGY
 							}
 							else{
@@ -2097,16 +2050,16 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 							
 							const int mm_base_pair = best_base_pair(*lhs_q_iter, *lhs_t_iter);
 
-							local_align.dH += param_loop_terminal_H[pm_base_pair][mm_base_pair];
-							local_align.dS += param_loop_terminal_S[pm_base_pair][mm_base_pair];
+							local_align.dH += param_loop_terminal_H[SCORE_INDEX(pm_base_pair, mm_base_pair)];
+							local_align.dS += param_loop_terminal_S[SCORE_INDEX(pm_base_pair, mm_base_pair)];
 							
 							#ifdef TRACK_ENERGY
 							cout << "\tleft terminal mismatch = " 
-								<< param_loop_terminal_H[pm_base_pair][mm_base_pair] - 
-									target_T*param_loop_terminal_S[pm_base_pair][mm_base_pair]
+								<< param_loop_terminal_H[SCORE_INDEX(pm_base_pair, mm_base_pair)] - 
+									target_T*param_loop_terminal_S[SCORE_INDEX(pm_base_pair, mm_base_pair)]
 								<< endl;
-							loop_dH += param_loop_terminal_H[pm_base_pair][mm_base_pair];
-							loop_dS += param_loop_terminal_S[pm_base_pair][mm_base_pair];
+							loop_dH += param_loop_terminal_H[SCORE_INDEX(pm_base_pair, mm_base_pair)];
+							loop_dS += param_loop_terminal_S[SCORE_INDEX(pm_base_pair, mm_base_pair)];
 							#endif // TRACK_ENERGY
 
 							break;
@@ -2169,14 +2122,14 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 					// Bulges of size 1 must include the NN terms from the flanking bases
 					if(bulge_size == 1){
 
-						local_align.dH += param_H[last_last_base_pair][cur_base_pair];
-						local_align.dS += param_S[last_last_base_pair][cur_base_pair];
+						local_align.dH += param_H[SCORE_INDEX(last_last_base_pair, cur_base_pair)];
+						local_align.dS += param_S[SCORE_INDEX(last_last_base_pair, cur_base_pair)];
 						
 						#ifdef TRACK_ENERGY
 						cout << "\tbulge 1" << endl;
 						cout << "\t\tflanking dg = " 
-							<< param_H[last_last_base_pair][cur_base_pair] - 
-							   target_T*param_S[last_last_base_pair][cur_base_pair] << endl;
+							<< param_H[SCORE_INDEX(last_last_base_pair, cur_base_pair)] - 
+							   target_T*param_S[SCORE_INDEX(last_last_base_pair, cur_base_pair)] << endl;
 						#endif // TRACK_ENERGY
 					}
 
@@ -2372,7 +2325,7 @@ bool NucCruc::evaluate_hairpin_alignment(alignment &local_align)
 	// Hairpin loop -- length dependent terms
 	//////////////////////////////////////////////////////////////////
 	
-	// The closing bases for the hairpin loop are requried for loops of all sizes
+	// The closing bases for the hairpin loop are required for loops of all sizes
 	const int last_base_pair = best_base_pair(query[last_5], query[last_3]);
 	int cur_base_pair = __;
 	
@@ -2424,8 +2377,8 @@ bool NucCruc::evaluate_hairpin_alignment(alignment &local_align)
 			
 			// Use the unpublished, terminal hairpin parameters (instead of the
 			// "normal" base stacking parameters that are commented out above).
-			local_align.dH += param_hairpin_terminal_H[last_base_pair][cur_base_pair];
-			local_align.dS += param_hairpin_terminal_S[last_base_pair][cur_base_pair];
+			local_align.dH += param_hairpin_terminal_H[SCORE_INDEX(last_base_pair, cur_base_pair)];
+			local_align.dS += param_hairpin_terminal_S[SCORE_INDEX(last_base_pair, cur_base_pair)];
 			
 			// DEBUG
 			//cerr << "param_loop_terminal_H[" << bp[last_base_pair] << "][" << bp[cur_base_pair] 

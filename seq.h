@@ -2,6 +2,7 @@
 #define __SEQ
 
 #include <ctype.h>
+#include "compress.h"
 
 // Provide a mapping back to ATGC
 #define	DB_MASK			3
@@ -185,5 +186,4 @@ inline char ascii_to_hash_base(char m_base)
 	
 	return DB_UNKNOWN;
 }
-
 #endif // __SEQ

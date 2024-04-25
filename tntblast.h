@@ -90,7 +90,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.61 (September 1, 2023)"
+#define		TNTBLAST_VERSION		"2.66 (April 24, 2024)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
@@ -323,17 +323,23 @@ struct BindCacheValue
 
 #ifdef USE_MPI
 //////////////////////////////////////////////////////////////////////////////////////////////
-// In tntblast_master.cpp
+// In tntblast_worker.cpp
 int worker(int argc, char *argv[]);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-// In tntblast_worker.cpp
+// In tntblast_master.cpp
 int master(int argc, char *argv[]);
 
+//////////////////////////////////////////////////////////////////////////////////////////////
+// In tntblast_util.cpp
 void distribute_queries(const std::vector<hybrid_sig> &m_sig);
 void receive_queries(std::vector<hybrid_sig> &m_sig);
 void serve_sequence(const int &m_dest, 
 	const unsigned int &m_index, const sequence_data &m_data);
+void distribute_string_table(const std::unordered_map<std::string, size_t> &m_table);
+void receive_string_table(std::unordered_map<std::string, size_t> &m_table);
+std::vector<std::string> synchronize_keys(const std::unordered_map<std::string, size_t> &str_table);
+
 #endif // USE_MPI
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -344,10 +350,11 @@ int local_main(int argc, char *argv[]);
 // In tntblast_util.cpp
 
 // Show all primer binding sites in lower case (if requested by the user).
-void mask_binding_sites(std::list<hybrid_sig> &m_sig, const int &m_mask, 
+void mask_binding_sites(std::string &m_amplicon, const hybrid_sig &m_sig, const int &m_mask, 
 	const float &m_min_primer_tm, const float &m_min_probe_tm, NucCruc &m_melt,
 	const float &m_forward_primer_strand, 
-	const float &m_reverse_primer_strand, const float &m_probe_strand);
+	const float &m_reverse_primer_strand, const float &m_probe_strand,
+	const std::vector<std::string> &m_index_table);
 	
 void mask_primer_5(std::string &m_amp, const std::string &m_oligo, NucCruc &m_melt,
 	const bool &m_mask, const bool &m_replace);
@@ -357,10 +364,14 @@ void mask_probe(std::string &m_amp, const std::string &m_primer, NucCruc &m_melt
 	const float &m_min_tm);
 	
 std::vector<hybrid_sig> expand_degenerate_signatures(const std::vector<hybrid_sig> &m_sig,
-													 const bool &m_degen_rescale_ct);
+													 const bool &m_degen_rescale_ct,
+													 const std::vector<std::string> &m_oligo_table, 
+													 std::unordered_map<std::string, size_t> &m_str_table);
 
 std::vector<hybrid_sig> multiplex_expansion(const std::vector<hybrid_sig> &m_sig, 
-	const unsigned int &m_format);
+	const unsigned int &m_format,
+	std::vector<std::string> &m_oligo_table, 
+	std::unordered_map<std::string, size_t> &m_str_table);
 
 std::string primer_heuristics(const std::string &m_primer);
 
@@ -381,14 +392,14 @@ void write_annotation(std::ostream &fout, const hybrid_sig &m_sig,
 
 void test_memory(const int &m_num_mb);
 
-void uniquify_results(std::list<hybrid_sig> &m_results);
+void uniquify_results(std::list<hybrid_sig> &m_results, const std::vector<std::string> &m_index_table);
 
 void select_best_match(std::list<hybrid_sig> &m_results);
 
 unsigned int probe_only_count(const std::vector<hybrid_sig> &m_queries);
 
-bool query_sched(const unsigned int &m_num_target, 
-	const unsigned int &m_num_query, const unsigned int &m_num_worker,
+bool query_sched(const size_t &m_num_target, 
+	const size_t &m_num_query, const size_t &m_num_worker,
 	const float &m_S_div_H, const int &m_mode);
 	
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,7 +421,10 @@ std::list<hybrid_sig> amplicon(DNAHash &m_hash, const std::pair<std::string, SEQ
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
 	const unsigned int &m_max_amplicon_len,
-	const bool &m_single_primer_pcr);
+	const bool &m_single_primer_pcr,
+	const int &m_mask_options,
+	const std::vector<std::string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // In padlock_search.cpp
@@ -424,7 +438,9 @@ std::list<hybrid_sig> padlock(DNAHash &m_hash, const std::pair<std::string, SEQP
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3, 
 	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
-	const int &m_target_strand);
+	const int &m_target_strand,
+	const std::vector<std::string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // In probe_search.cpp
@@ -433,7 +449,9 @@ bool hybrid(
 	const std::list<oligo_info> &m_bind_plus,
 	hybrid_sig &m_ret, 
 	const hybrid_sig &m_sig, 
-	const int &m_amp_start, const int &m_amp_stop);
+	const int &m_amp_start, const int &m_amp_stop,
+	const std::vector<std::string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table);
 
 std::list<hybrid_sig> hybrid(DNAHash &m_hash, const std::pair<std::string, SEQPTR> &m_seq, 
 	const hybrid_sig &m_sig, NucCruc &m_melt,
@@ -444,7 +462,9 @@ std::list<hybrid_sig> hybrid(DNAHash &m_hash, const std::pair<std::string, SEQPT
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
-	const int &m_target_strand);
+	const int &m_target_strand,
+	const std::vector<std::string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table);
 	
 
 //////////////////////////////////////////////////////////////////////////////////////////////

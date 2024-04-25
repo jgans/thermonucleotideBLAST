@@ -41,7 +41,7 @@
 using namespace std;
 
 size_t read_input_file(const string &m_file, vector<hybrid_sig> &m_sig_list, 
-	const bool &m_ignore_probe, const bool &m_force_probe)
+	const bool &m_ignore_probe, const bool &m_force_probe, std::unordered_map<std::string, size_t> &m_str_table)
 {
 	if(m_ignore_probe && m_force_probe){
 		throw "Error: Can not both ignore and force probes at the same time!";
@@ -61,7 +61,7 @@ size_t read_input_file(const string &m_file, vector<hybrid_sig> &m_sig_list,
 	
 	while( getline(fin, line) ){
 	
-		vector<string> tmp_sig;
+		deque<string> tmp_sig;
 		string entry;
 		
 		// Trim any characters that appear after a comment symbol on a line
@@ -89,7 +89,9 @@ size_t read_input_file(const string &m_file, vector<hybrid_sig> &m_sig_list,
 						throw "ignore_probe is true but only probes have been provided!";
 					}
 
-					m_sig_list.push_back( hybrid_sig(tmp_sig[0], tmp_sig[1], sig_count++) );
+					m_sig_list.push_back( hybrid_sig(
+						str_to_index(tmp_sig[0], m_str_table), 
+						str_to_index(tmp_sig[1], m_str_table), sig_count++) );
 				}
 				break;
 			case 3: // Name + forward + reverse
@@ -98,12 +100,19 @@ size_t read_input_file(const string &m_file, vector<hybrid_sig> &m_sig_list,
 					
 						// When we turn a pair of oligos into probes, append "_F" and "_R" to
 						// make the names unique
-						m_sig_list.push_back( hybrid_sig(tmp_sig[0] + "_F", tmp_sig[1], sig_count++) );
-						m_sig_list.push_back( hybrid_sig(tmp_sig[0] + "_R", tmp_sig[2], sig_count++) );
+						m_sig_list.push_back( hybrid_sig(
+							str_to_index(tmp_sig[0] + "_F", m_str_table), 
+							str_to_index(tmp_sig[1], m_str_table), sig_count++) );
+						m_sig_list.push_back( hybrid_sig(
+							str_to_index(tmp_sig[0] + "_R", m_str_table), 
+							str_to_index(tmp_sig[2], m_str_table), sig_count++) );
 					}
 					else{
 					
-						m_sig_list.push_back( hybrid_sig(tmp_sig[0], tmp_sig[1], tmp_sig[2], sig_count++) );
+						m_sig_list.push_back( hybrid_sig(
+							str_to_index(tmp_sig[0], m_str_table), 
+							str_to_index(tmp_sig[1], m_str_table), 
+							str_to_index(tmp_sig[2], m_str_table), sig_count++) );
 					}
 				}
 				break;
@@ -112,23 +121,36 @@ size_t read_input_file(const string &m_file, vector<hybrid_sig> &m_sig_list,
 					if(m_ignore_probe){
 					
 						// As the user has requested, do not include the probe sequence
-						m_sig_list.push_back( hybrid_sig(tmp_sig[0], tmp_sig[1], tmp_sig[2], sig_count++) );
+						m_sig_list.push_back( hybrid_sig(
+							str_to_index(tmp_sig[0], m_str_table), 
+							str_to_index(tmp_sig[1], m_str_table), 
+							str_to_index(tmp_sig[2], m_str_table), sig_count++) );
 					}
 					else{
 						if(m_force_probe){
 						
 							// When we turn a pair of oligos into probes, append "_F", "_R" and "_P" to
 							// make the names unique
-							m_sig_list.push_back( hybrid_sig(tmp_sig[0] + "_F", tmp_sig[1], 
+							m_sig_list.push_back( hybrid_sig(
+								str_to_index(tmp_sig[0] + "_F", m_str_table), 
+								str_to_index(tmp_sig[1], m_str_table), 
 								sig_count++) );
-							m_sig_list.push_back( hybrid_sig(tmp_sig[0] + "_R", tmp_sig[2],
+							m_sig_list.push_back( hybrid_sig(
+								str_to_index(tmp_sig[0] + "_R", m_str_table), 
+								str_to_index(tmp_sig[2], m_str_table),
 								sig_count++) );
-							m_sig_list.push_back( hybrid_sig(tmp_sig[0] + "_P", tmp_sig[3], 
+							m_sig_list.push_back( hybrid_sig(
+								str_to_index(tmp_sig[0] + "_P", m_str_table), 
+								str_to_index(tmp_sig[3], m_str_table), 
 								sig_count++) );
 						}
 						else{
 						
-							m_sig_list.push_back( hybrid_sig(tmp_sig[0], tmp_sig[1], tmp_sig[2], tmp_sig[3], 
+							m_sig_list.push_back( hybrid_sig(
+								str_to_index(tmp_sig[0], m_str_table), 
+								str_to_index(tmp_sig[1], m_str_table), 
+								str_to_index(tmp_sig[2], m_str_table), 
+								str_to_index(tmp_sig[3], m_str_table), 
 								sig_count++) );
 						}
 					}

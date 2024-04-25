@@ -9,11 +9,8 @@ void NucCruc::init_param_Santa_Lucia()
 	tm_param = SANTA_LUCIA;
 		
 	// Initialize all parameters to 0 by default
-	for(unsigned int i = 0;i < NUM_BASE_PAIR;i++){
-	
-		memset( param_H[i], 0, NUM_BASE_PAIR*sizeof(float) );
-		memset( param_S[i], 0, NUM_BASE_PAIR*sizeof(float) );
-	}
+	memset( param_H, 0, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
+	memset( param_S, 0, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
 	
 	// Initialize forbidden interactions:
 	// 
@@ -26,22 +23,22 @@ void NucCruc::init_param_Santa_Lucia()
 			int curr = BASE_PAIR(i, j);
 			int prev = BASE_PAIR(BASE::GAP, BASE::GAP);
 			
-			param_H[curr][prev] = param_H[prev][curr] = default_enthalpy;
-			param_S[curr][prev] = param_S[prev][curr] = default_entropy;
+			param_H[SCORE_INDEX(curr, prev)] = param_H[SCORE_INDEX(prev, curr)] = default_enthalpy;
+			param_S[SCORE_INDEX(curr, prev)] = param_S[SCORE_INDEX(prev, curr)] = default_entropy;
 			
 			// x-/-y is not allowed
 			curr = BASE_PAIR(i, BASE::GAP);
 			prev = BASE_PAIR(BASE::GAP, j);
 			
-			param_H[curr][prev] = param_H[prev][curr] = default_enthalpy;
-			param_S[curr][prev] = param_S[prev][curr] = default_entropy;
+			param_H[SCORE_INDEX(curr, prev)] = param_H[SCORE_INDEX(prev, curr)] = default_enthalpy;
+			param_S[SCORE_INDEX(curr, prev)] = param_S[SCORE_INDEX(prev, curr)] = default_entropy;
 			
 			//-x/y- is not allowed
 			curr = BASE_PAIR(BASE::GAP, i);
 			prev = BASE_PAIR(j, BASE::GAP);
 			
-			param_H[curr][prev] = param_H[prev][curr] = default_enthalpy;
-			param_S[curr][prev] = param_S[prev][curr] = default_entropy;
+			param_H[SCORE_INDEX(curr, prev)] = param_H[SCORE_INDEX(prev, curr)] = default_enthalpy;
+			param_S[SCORE_INDEX(curr, prev)] = param_S[SCORE_INDEX(prev, curr)] = default_entropy;
 		}
 	}
 
@@ -67,27 +64,27 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	GC_CG	-9.8f
 	#define	TA_AT	-7.2f
 	
-	param_H[AT][AT] = param_H[TA][TA] = AT_AT; 	// AA/TT
-	param_H[AT][CG] = param_H[GC][TA] = AT_CG; 	// AC/TG
-	param_H[AT][GC] = param_H[CG][TA] = AT_GC; 	// AG/TC
-	param_H[AT][TA] = AT_TA; 				// AT/TA
-	param_H[CG][AT] = param_H[TA][GC] = CG_AT; 	// CA/GT
-	param_H[CG][CG] = param_H[GC][GC] = CG_CG; 	// CC/GG
-	param_H[CG][GC] = CG_GC;					// CG/GC
-	param_H[GC][AT] = param_H[TA][CG] = GC_AT;	// GA/CT
-	param_H[GC][CG] = GC_CG;					// GC/CG
-	param_H[TA][AT] = TA_AT;					// TA/AT
+	param_H[SCORE_INDEX(AT, AT)] = param_H[SCORE_INDEX(TA, TA)] = AT_AT; 	// AA/TT
+	param_H[SCORE_INDEX(AT, CG)] = param_H[SCORE_INDEX(GC, TA)] = AT_CG; 	// AC/TG
+	param_H[SCORE_INDEX(AT, GC)] = param_H[SCORE_INDEX(CG, TA)] = AT_GC; 	// AG/TC
+	param_H[SCORE_INDEX(AT, TA)] = AT_TA; 				// AT/TA
+	param_H[SCORE_INDEX(CG, AT)] = param_H[SCORE_INDEX(TA, GC)] = CG_AT; 	// CA/GT
+	param_H[SCORE_INDEX(CG, CG)] = param_H[SCORE_INDEX(GC, GC)] = CG_CG; 	// CC/GG
+	param_H[SCORE_INDEX(CG, GC)] = CG_GC;					// CG/GC
+	param_H[SCORE_INDEX(GC, AT)] = param_H[SCORE_INDEX(TA, CG)] = GC_AT;	// GA/CT
+	param_H[SCORE_INDEX(GC, CG)] = GC_CG;					// GC/CG
+	param_H[SCORE_INDEX(TA, AT)] = TA_AT;					// TA/AT
 	
-	param_S[AT][AT] = param_S[TA][TA] = ENTROPY(-1.00f, AT_AT);	// AA/TT
-	param_S[AT][CG] = param_S[GC][TA] = ENTROPY(-1.44f, AT_CG);	// AC/TG
-	param_S[AT][GC] = param_S[CG][TA] = ENTROPY(-1.28f, AT_GC);	// AG/TC
-	param_S[AT][TA] = ENTROPY(-0.88f, AT_TA);				// AT/TA
-	param_S[CG][AT] = param_S[TA][GC] = ENTROPY(-1.45f, CG_AT);	// CA/GT
-	param_S[CG][CG] = param_S[GC][GC] = ENTROPY(-1.84f, CG_CG);	// CC/GG
-	param_S[CG][GC] = ENTROPY(-2.17f, CG_GC);				// CG/GC
-	param_S[GC][AT] = param_S[TA][CG] = ENTROPY(-1.30f, GC_AT);	// GA/CT
-	param_S[GC][CG] = ENTROPY(-2.24f, GC_CG);				// GC/CG
-	param_S[TA][AT] = ENTROPY(-0.58f, TA_AT);				// TA/AT
+	param_S[SCORE_INDEX(AT, AT)] = param_S[SCORE_INDEX(TA, TA)] = ENTROPY(-1.00f, AT_AT);	// AA/TT
+	param_S[SCORE_INDEX(AT, CG)] = param_S[SCORE_INDEX(GC, TA)] = ENTROPY(-1.44f, AT_CG);	// AC/TG
+	param_S[SCORE_INDEX(AT, GC)] = param_S[SCORE_INDEX(CG, TA)] = ENTROPY(-1.28f, AT_GC);	// AG/TC
+	param_S[SCORE_INDEX(AT, TA)] = ENTROPY(-0.88f, AT_TA);				// AT/TA
+	param_S[SCORE_INDEX(CG, AT)] = param_S[SCORE_INDEX(TA, GC)] = ENTROPY(-1.45f, CG_AT);	// CA/GT
+	param_S[SCORE_INDEX(CG, CG)] = param_S[SCORE_INDEX(GC, GC)] = ENTROPY(-1.84f, CG_CG);	// CC/GG
+	param_S[SCORE_INDEX(CG, GC)] = ENTROPY(-2.17f, CG_GC);				// CG/GC
+	param_S[SCORE_INDEX(GC, AT)] = param_S[SCORE_INDEX(TA, CG)] = ENTROPY(-1.30f, GC_AT);	// GA/CT
+	param_S[SCORE_INDEX(GC, CG)] = ENTROPY(-2.24f, GC_CG);				// GC/CG
+	param_S[SCORE_INDEX(TA, AT)] = ENTROPY(-0.58f, TA_AT);				// TA/AT
 	
 	#define	AE_AT	0.2f
 	#define	AE_CG	-6.3f
@@ -106,39 +103,39 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	TE_GC	-4.9f
 	#define	TE_TA	-0.2f
 	
-	param_H[AE][AT] = param_H[TA][EA] = AE_AT;	// AA/ET
-	param_H[AE][CG] = param_H[GC][EA] = AE_CG;	// AC/EG
-	param_H[AE][GC] = param_H[CG][EA] = AE_GC;	// AG/EC
-	param_H[AE][TA] = param_H[AT][EA] = AE_TA;	// AT/EA
-	param_H[CE][AT] = param_H[TA][EC] = CE_AT;	// CA/ET
-	param_H[CE][CG] = param_H[GC][EC] = CE_CG;	// CC/EG
-	param_H[CE][GC] = param_H[CG][EC] = CE_GC;	// CG/EC
-	param_H[CE][TA] = param_H[AT][EC] = CE_TA;	// CT/EA
-	param_H[GE][AT] = param_H[TA][EG] = GE_AT;	// GA/ET
-	param_H[GE][CG] = param_H[GC][EG] = GE_CG;	// GC/EG
-	param_H[GE][GC] = param_H[CG][EG] = GE_GC;	// GG/EC
-	param_H[GE][TA] = param_H[AT][EG] = GE_TA;	// GT/EA
-	param_H[TE][AT] = param_H[TA][ET] = TE_AT;	// TA/ET
-	param_H[TE][CG] = param_H[GC][ET] = TE_CG;	// TC/EG
-	param_H[TE][GC] = param_H[CG][ET] = TE_GC;	// TG/EC
-	param_H[TE][TA] = param_H[AT][ET] = TE_TA;	// TT/EA
+	param_H[SCORE_INDEX(AE, AT)] = param_H[SCORE_INDEX(TA, EA)] = AE_AT;	// AA/ET
+	param_H[SCORE_INDEX(AE, CG)] = param_H[SCORE_INDEX(GC, EA)] = AE_CG;	// AC/EG
+	param_H[SCORE_INDEX(AE, GC)] = param_H[SCORE_INDEX(CG, EA)] = AE_GC;	// AG/EC
+	param_H[SCORE_INDEX(AE, TA)] = param_H[SCORE_INDEX(AT, EA)] = AE_TA;	// AT/EA
+	param_H[SCORE_INDEX(CE, AT)] = param_H[SCORE_INDEX(TA, EC)] = CE_AT;	// CA/ET
+	param_H[SCORE_INDEX(CE, CG)] = param_H[SCORE_INDEX(GC, EC)] = CE_CG;	// CC/EG
+	param_H[SCORE_INDEX(CE, GC)] = param_H[SCORE_INDEX(CG, EC)] = CE_GC;	// CG/EC
+	param_H[SCORE_INDEX(CE, TA)] = param_H[SCORE_INDEX(AT, EC)] = CE_TA;	// CT/EA
+	param_H[SCORE_INDEX(GE, AT)] = param_H[SCORE_INDEX(TA, EG)] = GE_AT;	// GA/ET
+	param_H[SCORE_INDEX(GE, CG)] = param_H[SCORE_INDEX(GC, EG)] = GE_CG;	// GC/EG
+	param_H[SCORE_INDEX(GE, GC)] = param_H[SCORE_INDEX(CG, EG)] = GE_GC;	// GG/EC
+	param_H[SCORE_INDEX(GE, TA)] = param_H[SCORE_INDEX(AT, EG)] = GE_TA;	// GT/EA
+	param_H[SCORE_INDEX(TE, AT)] = param_H[SCORE_INDEX(TA, ET)] = TE_AT;	// TA/ET
+	param_H[SCORE_INDEX(TE, CG)] = param_H[SCORE_INDEX(GC, ET)] = TE_CG;	// TC/EG
+	param_H[SCORE_INDEX(TE, GC)] = param_H[SCORE_INDEX(CG, ET)] = TE_GC;	// TG/EC
+	param_H[SCORE_INDEX(TE, TA)] = param_H[SCORE_INDEX(AT, ET)] = TE_TA;	// TT/EA
 	
-	param_S[AE][AT] = param_S[TA][EA] = ENTROPY(-0.51f, AE_AT);	// AA/ET
-	param_S[AE][CG] = param_S[GC][EA] = ENTROPY(-0.96f, AE_CG);	// AC/EG
-	param_S[AE][GC] = param_S[CG][EA] = ENTROPY(-0.58f, AE_GC);	// AG/EC
-	param_S[AE][TA] = param_S[AT][EA] = ENTROPY(-0.5f, AE_TA);	// AT/EA
-	param_S[CE][AT] = param_S[TA][EC] = ENTROPY(-0.42f, CE_AT);	// CA/ET
-	param_S[CE][CG] = param_S[GC][EC] = ENTROPY(-0.52f, CE_CG);	// CC/EG
-	param_S[CE][GC] = param_S[CG][EC] = ENTROPY(-0.34f, CE_GC);	// CG/EC
-	param_S[CE][TA] = param_S[AT][EC] = ENTROPY(-0.02f, CE_TA);	// CT/EA
-	param_S[GE][AT] = param_S[TA][EG] = ENTROPY(-0.62f, GE_AT);	// GA/ET
-	param_S[GE][CG] = param_S[GC][EG] = ENTROPY(-0.72f, GE_CG);	// GC/EG
-	param_S[GE][GC] = param_S[CG][EG] = ENTROPY(-0.56f, GE_GC);	// GG/EC
-	param_S[GE][TA] = param_S[AT][EG] = ENTROPY(0.48f, GE_TA);	// GT/EA
-	param_S[TE][AT] = param_S[TA][ET] = ENTROPY(-0.71f, TE_AT);	// TA/ET
-	param_S[TE][CG] = param_S[GC][ET] = ENTROPY(-0.58f, TE_CG);	// TC/EG
-	param_S[TE][GC] = param_S[CG][ET] = ENTROPY(-0.61f, TE_GC);	// TG/EC
-	param_S[TE][TA] = param_S[AT][ET] = ENTROPY(-0.10f, TE_TA);	// TT/EA
+	param_S[SCORE_INDEX(AE, AT)] = param_S[SCORE_INDEX(TA, EA)] = ENTROPY(-0.51f, AE_AT);	// AA/ET
+	param_S[SCORE_INDEX(AE, CG)] = param_S[SCORE_INDEX(GC, EA)] = ENTROPY(-0.96f, AE_CG);	// AC/EG
+	param_S[SCORE_INDEX(AE, GC)] = param_S[SCORE_INDEX(CG, EA)] = ENTROPY(-0.58f, AE_GC);	// AG/EC
+	param_S[SCORE_INDEX(AE, TA)] = param_S[SCORE_INDEX(AT, EA)] = ENTROPY(-0.5f, AE_TA);	// AT/EA
+	param_S[SCORE_INDEX(CE, AT)] = param_S[SCORE_INDEX(TA, EC)] = ENTROPY(-0.42f, CE_AT);	// CA/ET
+	param_S[SCORE_INDEX(CE, CG)] = param_S[SCORE_INDEX(GC, EC)] = ENTROPY(-0.52f, CE_CG);	// CC/EG
+	param_S[SCORE_INDEX(CE, GC)] = param_S[SCORE_INDEX(CG, EC)] = ENTROPY(-0.34f, CE_GC);	// CG/EC
+	param_S[SCORE_INDEX(CE, TA)] = param_S[SCORE_INDEX(AT, EC)] = ENTROPY(-0.02f, CE_TA);	// CT/EA
+	param_S[SCORE_INDEX(GE, AT)] = param_S[SCORE_INDEX(TA, EG)] = ENTROPY(-0.62f, GE_AT);	// GA/ET
+	param_S[SCORE_INDEX(GE, CG)] = param_S[SCORE_INDEX(GC, EG)] = ENTROPY(-0.72f, GE_CG);	// GC/EG
+	param_S[SCORE_INDEX(GE, GC)] = param_S[SCORE_INDEX(CG, EG)] = ENTROPY(-0.56f, GE_GC);	// GG/EC
+	param_S[SCORE_INDEX(GE, TA)] = param_S[SCORE_INDEX(AT, EG)] = ENTROPY(0.48f, GE_TA);	// GT/EA
+	param_S[SCORE_INDEX(TE, AT)] = param_S[SCORE_INDEX(TA, ET)] = ENTROPY(-0.71f, TE_AT);	// TA/ET
+	param_S[SCORE_INDEX(TE, CG)] = param_S[SCORE_INDEX(GC, ET)] = ENTROPY(-0.58f, TE_CG);	// TC/EG
+	param_S[SCORE_INDEX(TE, GC)] = param_S[SCORE_INDEX(CG, ET)] = ENTROPY(-0.61f, TE_GC);	// TG/EC
+	param_S[SCORE_INDEX(TE, TA)] = param_S[SCORE_INDEX(AT, ET)] = ENTROPY(-0.10f, TE_TA);	// TT/EA
 	
 	#define	EA_AT	-0.7f
 	#define	EA_CG	-2.1f
@@ -157,39 +154,39 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	ET_GC	-5.2f
 	#define	ET_TA	-3.8f
 	
-	param_H[EA][AT] = param_H[TA][AE] = EA_AT;	// EA/AT
-	param_H[EA][CG] = param_H[GC][AE] = EA_CG;	// EC/AG
-	param_H[EA][GC] = param_H[CG][AE] = EA_GC;	// EG/AC
-	param_H[EA][TA] = param_H[AT][AE] = EA_TA;	// ET/AA
-	param_H[EC][AT] = param_H[TA][CE] = EC_AT;	// EA/CT
-	param_H[EC][CG] = param_H[GC][CE] = EC_CG;	// EC/CG
-	param_H[EC][GC] = param_H[CG][CE] = EC_GC;	// EG/CC
-	param_H[EC][TA] = param_H[AT][CE] = EC_TA;	// ET/CA
-	param_H[EG][AT] = param_H[TA][GE] = EG_AT;	// EA/GT
-	param_H[EG][CG] = param_H[GC][GE] = EG_CG;	// EC/GG
-	param_H[EG][GC] = param_H[CG][GE] = EG_GC;	// EG/GC
-	param_H[EG][TA] = param_H[AT][GE] = EG_TA;	// ET/GA
-	param_H[ET][AT] = param_H[TA][TE] = ET_AT;	// EA/TT
-	param_H[ET][CG] = param_H[GC][TE] = ET_CG;	// EC/TG
-	param_H[ET][GC] = param_H[CG][TE] = ET_GC;	// EG/TC
-	param_H[ET][TA] = param_H[AT][TE] = ET_TA;	// ET/TA
+	param_H[SCORE_INDEX(EA, AT)] = param_H[SCORE_INDEX(TA, AE)] = EA_AT;	// EA/AT
+	param_H[SCORE_INDEX(EA, CG)] = param_H[SCORE_INDEX(GC, AE)] = EA_CG;	// EC/AG
+	param_H[SCORE_INDEX(EA, GC)] = param_H[SCORE_INDEX(CG, AE)] = EA_GC;	// EG/AC
+	param_H[SCORE_INDEX(EA, TA)] = param_H[SCORE_INDEX(AT, AE)] = EA_TA;	// ET/AA
+	param_H[SCORE_INDEX(EC, AT)] = param_H[SCORE_INDEX(TA, CE)] = EC_AT;	// EA/CT
+	param_H[SCORE_INDEX(EC, CG)] = param_H[SCORE_INDEX(GC, CE)] = EC_CG;	// EC/CG
+	param_H[SCORE_INDEX(EC, GC)] = param_H[SCORE_INDEX(CG, CE)] = EC_GC;	// EG/CC
+	param_H[SCORE_INDEX(EC, TA)] = param_H[SCORE_INDEX(AT, CE)] = EC_TA;	// ET/CA
+	param_H[SCORE_INDEX(EG, AT)] = param_H[SCORE_INDEX(TA, GE)] = EG_AT;	// EA/GT
+	param_H[SCORE_INDEX(EG, CG)] = param_H[SCORE_INDEX(GC, GE)] = EG_CG;	// EC/GG
+	param_H[SCORE_INDEX(EG, GC)] = param_H[SCORE_INDEX(CG, GE)] = EG_GC;	// EG/GC
+	param_H[SCORE_INDEX(EG, TA)] = param_H[SCORE_INDEX(AT, GE)] = EG_TA;	// ET/GA
+	param_H[SCORE_INDEX(ET, AT)] = param_H[SCORE_INDEX(TA, TE)] = ET_AT;	// EA/TT
+	param_H[SCORE_INDEX(ET, CG)] = param_H[SCORE_INDEX(GC, TE)] = ET_CG;	// EC/TG
+	param_H[SCORE_INDEX(ET, GC)] = param_H[SCORE_INDEX(CG, TE)] = ET_GC;	// EG/TC
+	param_H[SCORE_INDEX(ET, TA)] = param_H[SCORE_INDEX(AT, TE)] = ET_TA;	// ET/TA
 	
-	param_S[EA][AT] = param_S[TA][AE] = ENTROPY(-0.48f, EA_AT);	// EA/AT
-	param_S[EA][CG] = param_S[GC][AE] = ENTROPY(-0.92f, EA_CG);	// EC/AG
-	param_S[EA][GC] = param_S[CG][AE] = ENTROPY(-0.82f, EA_GC);	// EG/AC
-	param_S[EA][TA] = param_S[AT][AE] = ENTROPY(-0.12f, EA_TA);	// ET/AA
-	param_S[EC][AT] = param_S[TA][CE] = ENTROPY(-0.19f, EC_AT);	// EA/CT
-	param_S[EC][CG] = param_S[GC][CE] = ENTROPY(-0.23f, EC_CG);	// EC/CG
-	param_S[EC][GC] = param_S[CG][CE] = ENTROPY(-0.31f, EC_GC);	// EG/CC
-	param_S[EC][TA] = param_S[AT][CE] = ENTROPY(0.28f, EC_TA);	// ET/CA
-	param_S[EG][AT] = param_S[TA][GE] = ENTROPY(-0.50f, EG_AT);	// EA/GT
-	param_S[EG][CG] = param_S[GC][GE] = ENTROPY(-0.44f, EG_CG);	// EC/GG
-	param_S[EG][GC] = param_S[CG][GE] = ENTROPY(-0.01f, EG_GC);	// EG/GC
-	param_S[EG][TA] = param_S[AT][GE] = ENTROPY(-0.01f, EG_TA);	// ET/GA
-	param_S[ET][AT] = param_S[TA][TE] = ENTROPY(-0.29f, ET_AT);	// EA/TT
-	param_S[ET][CG] = param_S[GC][TE] = ENTROPY(-0.35f, ET_CG);	// EC/TG
-	param_S[ET][GC] = param_S[CG][TE] = ENTROPY(-0.52f, ET_GC);	// EG/TC
-	param_S[ET][TA] = param_S[AT][TE] = ENTROPY(0.13f, ET_TA);	// ET/TA
+	param_S[SCORE_INDEX(EA, AT)] = param_S[SCORE_INDEX(TA, AE)] = ENTROPY(-0.48f, EA_AT);	// EA/AT
+	param_S[SCORE_INDEX(EA, CG)] = param_S[SCORE_INDEX(GC, AE)] = ENTROPY(-0.92f, EA_CG);	// EC/AG
+	param_S[SCORE_INDEX(EA, GC)] = param_S[SCORE_INDEX(CG, AE)] = ENTROPY(-0.82f, EA_GC);	// EG/AC
+	param_S[SCORE_INDEX(EA, TA)] = param_S[SCORE_INDEX(AT, AE)] = ENTROPY(-0.12f, EA_TA);	// ET/AA
+	param_S[SCORE_INDEX(EC, AT)] = param_S[SCORE_INDEX(TA, CE)] = ENTROPY(-0.19f, EC_AT);	// EA/CT
+	param_S[SCORE_INDEX(EC, CG)] = param_S[SCORE_INDEX(GC, CE)] = ENTROPY(-0.23f, EC_CG);	// EC/CG
+	param_S[SCORE_INDEX(EC, GC)] = param_S[SCORE_INDEX(CG, CE)] = ENTROPY(-0.31f, EC_GC);	// EG/CC
+	param_S[SCORE_INDEX(EC, TA)] = param_S[SCORE_INDEX(AT, CE)] = ENTROPY(0.28f, EC_TA);	// ET/CA
+	param_S[SCORE_INDEX(EG, AT)] = param_S[SCORE_INDEX(TA, GE)] = ENTROPY(-0.50f, EG_AT);	// EA/GT
+	param_S[SCORE_INDEX(EG, CG)] = param_S[SCORE_INDEX(GC, GE)] = ENTROPY(-0.44f, EG_CG);	// EC/GG
+	param_S[SCORE_INDEX(EG, GC)] = param_S[SCORE_INDEX(CG, GE)] = ENTROPY(-0.01f, EG_GC);	// EG/GC
+	param_S[SCORE_INDEX(EG, TA)] = param_S[SCORE_INDEX(AT, GE)] = ENTROPY(-0.01f, EG_TA);	// ET/GA
+	param_S[SCORE_INDEX(ET, AT)] = param_S[SCORE_INDEX(TA, TE)] = ENTROPY(-0.29f, ET_AT);	// EA/TT
+	param_S[SCORE_INDEX(ET, CG)] = param_S[SCORE_INDEX(GC, TE)] = ENTROPY(-0.35f, ET_CG);	// EC/TG
+	param_S[SCORE_INDEX(ET, GC)] = param_S[SCORE_INDEX(CG, TE)] = ENTROPY(-0.52f, ET_GC);	// EG/TC
+	param_S[SCORE_INDEX(ET, TA)] = param_S[SCORE_INDEX(AT, TE)] = ENTROPY(0.13f, ET_TA);	// ET/TA
 	
 	#define	AT_AG	-0.6f
 	#define	AT_GA	-0.7f
@@ -202,23 +199,23 @@ void NucCruc::init_param_Santa_Lucia()
 	
 	// Single G-A mismatch
 	// Allawi et. al. Biochemistry 1998, 37, 2170-2179
-	param_H[AT][AG] = param_H[GA][TA] = AT_AG;	// Aa/Tg
-	param_H[AT][GA] = param_H[AG][TA] = AT_GA;	// Ag/Ta
-	param_H[CG][AG] = param_H[GA][GC] = CG_AG;	// Ca/Gg
-	param_H[CG][GA] = param_H[AG][GC] = CG_GA;	// Cg/Ga
-	param_H[GC][AG] = param_H[GA][CG] = GC_AG;	// Ga/Cg
-	param_H[GC][GA] = param_H[AG][CG] = GC_GA;	// Gg/Ca
-	param_H[TA][AG] = param_H[GA][AT] = TA_AG;	// Ta/Ag
-	param_H[TA][GA] = param_H[AG][AT] = TA_GA;	// Tg/Aa
+	param_H[SCORE_INDEX(AT, AG)] = param_H[SCORE_INDEX(GA, TA)] = AT_AG;	// Aa/Tg
+	param_H[SCORE_INDEX(AT, GA)] = param_H[SCORE_INDEX(AG, TA)] = AT_GA;	// Ag/Ta
+	param_H[SCORE_INDEX(CG, AG)] = param_H[SCORE_INDEX(GA, GC)] = CG_AG;	// Ca/Gg
+	param_H[SCORE_INDEX(CG, GA)] = param_H[SCORE_INDEX(AG, GC)] = CG_GA;	// Cg/Ga
+	param_H[SCORE_INDEX(GC, AG)] = param_H[SCORE_INDEX(GA, CG)] = GC_AG;	// Ga/Cg
+	param_H[SCORE_INDEX(GC, GA)] = param_H[SCORE_INDEX(AG, CG)] = GC_GA;	// Gg/Ca
+	param_H[SCORE_INDEX(TA, AG)] = param_H[SCORE_INDEX(GA, AT)] = TA_AG;	// Ta/Ag
+	param_H[SCORE_INDEX(TA, GA)] = param_H[SCORE_INDEX(AG, AT)] = TA_GA;	// Tg/Aa
 	
-	param_S[AT][AG] = param_S[GA][TA] = ENTROPY(0.14f, AT_AG);	// Aa/Tg
-	param_S[AT][GA] = param_S[AG][TA] = ENTROPY(0.02f, AT_GA);	// Ag/Ta
-	param_S[CG][AG] = param_S[GA][GC] = ENTROPY(0.03f, CG_AG);	// Ca/Gg
-	param_S[CG][GA] = param_S[AG][GC] = ENTROPY(0.11f, CG_GA);	// Cg/Ga
-	param_S[GC][AG] = param_S[GA][CG] = ENTROPY(-0.25f, GC_AG);	// Ga/Cg
-	param_S[GC][GA] = param_S[AG][CG] = ENTROPY(-0.52f, GC_GA);	// Gg/Ca
-	param_S[TA][AG] = param_S[GA][AT] = ENTROPY(0.42f, TA_AG);	// Ta/Ag
-	param_S[TA][GA] = param_S[AG][AT] = ENTROPY(0.74f, TA_GA);	// Tg/Aa
+	param_S[SCORE_INDEX(AT, AG)] = param_S[SCORE_INDEX(GA, TA)] = ENTROPY(0.14f, AT_AG);	// Aa/Tg
+	param_S[SCORE_INDEX(AT, GA)] = param_S[SCORE_INDEX(AG, TA)] = ENTROPY(0.02f, AT_GA);	// Ag/Ta
+	param_S[SCORE_INDEX(CG, AG)] = param_S[SCORE_INDEX(GA, GC)] = ENTROPY(0.03f, CG_AG);	// Ca/Gg
+	param_S[SCORE_INDEX(CG, GA)] = param_S[SCORE_INDEX(AG, GC)] = ENTROPY(0.11f, CG_GA);	// Cg/Ga
+	param_S[SCORE_INDEX(GC, AG)] = param_S[SCORE_INDEX(GA, CG)] = ENTROPY(-0.25f, GC_AG);	// Ga/Cg
+	param_S[SCORE_INDEX(GC, GA)] = param_S[SCORE_INDEX(AG, CG)] = ENTROPY(-0.52f, GC_GA);	// Gg/Ca
+	param_S[SCORE_INDEX(TA, AG)] = param_S[SCORE_INDEX(GA, AT)] = ENTROPY(0.42f, TA_AG);	// Ta/Ag
+	param_S[SCORE_INDEX(TA, GA)] = param_S[SCORE_INDEX(AG, AT)] = ENTROPY(0.74f, TA_GA);	// Tg/Aa
 	
 	#define	AT_CT	0.7f
 	#define	AT_TC	-1.2f
@@ -231,23 +228,23 @@ void NucCruc::init_param_Santa_Lucia()
 	
 	// Single C-T mismatch
 	// Allawi et. al. Nucleic Acids Research, 1998, 26, 11, 2694-2701
-	param_H[AT][CT] = param_H[TC][TA] = AT_CT;	// Ac/Tt
-	param_H[AT][TC] = param_H[CT][TA] = AT_TC;	// At/Tc
-	param_H[CG][CT] = param_H[TC][GC] = CG_CT;	// Cc/Gt
-	param_H[CG][TC] = param_H[CT][GC] = CG_TC;	// Ct/Gc
-	param_H[GC][CT] = param_H[TC][CG] = GC_CT;	// Gc/Ct
-	param_H[GC][TC] = param_H[CT][CG] = GC_TC;	// Gt/Cc
-	param_H[TA][CT] = param_H[TC][AT] = TA_CT;	// Tc/At
-	param_H[TA][TC] = param_H[CT][AT] = TA_TC;	// Tt/Ac
+	param_H[SCORE_INDEX(AT, CT)] = param_H[SCORE_INDEX(TC, TA)] = AT_CT;	// Ac/Tt
+	param_H[SCORE_INDEX(AT, TC)] = param_H[SCORE_INDEX(CT, TA)] = AT_TC;	// At/Tc
+	param_H[SCORE_INDEX(CG, CT)] = param_H[SCORE_INDEX(TC, GC)] = CG_CT;	// Cc/Gt
+	param_H[SCORE_INDEX(CG, TC)] = param_H[SCORE_INDEX(CT, GC)] = CG_TC;	// Ct/Gc
+	param_H[SCORE_INDEX(GC, CT)] = param_H[SCORE_INDEX(TC, CG)] = GC_CT;	// Gc/Ct
+	param_H[SCORE_INDEX(GC, TC)] = param_H[SCORE_INDEX(CT, CG)] = GC_TC;	// Gt/Cc
+	param_H[SCORE_INDEX(TA, CT)] = param_H[SCORE_INDEX(TC, AT)] = TA_CT;	// Tc/At
+	param_H[SCORE_INDEX(TA, TC)] = param_H[SCORE_INDEX(CT, AT)] = TA_TC;	// Tt/Ac
 	
-	param_S[AT][CT] = param_S[TC][TA] = ENTROPY(0.64f, AT_CT);	// Ac/Tt
-	param_S[AT][TC] = param_S[CT][TA] = ENTROPY(0.73f, AT_TC);	// At/Tc
-	param_S[CG][CT] = param_S[TC][GC] = ENTROPY(0.62f, CG_CT);	// Cc/Gt
-	param_S[CG][TC] = param_S[CT][GC] = ENTROPY(0.40f, CG_TC);	// Ct/Gc
-	param_S[GC][CT] = param_S[TC][CG] = ENTROPY(0.62f, GC_CT);	// Gc/Ct
-	param_S[GC][TC] = param_S[CT][CG] = ENTROPY(0.98f, GC_TC);	// Gt/Cc
-	param_S[TA][CT] = param_S[TC][AT] = ENTROPY(0.97f, TA_CT);	// Tc/At
-	param_S[TA][TC] = param_S[CT][AT] = ENTROPY(0.75f, TA_TC);	// Tt/Ac
+	param_S[SCORE_INDEX(AT, CT)] = param_S[SCORE_INDEX(TC, TA)] = ENTROPY(0.64f, AT_CT);	// Ac/Tt
+	param_S[SCORE_INDEX(AT, TC)] = param_S[SCORE_INDEX(CT, TA)] = ENTROPY(0.73f, AT_TC);	// At/Tc
+	param_S[SCORE_INDEX(CG, CT)] = param_S[SCORE_INDEX(TC, GC)] = ENTROPY(0.62f, CG_CT);	// Cc/Gt
+	param_S[SCORE_INDEX(CG, TC)] = param_S[SCORE_INDEX(CT, GC)] = ENTROPY(0.40f, CG_TC);	// Ct/Gc
+	param_S[SCORE_INDEX(GC, CT)] = param_S[SCORE_INDEX(TC, CG)] = ENTROPY(0.62f, GC_CT);	// Gc/Ct
+	param_S[SCORE_INDEX(GC, TC)] = param_S[SCORE_INDEX(CT, CG)] = ENTROPY(0.98f, GC_TC);	// Gt/Cc
+	param_S[SCORE_INDEX(TA, CT)] = param_S[SCORE_INDEX(TC, AT)] = ENTROPY(0.97f, TA_CT);	// Tc/At
+	param_S[SCORE_INDEX(TA, TC)] = param_S[SCORE_INDEX(CT, AT)] = ENTROPY(0.75f, TA_TC);	// Tt/Ac
 	
 	#define	AT_AC	2.3f
 	#define	AT_CA	5.3f
@@ -260,23 +257,23 @@ void NucCruc::init_param_Santa_Lucia()
 	
 	// Single A-C mismatch
 	// Allawi et. al. Biochemistry 1998, 37, 9435-9444
-	param_H[AT][AC] = param_H[CA][TA] = AT_AC; 	// Aa/Tc
-	param_H[AT][CA] = param_H[AC][TA] = AT_CA;	// Ac/Ta
-	param_H[CG][AC] = param_H[CA][GC] = CG_AC;	// Ca/Gc
-	param_H[CG][CA] = param_H[AC][GC] = CG_CA;	// Cc/Ga
-	param_H[GC][AC] = param_H[CA][CG] = GC_AC;	// Ga/Cc
-	param_H[GC][CA] = param_H[AC][CG] = GC_CA;	// Gc/Ca
-	param_H[TA][AC] = param_H[CA][AT] = TA_AC;	// Ta/Ac
-	param_H[TA][CA] = param_H[AC][AT] = TA_CA;	// Tc/Aa
+	param_H[SCORE_INDEX(AT, AC)] = param_H[SCORE_INDEX(CA, TA)] = AT_AC; 	// Aa/Tc
+	param_H[SCORE_INDEX(AT, CA)] = param_H[SCORE_INDEX(AC, TA)] = AT_CA;	// Ac/Ta
+	param_H[SCORE_INDEX(CG, AC)] = param_H[SCORE_INDEX(CA, GC)] = CG_AC;	// Ca/Gc
+	param_H[SCORE_INDEX(CG, CA)] = param_H[SCORE_INDEX(AC, GC)] = CG_CA;	// Cc/Ga
+	param_H[SCORE_INDEX(GC, AC)] = param_H[SCORE_INDEX(CA, CG)] = GC_AC;	// Ga/Cc
+	param_H[SCORE_INDEX(GC, CA)] = param_H[SCORE_INDEX(AC, CG)] = GC_CA;	// Gc/Ca
+	param_H[SCORE_INDEX(TA, AC)] = param_H[SCORE_INDEX(CA, AT)] = TA_AC;	// Ta/Ac
+	param_H[SCORE_INDEX(TA, CA)] = param_H[SCORE_INDEX(AC, AT)] = TA_CA;	// Tc/Aa
 	
-	param_S[AT][AC] = param_S[CA][TA] = ENTROPY(0.88f, AT_AC); // Aa/Tc
-	param_S[AT][CA] = param_S[AC][TA] = ENTROPY(0.77f, AT_CA);// Ac/Ta
-	param_S[CG][AC] = param_S[CA][GC] = ENTROPY(0.75f, CG_AC);	// Ca/Gc
-	param_S[CG][CA] = param_S[AC][GC] = ENTROPY(0.79f, CG_CA);// Cc/Ga
-	param_S[GC][AC] = param_S[CA][CG] = ENTROPY(0.81f, GC_AC);// Ga/Cc
-	param_S[GC][CA] = param_S[AC][CG] = ENTROPY(0.47f, GC_CA);// Gc/Ca
-	param_S[TA][AC] = param_S[CA][AT] = ENTROPY(0.92f, TA_AC);	// Ta/Ac
-	param_S[TA][CA] = param_S[AC][AT] = ENTROPY(1.33f, TA_CA);// Tc/Aa
+	param_S[SCORE_INDEX(AT, AC)] = param_S[SCORE_INDEX(CA, TA)] = ENTROPY(0.88f, AT_AC); // Aa/Tc
+	param_S[SCORE_INDEX(AT, CA)] = param_S[SCORE_INDEX(AC, TA)] = ENTROPY(0.77f, AT_CA);// Ac/Ta
+	param_S[SCORE_INDEX(CG, AC)] = param_S[SCORE_INDEX(CA, GC)] = ENTROPY(0.75f, CG_AC);	// Ca/Gc
+	param_S[SCORE_INDEX(CG, CA)] = param_S[SCORE_INDEX(AC, GC)] = ENTROPY(0.79f, CG_CA);// Cc/Ga
+	param_S[SCORE_INDEX(GC, AC)] = param_S[SCORE_INDEX(CA, CG)] = ENTROPY(0.81f, GC_AC);// Ga/Cc
+	param_S[SCORE_INDEX(GC, CA)] = param_S[SCORE_INDEX(AC, CG)] = ENTROPY(0.47f, GC_CA);// Gc/Ca
+	param_S[SCORE_INDEX(TA, AC)] = param_S[SCORE_INDEX(CA, AT)] = ENTROPY(0.92f, TA_AC);	// Ta/Ac
+	param_S[SCORE_INDEX(TA, CA)] = param_S[SCORE_INDEX(AC, AT)] = ENTROPY(1.33f, TA_CA);// Tc/Aa
 	
 	#define	AT_GT	1.0f
 	#define	AT_TG	-2.5f
@@ -292,29 +289,29 @@ void NucCruc::init_param_Santa_Lucia()
 	
 	// Single G-T mismatch
 	// Allawi et. al. Biochemistry 1997, 36, 10581-10594
-	param_H[AT][GT] = param_H[TG][TA] = AT_GT;	// Ag/Tt
-	param_H[AT][TG] = param_H[GT][TA] = AT_TG;	// At/Tg
-	param_H[CG][GT] = param_H[TG][GC] = CG_GT;	// Cg/Gt
-	param_H[CG][TG] = param_H[GT][GC] = CG_TG;	// Ct/Gg
-	param_H[GC][GT] = param_H[TG][CG] = GC_GT;	// Gg/Ct
-	param_H[GT][GT] = param_H[TG][TG] = GT_GT;	// gg/tt <-- double mismatch!
-	param_H[GC][TG] = param_H[GT][CG] = GC_TG;	// Gt/Cg
-	param_H[GT][TG] 			    = GT_TG;	// gt/tg <-- double mismatch!
-	param_H[TA][GT] = param_H[TG][AT] = TA_GT;	// Tg/At
-	param_H[TG][GT] 			    = TG_GT;	// tg/gt <-- double mismatch!
-	param_H[TA][TG] = param_H[GT][AT] = TA_TG;	// Tt/Ag
+	param_H[SCORE_INDEX(AT, GT)] = param_H[SCORE_INDEX(TG, TA)] = AT_GT;	// Ag/Tt
+	param_H[SCORE_INDEX(AT, TG)] = param_H[SCORE_INDEX(GT, TA)] = AT_TG;	// At/Tg
+	param_H[SCORE_INDEX(CG, GT)] = param_H[SCORE_INDEX(TG, GC)] = CG_GT;	// Cg/Gt
+	param_H[SCORE_INDEX(CG, TG)] = param_H[SCORE_INDEX(GT, GC)] = CG_TG;	// Ct/Gg
+	param_H[SCORE_INDEX(GC, GT)] = param_H[SCORE_INDEX(TG, CG)] = GC_GT;	// Gg/Ct
+	param_H[SCORE_INDEX(GT, GT)] = param_H[SCORE_INDEX(TG, TG)] = GT_GT;	// gg/tt <-- double mismatch!
+	param_H[SCORE_INDEX(GC, TG)] = param_H[SCORE_INDEX(GT, CG)] = GC_TG;	// Gt/Cg
+	param_H[SCORE_INDEX(GT, TG)] 			    = GT_TG;	// gt/tg <-- double mismatch!
+	param_H[SCORE_INDEX(TA, GT)] = param_H[SCORE_INDEX(TG, AT)] = TA_GT;	// Tg/At
+	param_H[SCORE_INDEX(TG, GT)] 			    = TG_GT;	// tg/gt <-- double mismatch!
+	param_H[SCORE_INDEX(TA, TG)] = param_H[SCORE_INDEX(GT, AT)] = TA_TG;	// Tt/Ag
 	
-	param_S[AT][GT] = param_S[TG][TA] = ENTROPY(0.71f, AT_GT);	// Ag/Tt
-	param_S[AT][TG] = param_S[GT][TA] = ENTROPY(0.07f, AT_TG);	// At/Tg
-	param_S[CG][GT] = param_S[TG][GC] = ENTROPY(-0.47f, CG_GT);	// Cg/Gt
-	param_S[CG][TG] = param_S[GT][GC] = ENTROPY(-0.32f, CG_TG);	// Ct/Gg
-	param_S[GC][GT] = param_S[TG][CG] = ENTROPY(0.08f, GC_GT);	// Gg/Ct
-	param_S[GT][GT] = param_S[TG][TG] = ENTROPY(0.74f, GT_GT);	// gg/tt <-- double mismatch!
-	param_S[GC][TG] = param_S[GT][CG] = ENTROPY(-0.59f, GC_TG);	// Gt/Cg
-	param_S[GT][TG] 			    = ENTROPY(1.15f, GT_TG);	// gt/tg <-- double mismatch!
-	param_S[TA][GT] = param_S[TG][AT] = ENTROPY(0.43f, TA_GT);	// Tg/At
-	param_S[TG][GT] 			    = ENTROPY(0.52f, TG_GT);	// tg/gt <-- double mismatch!
-	param_S[TA][TG] = param_S[GT][AT] = ENTROPY(0.34f, TA_TG);	// Tt/Ag
+	param_S[SCORE_INDEX(AT, GT)] = param_S[SCORE_INDEX(TG, TA)] = ENTROPY(0.71f, AT_GT);	// Ag/Tt
+	param_S[SCORE_INDEX(AT, TG)] = param_S[SCORE_INDEX(GT, TA)] = ENTROPY(0.07f, AT_TG);	// At/Tg
+	param_S[SCORE_INDEX(CG, GT)] = param_S[SCORE_INDEX(TG, GC)] = ENTROPY(-0.47f, CG_GT);	// Cg/Gt
+	param_S[SCORE_INDEX(CG, TG)] = param_S[SCORE_INDEX(GT, GC)] = ENTROPY(-0.32f, CG_TG);	// Ct/Gg
+	param_S[SCORE_INDEX(GC, GT)] = param_S[SCORE_INDEX(TG, CG)] = ENTROPY(0.08f, GC_GT);	// Gg/Ct
+	param_S[SCORE_INDEX(GT, GT)] = param_S[SCORE_INDEX(TG, TG)] = ENTROPY(0.74f, GT_GT);	// gg/tt <-- double mismatch!
+	param_S[SCORE_INDEX(GC, TG)] = param_S[SCORE_INDEX(GT, CG)] = ENTROPY(-0.59f, GC_TG);	// Gt/Cg
+	param_S[SCORE_INDEX(GT, TG)] 			    = ENTROPY(1.15f, GT_TG);	// gt/tg <-- double mismatch!
+	param_S[SCORE_INDEX(TA, GT)] = param_S[SCORE_INDEX(TG, AT)] = ENTROPY(0.43f, TA_GT);	// Tg/At
+	param_S[SCORE_INDEX(TG, GT)] 			    = ENTROPY(0.52f, TG_GT);	// tg/gt <-- double mismatch!
+	param_S[SCORE_INDEX(TA, TG)] = param_S[SCORE_INDEX(GT, AT)] = ENTROPY(0.34f, TA_TG);	// Tt/Ag
 	
 	#define	AT_AA	1.2f
 	#define	CG_AA	-0.9f
@@ -323,60 +320,60 @@ void NucCruc::init_param_Santa_Lucia()
 	
 	// Single A-A, C-C, G-G or T-T mismatch
 	// Peyret et. al. Biochemistry 1999, 38, 3468-3477
-	param_H[AT][AA] = param_H[AA][TA] = AT_AA;	// Aa/Ta
-	param_H[CG][AA] = param_H[AA][GC] = CG_AA;	// Ca/Ga
-	param_H[GC][AA] = param_H[AA][CG] = GC_AA;	// Ga/Ca
-	param_H[TA][AA] = param_H[AA][AT] = TA_AA;	// Ta/Aa
+	param_H[SCORE_INDEX(AT, AA)] = param_H[SCORE_INDEX(AA, TA)] = AT_AA;	// Aa/Ta
+	param_H[SCORE_INDEX(CG, AA)] = param_H[SCORE_INDEX(AA, GC)] = CG_AA;	// Ca/Ga
+	param_H[SCORE_INDEX(GC, AA)] = param_H[SCORE_INDEX(AA, CG)] = GC_AA;	// Ga/Ca
+	param_H[SCORE_INDEX(TA, AA)] = param_H[SCORE_INDEX(AA, AT)] = TA_AA;	// Ta/Aa
 	
-	param_S[AT][AA] = param_S[AA][TA] = ENTROPY(0.61f, AT_AA);	// Aa/Ta
-	param_S[CG][AA] = param_S[AA][GC] = ENTROPY(0.43f, CG_AA);	// Ca/Ga
-	param_S[GC][AA] = param_S[AA][CG] = ENTROPY(0.17f, GC_AA);	// Ga/Ca
-	param_S[TA][AA] = param_S[AA][AT] = ENTROPY(0.69f, TA_AA);	// Ta/Aa
+	param_S[SCORE_INDEX(AT, AA)] = param_S[SCORE_INDEX(AA, TA)] = ENTROPY(0.61f, AT_AA);	// Aa/Ta
+	param_S[SCORE_INDEX(CG, AA)] = param_S[SCORE_INDEX(AA, GC)] = ENTROPY(0.43f, CG_AA);	// Ca/Ga
+	param_S[SCORE_INDEX(GC, AA)] = param_S[SCORE_INDEX(AA, CG)] = ENTROPY(0.17f, GC_AA);	// Ga/Ca
+	param_S[SCORE_INDEX(TA, AA)] = param_S[SCORE_INDEX(AA, AT)] = ENTROPY(0.69f, TA_AA);	// Ta/Aa
 	
 	#define	AT_CC	 0.0f
 	#define	CG_CC	 -1.5f
 	#define	GC_CC	 3.6f
 	#define	TA_CC	 6.1f
 	
-	param_H[AT][CC] = param_H[CC][TA] = AT_CC;	// Ac/Tc
-	param_H[CG][CC] = param_H[CC][GC] = CG_CC;	// Cc/Gc
-	param_H[GC][CC] = param_H[CC][CG] = GC_CC;	// Gc/Cc
-	param_H[TA][CC] = param_H[CC][AT] = TA_CC;	// Tc/Ac
+	param_H[SCORE_INDEX(AT, CC)] = param_H[SCORE_INDEX(CC, TA)] = AT_CC;	// Ac/Tc
+	param_H[SCORE_INDEX(CG, CC)] = param_H[SCORE_INDEX(CC, GC)] = CG_CC;	// Cc/Gc
+	param_H[SCORE_INDEX(GC, CC)] = param_H[SCORE_INDEX(CC, CG)] = GC_CC;	// Gc/Cc
+	param_H[SCORE_INDEX(TA, CC)] = param_H[SCORE_INDEX(CC, AT)] = TA_CC;	// Tc/Ac
 	
-	param_S[AT][CC] = param_S[CC][TA] = ENTROPY(1.33f, AT_CC);	// Ac/Tc
-	param_S[CG][CC] = param_S[CC][GC] = ENTROPY(0.70f, CG_CC);	// Cc/Gc
-	param_S[GC][CC] = param_S[CC][CG] = ENTROPY(0.79f, GC_CC);	// Gc/Cc
-	param_S[TA][CC] = param_S[CC][AT] = ENTROPY(1.05f, TA_CC);	// Tc/Ac
+	param_S[SCORE_INDEX(AT, CC)] = param_S[SCORE_INDEX(CC, TA)] = ENTROPY(1.33f, AT_CC);	// Ac/Tc
+	param_S[SCORE_INDEX(CG, CC)] = param_S[SCORE_INDEX(CC, GC)] = ENTROPY(0.70f, CG_CC);	// Cc/Gc
+	param_S[SCORE_INDEX(GC, CC)] = param_S[SCORE_INDEX(CC, CG)] = ENTROPY(0.79f, GC_CC);	// Gc/Cc
+	param_S[SCORE_INDEX(TA, CC)] = param_S[SCORE_INDEX(CC, AT)] = ENTROPY(1.05f, TA_CC);	// Tc/Ac
 	
 	#define	AT_GG	 -3.1f
 	#define	CG_GG	 -4.9f
 	#define	GC_GG	 -6.0f
 	#define	TA_GG	 1.6f
 	
-	param_H[AT][GG] = param_H[GG][TA] = AT_GG;	// Ag/Tg
-	param_H[CG][GG] = param_H[GG][GC] = CG_GG;	// Cg/Gg
-	param_H[GC][GG] = param_H[GG][CG] = GC_GG;	// Gg/Cg
-	param_H[TA][GG] = param_H[GG][AT] = TA_GG;	// Tg/Ag
+	param_H[SCORE_INDEX(AT, GG)] = param_H[SCORE_INDEX(GG, TA)] = AT_GG;	// Ag/Tg
+	param_H[SCORE_INDEX(CG, GG)] = param_H[SCORE_INDEX(GG, GC)] = CG_GG;	// Cg/Gg
+	param_H[SCORE_INDEX(GC, GG)] = param_H[SCORE_INDEX(GG, CG)] = GC_GG;	// Gg/Cg
+	param_H[SCORE_INDEX(TA, GG)] = param_H[SCORE_INDEX(GG, AT)] = TA_GG;	// Tg/Ag
 	
-	param_S[AT][GG] = param_S[GG][TA] = ENTROPY(-0.13f, AT_GG);	// Ag/Tg
-	param_S[CG][GG] = param_S[GG][GC] = ENTROPY(-0.11f, CG_GG);	// Cg/Gg
-	param_S[GC][GG] = param_S[GG][CG] = ENTROPY(-1.11f, GC_GG);	// Gg/Cg
-	param_S[TA][GG] = param_S[GG][AT] = ENTROPY(0.44f, TA_GG);	// Tg/Ag
+	param_S[SCORE_INDEX(AT, GG)] = param_S[SCORE_INDEX(GG, TA)] = ENTROPY(-0.13f, AT_GG);	// Ag/Tg
+	param_S[SCORE_INDEX(CG, GG)] = param_S[SCORE_INDEX(GG, GC)] = ENTROPY(-0.11f, CG_GG);	// Cg/Gg
+	param_S[SCORE_INDEX(GC, GG)] = param_S[SCORE_INDEX(GG, CG)] = ENTROPY(-1.11f, GC_GG);	// Gg/Cg
+	param_S[SCORE_INDEX(TA, GG)] = param_S[SCORE_INDEX(GG, AT)] = ENTROPY(0.44f, TA_GG);	// Tg/Ag
 	
 	#define	AT_TT	 -2.7f
 	#define	CG_TT	 -5.0f
 	#define	GC_TT	 -2.2f
 	#define	TA_TT	 0.2f
 	
-	param_H[AT][TT] = param_H[TT][TA] = AT_TT;	// At/Tt
-	param_H[CG][TT] = param_H[TT][GC] = CG_TT;	// Ct/Gt
-	param_H[GC][TT] = param_H[TT][CG] = GC_TT;	// Gt/Ct
-	param_H[TA][TT] = param_H[TT][AT] = TA_TT;	// Tt/At
+	param_H[SCORE_INDEX(AT, TT)] = param_H[SCORE_INDEX(TT, TA)] = AT_TT;	// At/Tt
+	param_H[SCORE_INDEX(CG, TT)] = param_H[SCORE_INDEX(TT, GC)] = CG_TT;	// Ct/Gt
+	param_H[SCORE_INDEX(GC, TT)] = param_H[SCORE_INDEX(TT, CG)] = GC_TT;	// Gt/Ct
+	param_H[SCORE_INDEX(TA, TT)] = param_H[SCORE_INDEX(TT, AT)] = TA_TT;	// Tt/At
 		
-	param_S[AT][TT] = param_S[TT][TA] = ENTROPY(0.69f, AT_TT);	// At/Tt
-	param_S[CG][TT] = param_S[TT][GC] = ENTROPY(-0.12f, CG_TT);	// Ct/Gt
-	param_S[GC][TT] = param_S[TT][CG] = ENTROPY(0.45f, GC_TT);	// Gt/Ct
-	param_S[TA][TT] = param_S[TT][AT] = ENTROPY(0.68f, TA_TT);	// Tt/At
+	param_S[SCORE_INDEX(AT, TT)] = param_S[SCORE_INDEX(TT, TA)] = ENTROPY(0.69f, AT_TT);	// At/Tt
+	param_S[SCORE_INDEX(CG, TT)] = param_S[SCORE_INDEX(TT, GC)] = ENTROPY(-0.12f, CG_TT);	// Ct/Gt
+	param_S[SCORE_INDEX(GC, TT)] = param_S[SCORE_INDEX(TT, CG)] = ENTROPY(0.45f, GC_TT);	// Gt/Ct
+	param_S[SCORE_INDEX(TA, TT)] = param_S[SCORE_INDEX(TT, AT)] = ENTROPY(0.68f, TA_TT);	// Tt/At
 	
 	// Inosine base-pairs from
 	// "Nearest-neighbor thermodynamics of deoxyinosine pairs in DNA duplexes"
@@ -393,23 +390,23 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	CG_CI	 -8.3f
 	#define	GC_CI	 -5.0f
 	
-	param_H[AT][IC] = param_H[CI][TA] = AT_IC;	// AI/TC
-	param_H[TA][IC] = param_H[CI][AT] = TA_IC;	// TI/AC
-	param_H[AT][CI] = param_H[IC][TA] = AT_CI;	// AC/TI
-	param_H[TA][CI] = param_H[IC][AT] = TA_CI;	// TC/AI
-	param_H[CG][IC] = param_H[CI][GC] = CG_IC; 	// CI/GC
-	param_H[GC][IC] = param_H[CI][CG] = GC_IC;	// GI/CC
-	param_H[CG][CI] = param_H[IC][GC] = CG_CI;	// CC/GI
-	param_H[GC][CI] = param_H[IC][CG] = GC_CI;	// GC/CI
+	param_H[SCORE_INDEX(AT, IC)] = param_H[SCORE_INDEX(CI, TA)] = AT_IC;	// AI/TC
+	param_H[SCORE_INDEX(TA, IC)] = param_H[SCORE_INDEX(CI, AT)] = TA_IC;	// TI/AC
+	param_H[SCORE_INDEX(AT, CI)] = param_H[SCORE_INDEX(IC, TA)] = AT_CI;	// AC/TI
+	param_H[SCORE_INDEX(TA, CI)] = param_H[SCORE_INDEX(IC, AT)] = TA_CI;	// TC/AI
+	param_H[SCORE_INDEX(CG, IC)] = param_H[SCORE_INDEX(CI, GC)] = CG_IC; 	// CI/GC
+	param_H[SCORE_INDEX(GC, IC)] = param_H[SCORE_INDEX(CI, CG)] = GC_IC;	// GI/CC
+	param_H[SCORE_INDEX(CG, CI)] = param_H[SCORE_INDEX(IC, GC)] = CG_CI;	// CC/GI
+	param_H[SCORE_INDEX(GC, CI)] = param_H[SCORE_INDEX(IC, CG)] = GC_CI;	// GC/CI
 	
-	param_S[AT][IC] = param_S[CI][TA] = ENTROPY(-0.96f, AT_IC);	// AI/TC
-	param_S[TA][IC] = param_S[CI][AT] = ENTROPY(-0.46f, TA_IC);	// AI/TC
-	param_S[AT][CI] = param_S[IC][TA] = ENTROPY(-0.89f, AT_CI);	// AC/TI
-	param_S[TA][CI] = param_S[IC][AT] = ENTROPY(-0.59f, TA_CI); // TC/AI
-	param_S[CG][IC] = param_S[CI][GC] = ENTROPY(-1.14f, CG_IC);	// CI/GC
-	param_S[GC][IC] = param_S[CI][CG] = ENTROPY(-0.86f, GC_IC);	// GI/CC
-	param_S[CG][CI] = param_S[IC][GC] = ENTROPY(-0.88f, CG_CI);	// CC/GI
-	param_S[GC][CI] = param_S[IC][CG] = ENTROPY(-1.07f, GC_CI);	// GC/CI
+	param_S[SCORE_INDEX(AT, IC)] = param_S[SCORE_INDEX(CI, TA)] = ENTROPY(-0.96f, AT_IC);	// AI/TC
+	param_S[SCORE_INDEX(TA, IC)] = param_S[SCORE_INDEX(CI, AT)] = ENTROPY(-0.46f, TA_IC);	// AI/TC
+	param_S[SCORE_INDEX(AT, CI)] = param_S[SCORE_INDEX(IC, TA)] = ENTROPY(-0.89f, AT_CI);	// AC/TI
+	param_S[SCORE_INDEX(TA, CI)] = param_S[SCORE_INDEX(IC, AT)] = ENTROPY(-0.59f, TA_CI); // TC/AI
+	param_S[SCORE_INDEX(CG, IC)] = param_S[SCORE_INDEX(CI, GC)] = ENTROPY(-1.14f, CG_IC);	// CI/GC
+	param_S[SCORE_INDEX(GC, IC)] = param_S[SCORE_INDEX(CI, CG)] = ENTROPY(-0.86f, GC_IC);	// GI/CC
+	param_S[SCORE_INDEX(CG, CI)] = param_S[SCORE_INDEX(IC, GC)] = ENTROPY(-0.88f, CG_CI);	// CC/GI
+	param_S[SCORE_INDEX(GC, CI)] = param_S[SCORE_INDEX(IC, CG)] = ENTROPY(-1.07f, GC_CI);	// GC/CI
 	
 	// Inosine IA pairs: Delta H
 	#define	AT_IA	 -8.3f
@@ -421,23 +418,23 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	CG_AI	 -7.0f
 	#define	GC_AI	 -7.6f
 	
-	param_H[AT][IA] = param_H[AI][TA] = AT_IA;	// AI/TA
-	param_H[TA][IA] = param_H[AI][AT] = TA_IA;	// TI/AA
-	param_H[AT][AI] = param_H[IA][TA] = AT_AI;	// AA/TI
-	param_H[TA][AI] = param_H[IA][AT] = TA_AI;	// TA/AI
-	param_H[CG][IA] = param_H[AI][GC] = CG_IA;	// CI/GA
-	param_H[GC][IA] = param_H[AI][CG] = GC_IA;	// GI/CA
-	param_H[CG][AI] = param_H[IA][GC] = CG_AI;   // CA/GI
-	param_H[GC][AI] = param_H[IA][CG] = GC_AI;	// GA/CI
+	param_H[SCORE_INDEX(AT, IA)] = param_H[SCORE_INDEX(AI, TA)] = AT_IA;	// AI/TA
+	param_H[SCORE_INDEX(TA, IA)] = param_H[SCORE_INDEX(AI, AT)] = TA_IA;	// TI/AA
+	param_H[SCORE_INDEX(AT, AI)] = param_H[SCORE_INDEX(IA, TA)] = AT_AI;	// AA/TI
+	param_H[SCORE_INDEX(TA, AI)] = param_H[SCORE_INDEX(IA, AT)] = TA_AI;	// TA/AI
+	param_H[SCORE_INDEX(CG, IA)] = param_H[SCORE_INDEX(AI, GC)] = CG_IA;	// CI/GA
+	param_H[SCORE_INDEX(GC, IA)] = param_H[SCORE_INDEX(AI, CG)] = GC_IA;	// GI/CA
+	param_H[SCORE_INDEX(CG, AI)] = param_H[SCORE_INDEX(IA, GC)] = CG_AI;   // CA/GI
+	param_H[SCORE_INDEX(GC, AI)] = param_H[SCORE_INDEX(IA, CG)] = GC_AI;	// GA/CI
 	
-	param_S[AT][IA] = param_S[AI][TA] = ENTROPY(-0.51f, AT_IA);	// AI/TA
-	param_S[TA][IA] = param_S[AI][AT] = ENTROPY(0.09f, TA_IA);	// TI/AA
-	param_S[AT][AI] = param_S[IA][TA] = ENTROPY(0.12f, AT_AI);	// AA/TI
-	param_S[TA][AI] = param_S[IA][AT] = ENTROPY(0.12f, TA_AI);	// TA/AI
-	param_S[CG][IA] = param_S[AI][GC] = ENTROPY(-0.18f, CG_IA);	// CI/GA
-	param_S[GC][IA] = param_S[AI][CG] = ENTROPY(-1.24f, GC_IA);	// GI/CA
-	param_S[CG][AI] = param_S[IA][GC] = ENTROPY(-0.77f, CG_AI);	// CA/GI
-	param_S[GC][AI] = param_S[IA][CG] = ENTROPY(-1.33f, GC_AI);	// GA/CI
+	param_S[SCORE_INDEX(AT, IA)] = param_S[SCORE_INDEX(AI, TA)] = ENTROPY(-0.51f, AT_IA);	// AI/TA
+	param_S[SCORE_INDEX(TA, IA)] = param_S[SCORE_INDEX(AI, AT)] = ENTROPY(0.09f, TA_IA);	// TI/AA
+	param_S[SCORE_INDEX(AT, AI)] = param_S[SCORE_INDEX(IA, TA)] = ENTROPY(0.12f, AT_AI);	// AA/TI
+	param_S[SCORE_INDEX(TA, AI)] = param_S[SCORE_INDEX(IA, AT)] = ENTROPY(0.12f, TA_AI);	// TA/AI
+	param_S[SCORE_INDEX(CG, IA)] = param_S[SCORE_INDEX(AI, GC)] = ENTROPY(-0.18f, CG_IA);	// CI/GA
+	param_S[SCORE_INDEX(GC, IA)] = param_S[SCORE_INDEX(AI, CG)] = ENTROPY(-1.24f, GC_IA);	// GI/CA
+	param_S[SCORE_INDEX(CG, AI)] = param_S[SCORE_INDEX(IA, GC)] = ENTROPY(-0.77f, CG_AI);	// CA/GI
+	param_S[SCORE_INDEX(GC, AI)] = param_S[SCORE_INDEX(IA, CG)] = ENTROPY(-1.33f, GC_AI);	// GA/CI
 	
 	// Inosine IT pairs: Delta H
 	#define	AT_IT	  0.49f
@@ -449,23 +446,23 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	CG_TI	  0.1f
 	#define	GC_TI	 -4.3f
 	
-	param_H[AT][IT] = param_H[TI][TA] = AT_IT;	// AI/TT
-	param_H[TA][IT] = param_H[TI][AT] = TA_IT;	// TI/AT
-	param_H[AT][TI] = param_H[IT][TA] = AT_TI;	// AT/TI
-	param_H[TA][TI] = param_H[IT][AT] = TA_TI;	// TT/AI
-	param_H[CG][IT] = param_H[TI][GC] = CG_IT;	// CI/GT
-	param_H[GC][IT] = param_H[TI][CG] = GC_IT;	// GI/CT
-	param_H[CG][TI] = param_H[IT][GC] = CG_TI;	// CT/GI
-	param_H[GC][TI] = param_H[IT][CG] = GC_TI;	// GT/CI
+	param_H[SCORE_INDEX(AT, IT)] = param_H[SCORE_INDEX(TI, TA)] = AT_IT;	// AI/TT
+	param_H[SCORE_INDEX(TA, IT)] = param_H[SCORE_INDEX(TI, AT)] = TA_IT;	// TI/AT
+	param_H[SCORE_INDEX(AT, TI)] = param_H[SCORE_INDEX(IT, TA)] = AT_TI;	// AT/TI
+	param_H[SCORE_INDEX(TA, TI)] = param_H[SCORE_INDEX(IT, AT)] = TA_TI;	// TT/AI
+	param_H[SCORE_INDEX(CG, IT)] = param_H[SCORE_INDEX(TI, GC)] = CG_IT;	// CI/GT
+	param_H[SCORE_INDEX(GC, IT)] = param_H[SCORE_INDEX(TI, CG)] = GC_IT;	// GI/CT
+	param_H[SCORE_INDEX(CG, TI)] = param_H[SCORE_INDEX(IT, GC)] = CG_TI;	// CT/GI
+	param_H[SCORE_INDEX(GC, TI)] = param_H[SCORE_INDEX(IT, CG)] = GC_TI;	// GT/CI
 	
-	param_S[AT][IT] = param_S[TI][TA] = ENTROPY(0.71f, AT_IT);	// AI/TT
-	param_S[TA][IT] = param_S[TI][AT] = ENTROPY(0.36f, TA_IT);	// TI/AT
-	param_S[AT][TI] = param_S[IT][TA] = ENTROPY(0.22f, AT_TI);	// AT/TI
-	param_S[TA][TI] = param_S[IT][AT] = ENTROPY(0.54f, TA_TI);	// TT/AI
-	param_S[CG][IT] = param_S[TI][GC] = ENTROPY(-0.26f, CG_IT);	// CI/GT
-	param_S[GC][IT] = param_S[TI][CG] = ENTROPY(-0.19f, GC_IT);	// GI/CT
-	param_S[CG][TI] = param_S[IT][GC] = ENTROPY(0.41f, CG_TI);	// CT/GI
-	param_S[GC][TI] = param_S[IT][CG] = ENTROPY(-0.54f, GC_TI);	// GT/CI
+	param_S[SCORE_INDEX(AT, IT)] = param_S[SCORE_INDEX(TI, TA)] = ENTROPY(0.71f, AT_IT);	// AI/TT
+	param_S[SCORE_INDEX(TA, IT)] = param_S[SCORE_INDEX(TI, AT)] = ENTROPY(0.36f, TA_IT);	// TI/AT
+	param_S[SCORE_INDEX(AT, TI)] = param_S[SCORE_INDEX(IT, TA)] = ENTROPY(0.22f, AT_TI);	// AT/TI
+	param_S[SCORE_INDEX(TA, TI)] = param_S[SCORE_INDEX(IT, AT)] = ENTROPY(0.54f, TA_TI);	// TT/AI
+	param_S[SCORE_INDEX(CG, IT)] = param_S[SCORE_INDEX(TI, GC)] = ENTROPY(-0.26f, CG_IT);	// CI/GT
+	param_S[SCORE_INDEX(GC, IT)] = param_S[SCORE_INDEX(TI, CG)] = ENTROPY(-0.19f, GC_IT);	// GI/CT
+	param_S[SCORE_INDEX(CG, TI)] = param_S[SCORE_INDEX(IT, GC)] = ENTROPY(0.41f, CG_TI);	// CT/GI
+	param_S[SCORE_INDEX(GC, TI)] = param_S[SCORE_INDEX(IT, CG)] = ENTROPY(-0.54f, GC_TI);	// GT/CI
 
 	// Inosine IG pairs: Delta H
 	#define	AT_IG	  -4.9f
@@ -477,23 +474,23 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	CG_GI	   5.8f
 	#define	GC_GI	  -7.6f
 	
-	param_H[AT][IG] = param_H[GI][TA] = AT_IG;	// AI/TG
-	param_H[TA][IG] = param_H[GI][AT] = TA_IG;	// TI/AG
-	param_H[AT][GI] = param_H[IG][TA] = AT_GI;	// AG/TI
-	param_H[TA][GI] = param_H[IG][AT] = TA_GI;	// TG/AI
-	param_H[CG][IG] = param_H[GI][GC] = CG_IG;	// CI/GG
-	param_H[GC][IG] = param_H[GI][CG] = GC_IG;	// GI/CG
-	param_H[CG][GI] = param_H[IG][GC] = CG_GI;	// CG/GI
-	param_H[GC][GI] = param_H[IG][CG] = GC_GI;	// GG/CI
+	param_H[SCORE_INDEX(AT, IG)] = param_H[SCORE_INDEX(GI, TA)] = AT_IG;	// AI/TG
+	param_H[SCORE_INDEX(TA, IG)] = param_H[SCORE_INDEX(GI, AT)] = TA_IG;	// TI/AG
+	param_H[SCORE_INDEX(AT, GI)] = param_H[SCORE_INDEX(IG, TA)] = AT_GI;	// AG/TI
+	param_H[SCORE_INDEX(TA, GI)] = param_H[SCORE_INDEX(IG, AT)] = TA_GI;	// TG/AI
+	param_H[SCORE_INDEX(CG, IG)] = param_H[SCORE_INDEX(GI, GC)] = CG_IG;	// CI/GG
+	param_H[SCORE_INDEX(GC, IG)] = param_H[SCORE_INDEX(GI, CG)] = GC_IG;	// GI/CG
+	param_H[SCORE_INDEX(CG, GI)] = param_H[SCORE_INDEX(IG, GC)] = CG_GI;	// CG/GI
+	param_H[SCORE_INDEX(GC, GI)] = param_H[SCORE_INDEX(IG, CG)] = GC_GI;	// GG/CI
 	
-	param_S[AT][IG] = param_S[GI][TA] = ENTROPY(0.02f, AT_IG);	// AI/TG
-	param_S[TA][IG] = param_S[GI][AT] = ENTROPY(0.76f, TA_IG);	// TI/AG
-	param_S[AT][GI] = param_S[IG][TA] = ENTROPY(0.65f, AT_GI);	// AG/TI
-	param_S[TA][GI] = param_S[IG][AT] = ENTROPY(0.70f, TA_GI);	// TG/AI
-	param_S[CG][IG] = param_S[GI][GC] = ENTROPY(0.47f, CG_IG);	// CI/GG
-	param_S[GC][IG] = param_S[GI][CG] = ENTROPY(-0.10f, GC_IG);	// GI/CG
-	param_S[CG][GI] = param_S[IG][GC] = ENTROPY(0.54f, CG_GI);	// CG/GI
-	param_S[GC][GI] = param_S[IG][CG] = ENTROPY(-0.74f, GC_GI);	// GG/CI
+	param_S[SCORE_INDEX(AT, IG)] = param_S[SCORE_INDEX(GI, TA)] = ENTROPY(0.02f, AT_IG);	// AI/TG
+	param_S[SCORE_INDEX(TA, IG)] = param_S[SCORE_INDEX(GI, AT)] = ENTROPY(0.76f, TA_IG);	// TI/AG
+	param_S[SCORE_INDEX(AT, GI)] = param_S[SCORE_INDEX(IG, TA)] = ENTROPY(0.65f, AT_GI);	// AG/TI
+	param_S[SCORE_INDEX(TA, GI)] = param_S[SCORE_INDEX(IG, AT)] = ENTROPY(0.70f, TA_GI);	// TG/AI
+	param_S[SCORE_INDEX(CG, IG)] = param_S[SCORE_INDEX(GI, GC)] = ENTROPY(0.47f, CG_IG);	// CI/GG
+	param_S[SCORE_INDEX(GC, IG)] = param_S[SCORE_INDEX(GI, CG)] = ENTROPY(-0.10f, GC_IG);	// GI/CG
+	param_S[SCORE_INDEX(CG, GI)] = param_S[SCORE_INDEX(IG, GC)] = ENTROPY(0.54f, CG_GI);	// CG/GI
+	param_S[SCORE_INDEX(GC, GI)] = param_S[SCORE_INDEX(IG, CG)] = ENTROPY(-0.74f, GC_GI);	// GG/CI
 	
 	// Inosine II pairs: Delta H
 	#define	AT_II	  -3.3f
@@ -501,15 +498,15 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	CG_II	   1.3f
 	#define	GC_II	  -0.5f
 	
-	param_H[AT][II] = param_H[II][TA] = AT_II;	// AI/TI
-	param_H[TA][II] = param_H[II][AT] = TA_II;	// TI/AI
-	param_H[CG][II] = param_H[II][GC] = CG_II;	// CI/GI
-	param_H[GC][II] = param_H[II][CG] = GC_II;	// GI/CI
+	param_H[SCORE_INDEX(AT, II)] = param_H[SCORE_INDEX(II, TA)] = AT_II;	// AI/TI
+	param_H[SCORE_INDEX(TA, II)] = param_H[SCORE_INDEX(II, AT)] = TA_II;	// TI/AI
+	param_H[SCORE_INDEX(CG, II)] = param_H[SCORE_INDEX(II, GC)] = CG_II;	// CI/GI
+	param_H[SCORE_INDEX(GC, II)] = param_H[SCORE_INDEX(II, CG)] = GC_II;	// GI/CI
 	
-	param_S[AT][II] = param_S[II][TA] = ENTROPY(0.40f, AT_II);	// AI/TI
-	param_S[TA][II] = param_S[II][AT] = ENTROPY(0.81f, TA_II);	// TI/AI
-	param_S[CG][II] = param_S[II][GC] = ENTROPY(0.36f, CG_II);	// CI/GI
-	param_S[GC][II] = param_S[II][CG] = ENTROPY(-0.09f, GC_II);	// GI/CI
+	param_S[SCORE_INDEX(AT, II)] = param_S[SCORE_INDEX(II, TA)] = ENTROPY(0.40f, AT_II);	// AI/TI
+	param_S[SCORE_INDEX(TA, II)] = param_S[SCORE_INDEX(II, AT)] = ENTROPY(0.81f, TA_II);	// TI/AI
+	param_S[SCORE_INDEX(CG, II)] = param_S[SCORE_INDEX(II, GC)] = ENTROPY(0.36f, CG_II);	// CI/GI
+	param_S[SCORE_INDEX(GC, II)] = param_S[SCORE_INDEX(II, CG)] = ENTROPY(-0.09f, GC_II);	// GI/CI
 	
 	// Inosine tandem internal pairs: Delta H
 	#define	IC_IC	-9.3f
@@ -528,33 +525,33 @@ void NucCruc::init_param_Santa_Lucia()
 							// Two values are published for II/II; -13.8 and -7.5. For
 							// now, use the average -> -10.65
 	
-	param_H[IC][IC] = param_H[CI][CI] = IC_IC;	// II/CC
-	param_H[IA][IC] = param_H[CI][AI] = IA_IC;	// II/AC
-	param_H[IC][IA] = param_H[AI][CI] = IC_IA;	// II/CA
-	param_H[IA][IA] = param_H[AI][AI] = IA_IA;	// II/AA
-	param_H[IT][IA] = param_H[AI][TI] = IT_IA;	// II/TA
-	param_H[IG][IA] = param_H[AI][GI] = IG_IA;	// II/GA
-	param_H[IC][IT] = param_H[TI][CI] = IC_IT;	// II/CT
-	param_H[IA][IT] = param_H[TI][AI] = IA_IT;	// II/AT
-	param_H[IT][IT] = param_H[TI][TI] = IT_IT;	// II/TT
-	param_H[IG][IT] = param_H[TI][GI] = IG_IT;	// II/GT
-	param_H[IT][IG] = param_H[GI][TI] = IT_IG;	// II/TG
-	param_H[IG][IG] = param_H[GI][GI] = IG_IG;	// II/GG
-	param_H[II][II]                   = II_II;	// II/II
+	param_H[SCORE_INDEX(IC, IC)] = param_H[SCORE_INDEX(CI, CI)] = IC_IC;	// II/CC
+	param_H[SCORE_INDEX(IA, IC)] = param_H[SCORE_INDEX(CI, AI)] = IA_IC;	// II/AC
+	param_H[SCORE_INDEX(IC, IA)] = param_H[SCORE_INDEX(AI, CI)] = IC_IA;	// II/CA
+	param_H[SCORE_INDEX(IA, IA)] = param_H[SCORE_INDEX(AI, AI)] = IA_IA;	// II/AA
+	param_H[SCORE_INDEX(IT, IA)] = param_H[SCORE_INDEX(AI, TI)] = IT_IA;	// II/TA
+	param_H[SCORE_INDEX(IG, IA)] = param_H[SCORE_INDEX(AI, GI)] = IG_IA;	// II/GA
+	param_H[SCORE_INDEX(IC, IT)] = param_H[SCORE_INDEX(TI, CI)] = IC_IT;	// II/CT
+	param_H[SCORE_INDEX(IA, IT)] = param_H[SCORE_INDEX(TI, AI)] = IA_IT;	// II/AT
+	param_H[SCORE_INDEX(IT, IT)] = param_H[SCORE_INDEX(TI, TI)] = IT_IT;	// II/TT
+	param_H[SCORE_INDEX(IG, IT)] = param_H[SCORE_INDEX(TI, GI)] = IG_IT;	// II/GT
+	param_H[SCORE_INDEX(IT, IG)] = param_H[SCORE_INDEX(GI, TI)] = IT_IG;	// II/TG
+	param_H[SCORE_INDEX(IG, IG)] = param_H[SCORE_INDEX(GI, GI)] = IG_IG;	// II/GG
+	param_H[SCORE_INDEX(II, II)]                   = II_II;	// II/II
 	
-	param_S[IC][IC] = param_S[CI][CI] = ENTROPY(-0.64f, IC_IC);	// II/CC
-	param_S[IA][IC] = param_S[CI][AI] = ENTROPY(0.27f, IA_IC);	// II/AC
-	param_S[IC][IA] = param_S[AI][CI] = ENTROPY(0.44f, IC_IA);	// II/CA
-	param_S[IA][IA] = param_S[AI][AI] = ENTROPY(-0.27f, IA_IA);	// II/AA
-	param_S[IT][IA] = param_S[AI][TI] = ENTROPY(0.83f, IT_IA);	// II/TA
-	param_S[IG][IA] = param_S[AI][GI] = ENTROPY(0.30f, IG_IA);	// II/GA
-	param_S[IC][IT] = param_S[TI][CI] = ENTROPY(0.33f, IC_IT);	// II/CT
-	param_S[IA][IT] = param_S[TI][AI] = ENTROPY(0.19f, IA_IT);	// II/AT
-	param_S[IT][IT] = param_S[TI][TI] = ENTROPY(1.69f, IT_IT);	// II/TT
-	param_S[IG][IT] = param_S[TI][GI] = ENTROPY(0.13f, IG_IT);	// II/GT
-	param_S[IT][IG] = param_S[GI][TI] = ENTROPY(0.03f, IT_IG);	// II/TG
-	param_S[IG][IG] = param_S[GI][GI] = ENTROPY(-1.30f, IG_IG);	// II/GG
-	param_S[II][II]                   = ENTROPY(0.52f, II_II);	// II/II; Not two state!
+	param_S[SCORE_INDEX(IC, IC)] = param_S[SCORE_INDEX(CI, CI)] = ENTROPY(-0.64f, IC_IC);	// II/CC
+	param_S[SCORE_INDEX(IA, IC)] = param_S[SCORE_INDEX(CI, AI)] = ENTROPY(0.27f, IA_IC);	// II/AC
+	param_S[SCORE_INDEX(IC, IA)] = param_S[SCORE_INDEX(AI, CI)] = ENTROPY(0.44f, IC_IA);	// II/CA
+	param_S[SCORE_INDEX(IA, IA)] = param_S[SCORE_INDEX(AI, AI)] = ENTROPY(-0.27f, IA_IA);	// II/AA
+	param_S[SCORE_INDEX(IT, IA)] = param_S[SCORE_INDEX(AI, TI)] = ENTROPY(0.83f, IT_IA);	// II/TA
+	param_S[SCORE_INDEX(IG, IA)] = param_S[SCORE_INDEX(AI, GI)] = ENTROPY(0.30f, IG_IA);	// II/GA
+	param_S[SCORE_INDEX(IC, IT)] = param_S[SCORE_INDEX(TI, CI)] = ENTROPY(0.33f, IC_IT);	// II/CT
+	param_S[SCORE_INDEX(IA, IT)] = param_S[SCORE_INDEX(TI, AI)] = ENTROPY(0.19f, IA_IT);	// II/AT
+	param_S[SCORE_INDEX(IT, IT)] = param_S[SCORE_INDEX(TI, TI)] = ENTROPY(1.69f, IT_IT);	// II/TT
+	param_S[SCORE_INDEX(IG, IT)] = param_S[SCORE_INDEX(TI, GI)] = ENTROPY(0.13f, IG_IT);	// II/GT
+	param_S[SCORE_INDEX(IT, IG)] = param_S[SCORE_INDEX(GI, TI)] = ENTROPY(0.03f, IT_IG);	// II/TG
+	param_S[SCORE_INDEX(IG, IG)] = param_S[SCORE_INDEX(GI, GI)] = ENTROPY(-1.30f, IG_IG);	// II/GG
+	param_S[SCORE_INDEX(II, II)]                   = ENTROPY(0.52f, II_II);	// II/II; Not two state!
 									// Use the average DG:
 									// (-0.7 and 1.74)
 	
@@ -568,37 +565,34 @@ void NucCruc::init_param_Santa_Lucia()
 	#define	IG_GI	 3.2f
 	#define	GI_IG	-4.2f
 	
-	param_H[IC][CI] = IC_CI;	// IC/CI
-	param_H[CI][IC] = CI_IC;	// CI/IC
-	param_H[IA][AI] = IA_AI;	// IA/AI
-	param_H[AI][IA] = AI_IA;	// AI/IA
-	param_H[IT][TI] = IT_TI;	// IT/TI
-	param_H[TI][IT] = TI_IT;	// TI/IT
-	param_H[IG][GI] = IG_GI;	// IG/GI
-	param_H[GI][IG] = GI_IG;	// GI/IG
+	param_H[SCORE_INDEX(IC, CI)] = IC_CI;	// IC/CI
+	param_H[SCORE_INDEX(CI, IC)] = CI_IC;	// CI/IC
+	param_H[SCORE_INDEX(IA, AI)] = IA_AI;	// IA/AI
+	param_H[SCORE_INDEX(AI, IA)] = AI_IA;	// AI/IA
+	param_H[SCORE_INDEX(IT, TI)] = IT_TI;	// IT/TI
+	param_H[SCORE_INDEX(TI, IT)] = TI_IT;	// TI/IT
+	param_H[SCORE_INDEX(IG, GI)] = IG_GI;	// IG/GI
+	param_H[SCORE_INDEX(GI, IG)] = GI_IG;	// GI/IG
 	
-	param_S[IC][CI] =  ENTROPY(-0.85f, IC_CI);	// IC/CI
-	param_S[CI][IC] =  ENTROPY(0.06f, CI_IC);	// CI/IC
-	param_S[IA][AI] =  ENTROPY(-1.43f, IA_AI);	// IA/AI
-	param_S[AI][IA] =  ENTROPY(-0.56f, AI_IA);	// AI/IA
-	param_S[IT][TI] =  ENTROPY(2.03f, IT_TI);	// IT/TI
-	param_S[TI][IT] =  ENTROPY(0.61f, TI_IT);	// TI/IT
-	param_S[IG][GI] =  ENTROPY(1.18f, IG_GI);	// IG/GI
-	param_S[GI][IG] =  ENTROPY(1.12f, GI_IG);	// GI/IG
+	param_S[SCORE_INDEX(IC, CI)] =  ENTROPY(-0.85f, IC_CI);	// IC/CI
+	param_S[SCORE_INDEX(CI, IC)] =  ENTROPY(0.06f, CI_IC);	// CI/IC
+	param_S[SCORE_INDEX(IA, AI)] =  ENTROPY(-1.43f, IA_AI);	// IA/AI
+	param_S[SCORE_INDEX(AI, IA)] =  ENTROPY(-0.56f, AI_IA);	// AI/IA
+	param_S[SCORE_INDEX(IT, TI)] =  ENTROPY(2.03f, IT_TI);	// IT/TI
+	param_S[SCORE_INDEX(TI, IT)] =  ENTROPY(0.61f, TI_IT);	// TI/IT
+	param_S[SCORE_INDEX(IG, GI)] =  ENTROPY(1.18f, IG_GI);	// IG/GI
+	param_S[SCORE_INDEX(GI, IG)] =  ENTROPY(1.12f, GI_IG);	// GI/IG
 	
 	///////////////////////////////////////////////////////////////////////
 	// Internal loop and hairpin terminal mismatch parameters
 	// These parameters have not been officially published. However, the parameters
 	// are available from the unafold software package 
 	// (http://frontend.bioinfo.rpi.edu/applications/hybrid/download.php).
-	for(unsigned int i = 0;i < NUM_BASE_PAIR;i++){
+	memcpy( param_loop_terminal_H, param_H, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
+	memcpy( param_loop_terminal_S, param_S, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
 	
-		memcpy( param_loop_terminal_H[i], param_H[i], NUM_BASE_PAIR*sizeof(float) );
-		memcpy( param_loop_terminal_S[i], param_S[i], NUM_BASE_PAIR*sizeof(float) );
-		
-		memcpy( param_hairpin_terminal_H[i], param_H[i], NUM_BASE_PAIR*sizeof(float) );
-		memcpy( param_hairpin_terminal_S[i], param_S[i], NUM_BASE_PAIR*sizeof(float) );
-	}
+	memcpy( param_hairpin_terminal_H, param_H, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
+	memcpy( param_hairpin_terminal_S, param_S, NUM_BASE_PAIR*NUM_BASE_PAIR*sizeof(float) );
 	
 	// ******************************************************************************
 	// Include a subset of unpublished parameters from the unafold program.

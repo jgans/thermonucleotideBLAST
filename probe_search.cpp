@@ -7,7 +7,9 @@ bool hybrid(
 	const list<oligo_info> &m_bind_plus,
 	hybrid_sig &m_ret, 
 	const hybrid_sig &m_sig, 
-	const int &m_amp_start, const int &m_amp_stop)
+	const int &m_amp_start, const int &m_amp_stop,
+	const vector<string> &m_oligo_table,
+	unordered_map<string, size_t> &m_str_table)
 {
 	list<oligo_info>::const_iterator iter;
 	
@@ -35,7 +37,7 @@ bool hybrid(
 			m_ret.probe_mm = iter->num_mm;
 			m_ret.probe_gap = iter->num_gap;
 			m_ret.probe_strand = hybrid_sig::MINUS;
-			m_ret.probe_align = iter->alignment;
+			m_ret.probe_align_str_index = str_to_index(deflate_dna_seq(iter->alignment), m_str_table);
 		}
 	}
 	
@@ -53,7 +55,7 @@ bool hybrid(
 			m_ret.probe_mm = iter->num_mm;
 			m_ret.probe_gap = iter->num_gap;
 			m_ret.probe_strand = hybrid_sig::PLUS;
-			m_ret.probe_align = iter->alignment;
+			m_ret.probe_align_str_index = str_to_index(deflate_dna_seq(iter->alignment), m_str_table);
 		}
 	}
 	
@@ -70,7 +72,9 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
-	const int &m_target_strand)
+	const int &m_target_strand,
+	const vector<string> &m_oligo_table,
+	unordered_map<string, size_t> &m_str_table)
 {
 	const float probe_strand = m_probe_strand/m_sig.probe_degen;
 
@@ -78,7 +82,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		
 	m_melt.strand(probe_strand);
 
-	m_melt.set_query(m_sig.probe_oligo);
+	m_melt.set_query( index_to_str(m_sig.probe_oligo_str_index, m_oligo_table) );
 		
 	list<oligo_info> bind;
 	list<oligo_info>::const_iterator iter;
@@ -91,7 +95,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 
 		bind_oligo_to_minus_strand(bind, 
 			m_hash, m_seq.second, 
-			m_sig.probe_oligo,
+			index_to_str(m_sig.probe_oligo_str_index, m_oligo_table),
 			m_melt, dummy_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -122,17 +126,17 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		
 		tmp.probe_range.first = probe_start;
 		tmp.probe_range.second = probe_stop;
-		tmp.amplicon_def = m_seq.first;
+		tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 
 		tmp.probe_strand = hybrid_sig::MINUS;
 		
-		tmp.probe_align = iter->alignment;
+		tmp.probe_align_str_index = str_to_index(deflate_dna_seq(iter->alignment), m_str_table);
 						
 		// ********************************************************
 		// Copy the probe bases (taking the complement of the probe)
 		SEQPTR ptr = SEQ_START(m_seq.second) + min( probe_stop, (int)SEQ_SIZE(m_seq.second) - 1);
 
-		tmp.amplicon = string(probe_len, '-');
+		string tmp_amplicon(probe_len, '-');
 
 		for(unsigned int i = 0;i < probe_len;i++, ptr--){
 			
@@ -141,8 +145,10 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				break;
 			}
 			
-			tmp.amplicon[i] = hash_base_to_ascii_complement(*ptr);
+			tmp_amplicon[i] = hash_base_to_ascii_complement(*ptr);
 		}
+
+		tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 
 		sig_list.push_back(tmp);
 	}
@@ -158,7 +164,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 
 		bind_oligo_to_plus_strand(bind, 
 			m_hash, m_seq.second,
-			m_sig.probe_oligo,
+			index_to_str(m_sig.probe_oligo_str_index, m_oligo_table),
 			m_melt, dummy_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -189,17 +195,17 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		
 		tmp.probe_range.first = probe_start;
 		tmp.probe_range.second = probe_stop;
-		tmp.amplicon_def = m_seq.first;
+		tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 		
 		tmp.probe_strand = hybrid_sig::PLUS;
 		
-		tmp.probe_align = iter->alignment;
+		tmp.probe_align_str_index = str_to_index(deflate_dna_seq(iter->alignment), m_str_table);
 		
 		// ********************************************************
 		// Copy the probe bases
 		SEQPTR ptr = SEQ_START(m_seq.second) + max(0, probe_start);
 
-		tmp.amplicon = string(probe_len, '-');
+		string tmp_amplicon(probe_len, '-');
 
 		for(unsigned int i = 0;i < probe_len;i++, ptr++){
 			
@@ -208,8 +214,10 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				break;
 			}
 			
-			tmp.amplicon[i] = hash_base_to_ascii(*ptr);
+			tmp_amplicon[i] = hash_base_to_ascii(*ptr);
 		}
+
+		tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 
 		sig_list.push_back(tmp);
 	}

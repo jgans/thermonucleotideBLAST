@@ -68,7 +68,9 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	const float &m_min_probe_dg, const float &m_max_probe_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
-	const int &m_target_strand)
+	const int &m_target_strand,
+	const std::vector<std::string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table)
 {	
 	const float forward_primer_strand = m_forward_primer_strand/m_sig.forward_degen;
 	const float reverse_primer_strand = m_reverse_primer_strand/m_sig.reverse_degen;
@@ -85,7 +87,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	// primer 2 upstream (5') and primer 1 downstream (3'): bind to minus strand
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	// The upstream (5') primer has a 3' dangling base
-	m_melt.set_query(m_sig.reverse_oligo);
+	m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 	
 	// Assume that the primer oligos are in vast excess to the target strands
 	m_melt.strand(reverse_primer_strand, 0.0f);
@@ -94,7 +96,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	
 		bind_oligo_to_minus_strand(upstream_bind, 
 			m_hash, m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -105,7 +107,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	}
 		
 	// Test primer 1 in the downstream position
-	m_melt.set_query(m_sig.forward_oligo);
+	m_melt.set_query( index_to_str(m_sig.forward_oligo_str_index, m_oligo_table) );
 	
 	// Assume that the primer oligos are in vast excess to the target strands
 	m_melt.strand(forward_primer_strand, 0.0f);
@@ -114,7 +116,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	
 		bind_oligo_to_minus_strand(downstream_bind, 
 			m_hash, m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -160,13 +162,13 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				tmp = m_sig;
 
 				// Downstream primer
-				tmp.forward_oligo = m_sig.forward_oligo; 
+				tmp.forward_oligo_str_index = m_sig.forward_oligo_str_index; 
 
 				// Upstream primer
-				tmp.reverse_oligo = m_sig.reverse_oligo;
+				tmp.reverse_oligo_str_index = m_sig.reverse_oligo_str_index;
 				
 				tmp.primer_strand = hybrid_sig::MINUS;
-				tmp.amplicon_def = m_seq.first;
+				tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 				
 				tmp.amplicon_range.first = start;
 				tmp.amplicon_range.second = stop;
@@ -186,14 +188,14 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				tmp.forward_gap = down_iter->num_gap;
 				tmp.reverse_gap = up_iter->num_gap;
 				
-				tmp.forward_align = down_iter->alignment;
-				tmp.reverse_align = up_iter->alignment;
+				tmp.forward_align_str_index = str_to_index(deflate_dna_seq(down_iter->alignment), m_str_table);
+				tmp.reverse_align_str_index = str_to_index(deflate_dna_seq(up_iter->alignment), m_str_table);
 				
 				tmp.forward_primer_clamp = down_iter->anchor_3;
 				tmp.reverse_primer_clamp = up_iter->anchor_5;
 				
 				// Extract the match sequence in the same orientation as the primers
-				tmp.amplicon = string(len, '-');
+				string tmp_amplicon(len, '-');
 				
 				SEQPTR ptr = SEQ_START(m_seq.second) + max(0, start);
 				
@@ -204,9 +206,10 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 						break;
 					}
 					
-					tmp.amplicon[i] = hash_base_to_ascii(*ptr);
+					tmp_amplicon[i] = hash_base_to_ascii(*ptr);
 				}
 
+				tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 				sig_list.push_back(tmp);
 			}
 		}
@@ -219,7 +222,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	// primer 2 upstream (5') and primer 1 downstream (3'): bind to plus strand
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	// The upstream (5') primer has a 3' dangling base
-	m_melt.set_query(m_sig.reverse_oligo);
+	m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 	
 	// Assume that the primer oligos are in vast excess to the target strands
 	m_melt.strand(reverse_primer_strand, 0.0f);
@@ -228,7 +231,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	
 		bind_oligo_to_plus_strand(upstream_bind, 
 			m_hash, m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -239,7 +242,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	}
 	
 	// Test primer 1 in the downstream position
-	m_melt.set_query(m_sig.forward_oligo);
+	m_melt.set_query( index_to_str(m_sig.forward_oligo_str_index, m_oligo_table) );
 	
 	// Assume that the primer oligos are in vast excess to the target strands
 	m_melt.strand(forward_primer_strand, 0.0f);
@@ -248,7 +251,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	
 		bind_oligo_to_plus_strand(downstream_bind, 
 			m_hash, m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -286,13 +289,13 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				tmp = m_sig;
 
 				// Downstream primer
-				tmp.forward_oligo = m_sig.forward_oligo; 
+				tmp.forward_oligo_str_index = m_sig.forward_oligo_str_index; 
 
 				// Upstream primer
-				tmp.reverse_oligo = m_sig.reverse_oligo;
+				tmp.reverse_oligo_str_index = m_sig.reverse_oligo_str_index;
 				
 				tmp.primer_strand = hybrid_sig::PLUS;
-				tmp.amplicon_def = m_seq.first;
+				tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 				
 				tmp.amplicon_range.first = start;
 				tmp.amplicon_range.second = stop;
@@ -312,14 +315,14 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				tmp.forward_gap = down_iter->num_gap;
 				tmp.reverse_gap = up_iter->num_gap;
 				
-				tmp.forward_align = down_iter->alignment;
-				tmp.reverse_align = up_iter->alignment;
+				tmp.forward_align_str_index = str_to_index(deflate_dna_seq(down_iter->alignment), m_str_table);
+				tmp.reverse_align_str_index = str_to_index(deflate_dna_seq(up_iter->alignment), m_str_table);
 				
 				tmp.forward_primer_clamp = down_iter->anchor_3;
 				tmp.reverse_primer_clamp = up_iter->anchor_5;
 				
 				// Extract the match sequence in the same orientation as the primers
-				tmp.amplicon = string(len, '-');
+				string tmp_amplicon(len, '-');
 								
 				SEQPTR ptr = SEQ_START(m_seq.second) + min( stop, (int)SEQ_SIZE(m_seq.second) - 1);
 				
@@ -330,8 +333,10 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 						break;
 					}
 					
-					tmp.amplicon[i] = hash_base_to_ascii_complement(*ptr);
+					tmp_amplicon[i] = hash_base_to_ascii_complement(*ptr);
 				}
+
+				tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 
 				sig_list.push_back(tmp);
 			}

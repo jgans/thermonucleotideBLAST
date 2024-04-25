@@ -10,7 +10,6 @@
 
 using namespace std;
 
-
 // Global variables
 extern int mpi_numtasks;
 extern int mpi_rank;
@@ -35,6 +34,9 @@ int worker(int argc, char *argv[])
 		if(continue_exec == false){
 			return EXIT_SUCCESS;
 		}
+
+		// Reduce memory usage by caching all assay-related strings
+		unordered_map<string, size_t> str_table;
 
 		vector<hybrid_sig> sig_list; // The queries
 		bitmask sig_match; // Has a given query matched at least one target (for OUTPUT_INVERSE_QUERY)
@@ -66,6 +68,11 @@ int worker(int argc, char *argv[])
 		// Get the queries from the master
 		receive_queries(sig_list);
 		
+		receive_string_table(str_table);
+
+		// Store the oligo strings in a separate vector for fast lookup
+		const vector<string> oligo_table = ordered_keys(str_table);
+
 		const unsigned long int num_sig = sig_list.size();
 		
 		// If the user has selected OUTPUT_INVERSE_QUERY for their output format,
@@ -95,7 +102,7 @@ int worker(int argc, char *argv[])
 			seq_file.open( (char*)opt.dbase_filename.c_str(), opt.blast_include, opt.blast_exclude);
 		}
 		
-		// Initialize the melting engine. There is a fair amount of overhead involved in
+		// Initialize the melting temperature engine. There is a fair amount of overhead involved in
 		// initialization (handled by the constructor) so it is best to do it just once
 		// per program invocation.
 		NucCruc melt(opt.melting_param, opt.target_t);
@@ -296,11 +303,10 @@ int worker(int argc, char *argv[])
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
 								opt.max_len,
-								opt.single_primer_pcr);
-
-							mask_binding_sites(local_results, opt.mask_options,
-								opt.min_primer_tm, opt.min_probe_tm, melt,
-								forward_primer_strand, reverse_primer_strand, opt.probe_strand);
+								opt.single_primer_pcr,
+								opt.mask_options,
+								oligo_table,
+								str_table);
 
 							break;
 						case ASSAY_PADLOCK:
@@ -312,7 +318,9 @@ int worker(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
-								opt.target_strand);
+								opt.target_strand,
+								oligo_table,
+								str_table);
 
 							break;
 					};
@@ -327,7 +335,9 @@ int worker(int argc, char *argv[])
 							opt.min_probe_dg, opt.max_probe_dg, 
 							opt.probe_clamp_5, opt.probe_clamp_3,
 							opt.max_gap, opt.max_mismatch, 
-							opt.target_strand);
+							opt.target_strand,
+							oligo_table,
+							str_table);
 					}
 				}
 				
@@ -373,20 +383,20 @@ int worker(int argc, char *argv[])
 					// Compute the dimer and hairpin temperatures for this assay
 					if(local_iter->has_primers() == true){
 					
-						melt.set_duplex(local_iter->forward_oligo);
+						melt.set_duplex( index_to_str(local_iter->forward_oligo_str_index, oligo_table) );
 						melt.Strand(forward_primer_strand, forward_primer_strand);
 
 						local_iter->forward_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->forward_dimer_tm = melt.approximate_tm_homodimer();
 
-						melt.set_duplex(local_iter->reverse_oligo);
+						melt.set_duplex(index_to_str(local_iter->reverse_oligo_str_index, oligo_table) );
 						melt.Strand(reverse_primer_strand, reverse_primer_strand);
 
 						local_iter->reverse_hairpin_tm = melt.approximate_tm_hairpin();
 						local_iter->reverse_dimer_tm = melt.approximate_tm_homodimer();
 
-						melt.set_query(local_iter->forward_oligo);
-						melt.set_target(local_iter->reverse_oligo);
+						melt.set_query( index_to_str(local_iter->forward_oligo_str_index, oligo_table) );
+						melt.set_target( index_to_str(local_iter->reverse_oligo_str_index, oligo_table) );
 
 						melt.Strand(forward_primer_strand, reverse_primer_strand);
 
@@ -395,7 +405,7 @@ int worker(int argc, char *argv[])
 					
 					if(local_iter->has_probe() == true){
 					
-						melt.set_duplex(local_iter->probe_oligo);
+						melt.set_duplex( index_to_str(local_iter->probe_oligo_str_index, oligo_table) );
 
 						melt.strand(opt.probe_strand, opt.probe_strand);
 
@@ -441,6 +451,10 @@ int worker(int argc, char *argv[])
 			#endif // PROFILE
 		}
 		
+		// Close the sequence file. In the case of BLAST-formatted databases this will
+		// hopefully free up any associated memory.
+		seq_file.close();
+
 		// Clean up any previously allocated sequence
 		if(bio_seq.second != NULL){
 
@@ -463,6 +477,33 @@ int worker(int argc, char *argv[])
 		}
 		#endif // PROFILE
 		
+		const vector<string> index_table = synchronize_keys(str_table);
+
+		// The final string table (used by all ranks) may have a different ordering of strings
+		unordered_map<size_t, size_t> old_to_new;
+
+		// Invalid indicies are still invalid indicies
+		old_to_new[INVALID_INDEX] = INVALID_INDEX;
+
+		for(unordered_map<string, size_t>::const_iterator i = str_table.begin();i != str_table.end();++i){
+
+			vector<string>::const_iterator iter = lower_bound(index_table.begin(), index_table.end(), i->first);
+
+			if( ( iter == index_table.end() ) || (*iter != i->first) ){
+				throw __FILE__ ":worker: Unable to look up string for reindexing";
+			}
+
+			old_to_new[i->second] = iter - index_table.begin();
+		}
+
+		// We no longer need the string table
+		unordered_map<string, size_t>().swap(str_table); // Force the memory to be deallocated
+
+		// Reindex all of the assay results
+		for(list<hybrid_sig>::iterator i = results_list.begin();i != results_list.end();++i){
+			i->reindex_str(old_to_new);
+		}
+
 		// The number of query results to send back in a single chunk
 		unsigned int query_chunck_size = 0;
 		int num_chunck = 0;

@@ -72,8 +72,11 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
 	const unsigned int &m_max_amplicon_len,
-	const bool &m_single_primer_pcr)
-{	
+	const bool &m_single_primer_pcr,
+	const int &m_mask_options,
+	const vector<string> &m_oligo_table,
+	std::unordered_map<std::string, size_t> &m_str_table)
+{
 	// Only apply the min primer clamp test when we have a sensible (>= 0) value
 	const bool apply_min_max_primer_clamp = (m_min_max_primer_clamp >= 0);
 	
@@ -88,8 +91,8 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	// Assemble a list of hash matches so we can cull *before* computing sequence alignments
 	list<oligo_info> match_list;
 	
-	match_oligo_to_minus_strand(match_list, m_hash, m_sig.forward_oligo, oligo_info::F);
-	match_oligo_to_minus_strand(match_list, m_hash, m_sig.reverse_oligo, oligo_info::R);
+	match_oligo_to_minus_strand(match_list, m_hash, index_to_str(m_sig.forward_oligo_str_index, m_oligo_table), oligo_info::F);
+	match_oligo_to_minus_strand(match_list, m_hash, index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table), oligo_info::R);
 	
 	// Did we find any oligo locations for either primer to bind to the
 	// minus strand? If not, then we can stop looking right now
@@ -99,8 +102,8 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		return sig_list;
 	}	
 	
-	match_oligo_to_plus_strand(match_list, m_hash, m_sig.forward_oligo, oligo_info::F);
-	match_oligo_to_plus_strand(match_list, m_hash, m_sig.reverse_oligo, oligo_info::R);
+	match_oligo_to_plus_strand(match_list, m_hash, index_to_str(m_sig.forward_oligo_str_index, m_oligo_table), oligo_info::F);
+	match_oligo_to_plus_strand(match_list, m_hash, index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table), oligo_info::R);
 	
 	const unsigned int num_plus_match = match_list.size();
 
@@ -111,8 +114,8 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	
 	if( m_sig.has_probe() ){
 	
-		match_oligo_to_minus_strand(match_list, m_hash, m_sig.probe_oligo, oligo_info::P);
-		match_oligo_to_plus_strand(match_list, m_hash, m_sig.probe_oligo, oligo_info::P);
+		match_oligo_to_minus_strand(match_list, m_hash, index_to_str(m_sig.probe_oligo_str_index, m_oligo_table), oligo_info::P);
+		match_oligo_to_plus_strand(match_list, m_hash, index_to_str(m_sig.probe_oligo_str_index, m_oligo_table), oligo_info::P);
 		
 		// If the number of matches has not increased, then we did not match any probe oligos
 		if(match_list.size() == num_plus_match){
@@ -125,7 +128,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 
 	if(strand_count.first < strand_count.second){ // num minus < num plus
 		
-		m_melt.set_query(m_sig.forward_oligo);
+		m_melt.set_query(index_to_str(m_sig.forward_oligo_str_index, m_oligo_table));
 
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(forward_primer_strand, 0.0f);
@@ -134,7 +137,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::F,
 			m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -149,7 +152,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 		
-		m_melt.set_query(m_sig.reverse_oligo);
+		m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(reverse_primer_strand, 0.0f);
@@ -158,7 +161,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::R,
 			m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -173,7 +176,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 	
-		m_melt.set_query(m_sig.forward_oligo);
+		m_melt.set_query( index_to_str(m_sig.forward_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(forward_primer_strand, 0.0f);
@@ -182,7 +185,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_plus_strand(match_list, 
 			oligo_info::F,
 			m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -193,7 +196,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
 		
-		m_melt.set_query(m_sig.reverse_oligo);
+		m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(reverse_primer_strand, 0.0f);
@@ -202,7 +205,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_plus_strand(match_list, 
 			oligo_info::R,
 			m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -212,7 +215,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	}
 	else{ // num plus >= num minus
 
-		m_melt.set_query(m_sig.forward_oligo);
+		m_melt.set_query( index_to_str(m_sig.forward_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(forward_primer_strand, 0.0f);
@@ -221,7 +224,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_plus_strand(match_list, 
 			oligo_info::F,
 			m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -236,7 +239,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 		
-		m_melt.set_query(m_sig.reverse_oligo);
+		m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(reverse_primer_strand, 0.0f);
@@ -245,7 +248,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_plus_strand(match_list, 
 			oligo_info::R,
 			m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -260,7 +263,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 		
-		m_melt.set_query(m_sig.forward_oligo);
+		m_melt.set_query( index_to_str(m_sig.forward_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(forward_primer_strand, 0.0f);
@@ -269,7 +272,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::F,
 			m_seq.second, 
-			m_sig.forward_oligo,
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -284,7 +287,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 		
-		m_melt.set_query(m_sig.reverse_oligo);
+		m_melt.set_query( index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the primer oligos are in vast excess to the target strands
 		m_melt.strand(reverse_primer_strand, 0.0f);
@@ -293,7 +296,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::R,
 			m_seq.second, 
-			m_sig.reverse_oligo,
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_primer_tm, m_max_primer_tm,
 			m_min_primer_dg, m_max_primer_dg,
@@ -312,7 +315,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			return sig_list;
 		}
 	
-		m_melt.set_query(m_sig.probe_oligo);
+		m_melt.set_query( index_to_str(m_sig.probe_oligo_str_index, m_oligo_table) );
 		
 		// Assume that the probes are in vast excess to the amplicons
 		m_melt.strand(probe_strand, 0.0f);
@@ -329,7 +332,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		// Does the probe bind to the minus strand?
 		bind_oligo_to_minus_strand(match_list, 
 			oligo_info::P, m_seq.second, 
-			m_sig.probe_oligo,
+			index_to_str(m_sig.probe_oligo_str_index, m_oligo_table),
 			m_melt, m_minus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -339,7 +342,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		// Does the probe bind to the plus strand?
 		bind_oligo_to_plus_strand(match_list,
 			oligo_info::P, m_seq.second, 
-			m_sig.probe_oligo,
+			index_to_str(m_sig.probe_oligo_str_index, m_oligo_table),
 			m_melt, m_plus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
@@ -360,7 +363,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		
 		list<oligo_info>::iterator r = f;
 		r++;
-		
+
 		for(;r != match_list.end();r++){
 
 			// Exclude probes and primers that bind to the minus strand
@@ -448,18 +451,18 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 						if( (f->mask & oligo_info::R) && (r->mask & oligo_info::R) ){
 							
 							// Two reverse oligos
-							tmp.forward_oligo = m_sig.reverse_oligo;
+							tmp.forward_oligo_str_index = m_sig.reverse_oligo_str_index;
 						}
 						
 						if( (f->mask & oligo_info::F) && (r->mask & oligo_info::F) ){
 							
 							// Two forward oligos
-							tmp.reverse_oligo = m_sig.forward_oligo;
+							tmp.reverse_oligo_str_index = m_sig.forward_oligo_str_index;
 						}
 						
 						tmp.primer_strand = (f->mask & oligo_info::F) ? hybrid_sig::PLUS : hybrid_sig::MINUS;
 						
-						tmp.amplicon_def = m_seq.first;
+						tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 
 						tmp.amplicon_range.first = amp_start;
 						tmp.amplicon_range.second = amp_stop;
@@ -488,23 +491,23 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 						
 						tmp.forward_mm = f_output->num_mm;
 						tmp.reverse_mm = r_output->num_mm;
-						
+
 						tmp.forward_gap = f_output->num_gap;
 						tmp.reverse_gap = r_output->num_gap;
 						
 						tmp.forward_primer_clamp = f_output->anchor_3;
 						tmp.reverse_primer_clamp = r_output->anchor_3;
 
-						tmp.forward_align = f_output->alignment;
-						tmp.reverse_align = r_output->alignment;
+						tmp.forward_align_str_index = str_to_index(deflate_dna_seq(f_output->alignment), m_str_table);
+						tmp.reverse_align_str_index = str_to_index(deflate_dna_seq(r_output->alignment), m_str_table);
 
 						// Copy the amplicon bases in the orientation of primer 1
 						// (starting from the first valid base)	
+						string tmp_amplicon(amp_len, '-');
+
 						if(tmp.primer_strand == hybrid_sig::PLUS){
 						
 							SEQPTR ptr = SEQ_START(m_seq.second) + max(0, amp_start);
-
-							tmp.amplicon = string(amp_len, '-');
 
 							for(unsigned int i = max(0, -amp_start);i < amp_len;i++, ptr++){
 
@@ -513,14 +516,12 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 									break;
 								}
 
-								tmp.amplicon[i] = hash_base_to_ascii(*ptr);
+								tmp_amplicon[i] = hash_base_to_ascii(*ptr);
 							}
 						}
 						else{
 							// Taking the complement of the amplicon
 							SEQPTR ptr = SEQ_START(m_seq.second) + min(amp_stop, (int)SEQ_SIZE(m_seq.second) - 1);
-
-							tmp.amplicon = string(amp_len, '-');
 
 							for(unsigned int i = max(0, int(amp_stop) - (int)SEQ_SIZE(m_seq.second) + 1);i < amp_len;i++, ptr--){
 
@@ -529,10 +530,16 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 									break;
 								}
 
-								tmp.amplicon[i] = hash_base_to_ascii_complement(*ptr);
+								tmp_amplicon[i] = hash_base_to_ascii_complement(*ptr);
 							}
 						}
 						
+						mask_binding_sites(tmp_amplicon, tmp, m_mask_options,
+							m_min_primer_tm, m_min_probe_tm, m_melt,
+							m_forward_primer_strand, m_reverse_primer_strand, m_probe_strand,
+							m_oligo_table);
+
+						tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 						tmp.probe_range = make_pair(p->loc_5, p->loc_3);
 						tmp.probe_tm = p->tm;
 						tmp.probe_dH = p->dH;
@@ -540,7 +547,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 						tmp.probe_mm = p->num_mm;
 						tmp.probe_gap = p->num_gap;
 						tmp.probe_strand = (p->mask & oligo_info::PLUS_STRAND) ? hybrid_sig::PLUS : hybrid_sig::MINUS;
-						tmp.probe_align = p->alignment;
+						tmp.probe_align_str_index = str_to_index(deflate_dna_seq(p->alignment), m_str_table);
 						
 						// This is a valid solution
 						sig_list.push_back(tmp);
@@ -568,18 +575,18 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 				if( (f->mask & oligo_info::R) && (r->mask & oligo_info::R) ){
 
 					// Two reverse oligos
-					tmp.forward_oligo = m_sig.reverse_oligo;
+					tmp.forward_oligo_str_index = m_sig.reverse_oligo_str_index;
 				}
 
 				if( (f->mask & oligo_info::F) && (r->mask & oligo_info::F) ){
 
 					// Two forward oligos
-					tmp.reverse_oligo = m_sig.forward_oligo;
+					tmp.reverse_oligo_str_index = m_sig.forward_oligo_str_index;
 				}
 				
 				tmp.primer_strand = (f->mask & oligo_info::F) ? hybrid_sig::PLUS : hybrid_sig::MINUS;
 				
-				tmp.amplicon_def = m_seq.first;
+				tmp.amplicon_def_str_index = str_to_index(m_seq.first, m_str_table);
 
 				tmp.amplicon_range.first = amp_start;
 				tmp.amplicon_range.second = amp_stop;
@@ -607,23 +614,23 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 				
 				tmp.forward_mm = f_output->num_mm;
 				tmp.reverse_mm = r_output->num_mm;
-								
+				
 				tmp.forward_gap = f_output->num_gap;
 				tmp.reverse_gap = r_output->num_gap;
 
 				tmp.forward_primer_clamp = f_output->anchor_3;
 				tmp.reverse_primer_clamp = r_output->anchor_3;
 
-				tmp.forward_align = f_output->alignment;
-				tmp.reverse_align = r_output->alignment;
+				tmp.forward_align_str_index = str_to_index(deflate_dna_seq(f_output->alignment), m_str_table);
+				tmp.reverse_align_str_index = str_to_index(deflate_dna_seq(r_output->alignment), m_str_table);
 
 				// Copy the amplicon bases in the orientation of primer 1
 				// (starting from the first valid base)	
+				string tmp_amplicon(amp_len, '-');
+
 				if(tmp.primer_strand == hybrid_sig::PLUS){
 
 					SEQPTR ptr = SEQ_START(m_seq.second) + max(0, amp_start);
-
-					tmp.amplicon = string(amp_len, '-');
 
 					for(unsigned int i = max(0, -amp_start);i < amp_len;i++, ptr++){
 
@@ -632,15 +639,13 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 							break;
 						}
 
-						tmp.amplicon[i] = hash_base_to_ascii(*ptr);
+						tmp_amplicon[i] = hash_base_to_ascii(*ptr);
 					}
 				}
 				else{
 
 					// Taking the complement of the amplicon
 					SEQPTR ptr = SEQ_START(m_seq.second) + min(amp_stop, (int)SEQ_SIZE(m_seq.second) - 1);
-
-					tmp.amplicon = string(amp_len, '-');
 
 					for(unsigned int i = max(0, int(amp_stop) - (int)SEQ_SIZE(m_seq.second) + 1);i < amp_len;i++, ptr--){
 
@@ -649,9 +654,16 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 							break;
 						}
 
-						tmp.amplicon[i] = hash_base_to_ascii_complement(*ptr);
+						tmp_amplicon[i] = hash_base_to_ascii_complement(*ptr);
 					}
 				}
+
+				mask_binding_sites(tmp_amplicon, tmp, m_mask_options,
+					m_min_primer_tm, m_min_probe_tm, m_melt,
+					m_forward_primer_strand, m_reverse_primer_strand, m_probe_strand,
+					m_oligo_table);
+
+				tmp.amplicon_str_index = str_to_index(deflate_dna_seq(tmp_amplicon), m_str_table);
 				
 				// This is a valid solution
 				sig_list.push_back(tmp);
@@ -668,7 +680,7 @@ pair<unsigned int, unsigned int> cull_oligo_match(list<oligo_info> &m_match_list
 	const unsigned int threshold = m_max_amplicon_len + 50;
 	pair<unsigned int, unsigned int> ret = make_pair(0, 0);
 	
-	// ** It may be better to move this sort out of this function and into bind oligo **
+	// ** It may be better to move the following sorting operation out of this function and into bind oligo **
 	
 	// Sort the oligo matches by the target_loc in ascending order
 	m_match_list.sort( sort_by_oligo_loc() );

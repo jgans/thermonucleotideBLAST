@@ -13,25 +13,6 @@ using namespace std;
 extern int mpi_numtasks;
 extern int mpi_rank;
 
-// For case-insensitive string matching
-inline bool are_oligos_equal(const string &m_a, const string &m_b)
-{
-	if( m_a.size() != m_b.size() ){
-		return false;
-	}
-
-	const size_t len = m_a.size();
-
-	for(size_t i = 0;i < len;++i){
-		if( toupper(m_a[i]) != toupper(m_b[i]) ){
-			return false;
-		}
-	}
-
-	// If we get here, the strings are equal
-	return true;
-};
-
 inline string toupper(const string &m_str)
 {
 	string ret(m_str);
@@ -51,16 +32,16 @@ struct sort_by_seq // < using oligo sequences
 	inline bool operator()(const hybrid_sig &m_a, const hybrid_sig &m_b) const
 	{
 
-		// Impose a consistent case and order on all assay oligo
-		string F_a = toupper(m_a.forward_oligo);
-		string R_a = toupper(m_a.reverse_oligo);
+		// Impose a consistent order on all assay oligo
+		size_t F_a = m_a.forward_oligo_str_index;
+		size_t R_a = m_a.reverse_oligo_str_index;
 
 		if(F_a < R_a){
 			swap(F_a, R_a);
 		}
 
-		string F_b = toupper(m_b.forward_oligo);
-		string R_b = toupper(m_b.reverse_oligo);
+		size_t F_b = m_b.forward_oligo_str_index;
+		size_t R_b = m_b.reverse_oligo_str_index;
 
 		if(F_b < R_b){
 			swap(F_b, R_b);
@@ -69,7 +50,7 @@ struct sort_by_seq // < using oligo sequences
 		if(F_a == F_b){
 			
 			if(R_a == R_b){
-				return toupper(m_a.probe_oligo) < toupper(m_b.probe_oligo);
+				return m_a.probe_oligo_str_index < m_b.probe_oligo_str_index;
 			}
 
 			return R_a < R_b;
@@ -83,16 +64,16 @@ struct compare_by_seq // == using oligo sequences
 {
 	inline bool operator()(const hybrid_sig &m_a, const hybrid_sig &m_b) const
 	{
-		// Impose a consistent case and order on all assay oligo
-		string F_a = toupper(m_a.forward_oligo);
-		string R_a = toupper(m_a.reverse_oligo);
+		// Impose a consistent order on all assay oligo
+		size_t F_a = m_a.forward_oligo_str_index;
+		size_t R_a = m_a.reverse_oligo_str_index;
 
 		if(F_a < R_a){
 			swap(F_a, R_a);
 		}
 
-		string F_b = toupper(m_b.forward_oligo);
-		string R_b = toupper(m_b.reverse_oligo);
+		size_t F_b = m_b.forward_oligo_str_index;
+		size_t R_b = m_b.reverse_oligo_str_index;
 
 		if(F_b < R_b){
 			swap(F_b, R_b);
@@ -106,47 +87,52 @@ struct compare_by_seq // == using oligo sequences
 			return false;
 		}
 
-		return toupper(m_a.probe_oligo) == toupper(m_b.probe_oligo);
+		return m_a.probe_oligo_str_index == m_b.probe_oligo_str_index;
 	};	
 };
 
 string top_strand(const string &m_align);
 
-void mask_binding_sites(list<hybrid_sig> &m_sig, const int &m_mask, 
+void mask_binding_sites(string &m_amplicon, const hybrid_sig &m_sig, const int &m_mask, 
 	const float &m_min_primer_tm, const float &m_min_probe_tm, NucCruc &m_melt,
 	const float &m_forward_primer_strand, 
-	const float &m_reverse_primer_strand, const float &m_probe_strand)
+	const float &m_reverse_primer_strand, const float &m_probe_strand,
+	const vector<string> &m_oligo_table)
 {
 	if(m_mask == NO_MASK){
 		return;
 	}
 	
-	list<hybrid_sig>::iterator iter;
+	if( m_sig.has_primers() ){
 	
-	for(iter = m_sig.begin();iter != m_sig.end(); iter++){
-
-		if( iter->has_primers() ){
+		m_melt.strand(m_forward_primer_strand, 0.0f);
 		
-			m_melt.strand(m_forward_primer_strand, 0.0f);
-			
-			mask_primer_5(iter->amplicon, iter->forward_oligo, m_melt, 
-				(m_mask & MASK_PRIMERS) == 0 ? false : true, 
-				(m_mask & REPLACE_PRIMERS) == 0 ? false : true);
-			
-			m_melt.strand(m_reverse_primer_strand, 0.0f);
-			
-			mask_primer_3(iter->amplicon, iter->reverse_oligo, m_melt, 
-				(m_mask & MASK_PRIMERS) == 0 ? false : true, 
-				(m_mask & REPLACE_PRIMERS) == 0 ? false : true);
-		}
+		mask_primer_5( 
+			m_amplicon, 
+			index_to_str(m_sig.forward_oligo_str_index, m_oligo_table), 
+			m_melt, 
+			(m_mask & MASK_PRIMERS) == 0 ? false : true, 
+			(m_mask & REPLACE_PRIMERS) == 0 ? false : true);
 		
-		if( (m_mask & MASK_PROBE) && iter->has_probe() ){
+		m_melt.strand(m_reverse_primer_strand, 0.0f);
 		
-			m_melt.strand(m_probe_strand, 0.0f);
-			
-			mask_probe(iter->amplicon, iter->probe_oligo, m_melt, m_min_probe_tm);
-		}
-	}	
+		mask_primer_3(
+			m_amplicon, 
+			index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table), 
+			m_melt, 
+			(m_mask & MASK_PRIMERS) == 0 ? false : true, 
+			(m_mask & REPLACE_PRIMERS) == 0 ? false : true);
+	}
+	
+	if( (m_mask & MASK_PROBE) && m_sig.has_probe() ){
+	
+		m_melt.strand(m_probe_strand, 0.0f);
+		
+		mask_probe(
+			m_amplicon, 
+			index_to_str(m_sig.probe_oligo_str_index, m_oligo_table), 
+			m_melt, m_min_probe_tm);
+	}
 }
 
 void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
@@ -242,11 +228,6 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	// maximum range is [0, oligo_len].
 	pair<unsigned int, unsigned int> range = m_melt.alignment_range_target();
 	
-	// DEBUG
-	//cerr << "\npre range.first = " << range.first<< endl;
-	//cerr << "pre range.second = " << range.second<< endl;
-	//cerr << "amp: " << m_amp << endl;
-
 	range.first = gap_offset + target_len - range.first - 1;
 	range.second = gap_offset + target_len - range.second - 1;
 	
@@ -264,13 +245,6 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	}
 	else{
 		if(m_mask){
-			
-			// DEBUG
-			//cerr << "post range.first = " << range.first<< endl;
-			//cerr << "post range.second = " << range.second<< endl;
-			//cerr << "gap_offset = " << gap_offset << endl;
-			//cerr << "target_len = " << target_len << endl;
-			//cerr << "amp len = " << len << endl;
 			
 			// Mask this region of the amplicon
 			for(int j = (int)range.second;j <= (int)range.first;j++){
@@ -602,7 +576,9 @@ void mask_probe(string &m_amp, const string &m_oligo, NucCruc &m_melt, const flo
 
 // Expand degenerate NA bases as needed
 vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig, 
-	const bool &m_degen_rescale_ct)
+	const bool &m_degen_rescale_ct, 
+	const vector<string> &m_oligo_table, 
+	unordered_map<string, size_t> &m_str_table)
 {
 	vector<hybrid_sig> ret;
 	
@@ -616,58 +592,61 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 	for(iter = m_sig.begin();iter != m_sig.end();iter++){
 	
 		list< pair<string, string> > primers;
-	
-		primers.push_back( make_pair(iter->forward_oligo, iter->reverse_oligo) );
+		
+		if( (iter->forward_oligo_str_index != INVALID_INDEX) && (iter->reverse_oligo_str_index != INVALID_INDEX) ){
+			primers.push_back( make_pair( 
+				index_to_str(iter->forward_oligo_str_index, m_oligo_table), 
+				index_to_str(iter->reverse_oligo_str_index, m_oligo_table) ) );
+		}
 
 		try{
 			primers = expand_nucleic_acid(primers);
 		}
 		catch(const char* error){
 		
-			cerr << "Error expanding primers in assay: " << iter->name << endl;
+			cerr << "Error expanding primers in assay: " << index_to_str(iter->name_str_index, m_oligo_table) << endl;
 			throw error;
 		}
 		
 		list<string> probes;
 		
 		try{
-			probes = expand_nucleic_acid(iter->probe_oligo);
+			if(iter->probe_oligo_str_index != INVALID_INDEX){
+				probes = expand_nucleic_acid( index_to_str(iter->probe_oligo_str_index, m_oligo_table) );
+			}
 		}
 		catch(const char* error){
 		
-			cerr << "Error expanding probe in assay: " << iter->name << endl;
+			cerr << "Error expanding probe in assay: " << index_to_str(iter->name_str_index, m_oligo_table) << endl;
 			throw error;
 		}
 		
 		const size_t num_expanded_assays = primers.size() * probes.size();
 		
 		if(num_expanded_assays > 1){
-			cout << "Expanded degenerate bases in " << iter->name << " to make " 
+			cout << "Expanded degenerate bases in " 
+				<< index_to_str(iter->name_str_index, m_oligo_table) << " to make " 
 				<< num_expanded_assays << " non-degenerate assays" << endl;
 		}
 		
-		const int degen_forward = m_degen_rescale_ct ? degeneracy(iter->forward_oligo) : 1;
-		const int degen_reverse = m_degen_rescale_ct ? degeneracy(iter->reverse_oligo) : 1;
-		const int degen_probe = m_degen_rescale_ct ? degeneracy(iter->probe_oligo) : 1;
+		const int degen_forward = m_degen_rescale_ct ? 
+			degeneracy( index_to_str(iter->forward_oligo_str_index, m_oligo_table) ) : 1;
+		const int degen_reverse = m_degen_rescale_ct ? 
+			degeneracy( index_to_str(iter->reverse_oligo_str_index, m_oligo_table) ) : 1;
+		const int degen_probe = m_degen_rescale_ct ? 
+			degeneracy( index_to_str(iter->probe_oligo_str_index, m_oligo_table) ) : 1;
 
 		list< pair<string, string> >::const_iterator primer_iter;
 		list<string>::const_iterator probe_iter;
 		
-		for(primer_iter = primers.begin();primer_iter != primers.end();primer_iter++){
-			for(probe_iter = probes.begin();probe_iter != probes.end();probe_iter++){
-			
-				// This was the first attempt (every "real" assay created from a degenerate assay
-				// got a new unique assay id).
-				//hybrid_sig tmp(iter->name, primer_iter->first, primer_iter->second,
-				//	*probe_iter, id++);
-				
-				// This is the second attempt (every "real" assay created from a degenerate assay
-				// uses the assay id of its degenerate parent).
-				hybrid_sig tmp( iter->name, primer_iter->first, primer_iter->second,
-					*probe_iter, iter->my_id() );
+		if( primers.empty() ){
 
-				tmp.forward_degen = degen_forward;
-				tmp.reverse_degen = degen_reverse;
+			for(probe_iter = probes.begin();probe_iter != probes.end();probe_iter++){
+				
+				hybrid_sig tmp( iter->name_str_index, 
+					str_to_index(*probe_iter, m_str_table), 
+					iter->my_id() );
+
 				tmp.probe_degen = degen_probe;
 
 				// "Real" assays derived from degenerate, "virtual" assays, get an additional identifier.
@@ -678,13 +657,65 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 				ret.push_back(tmp);
 			}
 		}
+		else{
+
+			for(primer_iter = primers.begin();primer_iter != primers.end();primer_iter++){
+
+				if( probes.empty() ){
+
+					hybrid_sig tmp( iter->name_str_index, 
+						str_to_index(primer_iter->first, m_str_table), 
+						str_to_index(primer_iter->second, m_str_table),
+						iter->my_id() );
+
+					tmp.forward_degen = degen_forward;
+					tmp.reverse_degen = degen_reverse;
+
+					// "Real" assays derived from degenerate, "virtual" assays, get an additional identifier.
+					// This additional identifier is needed to make the search results unique when using
+					// target fragmentation.
+					tmp.my_degen_id(id++);
+
+					ret.push_back(tmp);
+				}
+				else{
+					for(probe_iter = probes.begin();probe_iter != probes.end();probe_iter++){
+					
+						// This was the first attempt (every "real" assay created from a degenerate assay
+						// got a new unique assay id).
+						//hybrid_sig tmp(iter->name, primer_iter->first, primer_iter->second,
+						//	*probe_iter, id++);
+						
+						// This is the second attempt (every "real" assay created from a degenerate assay
+						// uses the assay id of its degenerate parent).
+						hybrid_sig tmp( iter->name_str_index, 
+							str_to_index(primer_iter->first, m_str_table), 
+							str_to_index(primer_iter->second, m_str_table),
+							str_to_index(*probe_iter, m_str_table), 
+							iter->my_id() );
+
+						tmp.forward_degen = degen_forward;
+						tmp.reverse_degen = degen_reverse;
+						tmp.probe_degen = degen_probe;
+
+						// "Real" assays derived from degenerate, "virtual" assays, get an additional identifier.
+						// This additional identifier is needed to make the search results unique when using
+						// target fragmentation.
+						tmp.my_degen_id(id++);
+
+						ret.push_back(tmp);
+					}
+				}
+			}
+		}
 	}
 	
 	return ret;
 }
 
 vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig, 
-	const unsigned int &m_format)
+	const unsigned int &m_format, vector<string> &m_oligo_table, 
+	unordered_map<string, size_t> &m_str_table)
 {
 	vector<hybrid_sig> ret;
 
@@ -701,8 +732,11 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		
 			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				hybrid_sig tmp(i->name + "(5')/" + j->name + "(3')", 
-					i->forward_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp( 
+					str_to_index(
+						index_to_str(i->name_str_index, m_oligo_table) + "(5')/" + 
+						index_to_str(j->name_str_index, m_oligo_table) + "(3')", m_str_table), 
+					i->forward_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
 			}
@@ -717,14 +751,14 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
-			if(i->forward_oligo == ""){
+			if(i->forward_oligo_str_index == INVALID_INDEX){
 			
-				hybrid_sig tmp(i->name, i->probe_oligo, id++);
+				hybrid_sig tmp(i->name_str_index, i->probe_oligo_str_index, id++);
 				continue;
 			}
 			
 			// Count the number of PCR primer pairs that have an associated probe
-			if(i->probe_oligo != ""){
+			if(i->probe_oligo_str_index != INVALID_INDEX){
 				has_probes = true;
 			}
 			
@@ -733,12 +767,15 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 				// Since tntblast automatically tests for PCR with the *same* primers
 				// (i.e. two forward or two reverse), there is no need to enumerate
 				// an assay with the same primer in both positions
-				if( are_oligos_equal(i->forward_oligo, j->reverse_oligo) ){
+				if(i->forward_oligo_str_index == j->reverse_oligo_str_index){
 					continue;
 				}
 				
-				hybrid_sig tmp( i->name + "(F)/" + j->name + "(R)", 
-					i->forward_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp( 
+					str_to_index(
+						index_to_str(i->name_str_index, m_oligo_table) + "(F)/" + 
+						index_to_str(j->name_str_index, m_oligo_table) + "(R)", m_str_table), 
+					i->forward_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
 			}
@@ -747,7 +784,7 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
-			if(i->forward_oligo == ""){
+			if(i->forward_oligo_str_index == INVALID_INDEX){
 				continue;
 			}
 			
@@ -756,12 +793,15 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 				// Since tntblast automatically tests for PCR with the *same* primers
 				// (i.e. two forward or two reverse), there is no need to enumerate
 				// an assay with the same primer in both positions
-				if( are_oligos_equal(i->forward_oligo, j->forward_oligo) ){
+				if(i->forward_oligo_str_index == j->forward_oligo_str_index){
 					continue;
 				}
 				
-				hybrid_sig tmp(i->name + "(F)/" + j->name + "(F)", 
-					i->forward_oligo, j->forward_oligo, id++);
+				hybrid_sig tmp(
+					str_to_index(
+						index_to_str(i->name_str_index, m_oligo_table) + "(F)/" + 
+						index_to_str(j->name_str_index, m_oligo_table) + "(F)", m_str_table), 
+					i->forward_oligo_str_index, j->forward_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
 			}
@@ -770,7 +810,7 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			// Is this a probe-only assay?
-			if(i->forward_oligo == ""){
+			if(i->forward_oligo_str_index == INVALID_INDEX){
 				continue;
 			}
 			
@@ -779,12 +819,15 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 				// Since tntblast automatically tests for PCR with the *same* primers
 				// (i.e. two forward or two reverse), there is no need to enumerate
 				// an assay with the same primer in both positions
-				if( are_oligos_equal(i->reverse_oligo, j->reverse_oligo) ){
+				if(i->reverse_oligo_str_index == j->reverse_oligo_str_index){
 					continue;
 				}
 				
-				hybrid_sig tmp(i->name + "(R)/" + j->name + "(R)", 
-					i->reverse_oligo, j->reverse_oligo, id++);
+				hybrid_sig tmp(
+					str_to_index(
+						index_to_str(i->name_str_index, m_oligo_table) + "(R)/" + 
+						index_to_str(j->name_str_index, m_oligo_table) + "(R)", m_str_table),
+					i->reverse_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
 			}
@@ -798,6 +841,9 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 			// Reset the id
 			id = 0;
 			
+			// Update the oligo table to account for the new names referenced in ret
+			m_oligo_table = ordered_keys(m_str_table);
+
 			for(vector<hybrid_sig>::const_iterator i = ret.begin();i != ret.end();i++){
 				
 				for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
@@ -805,13 +851,16 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 					// Allow a mixture of assay with and without probes.
 					// If one or more probes is present, then *all* of the
 					// resulting assays will have probes.
-					if(j->probe_oligo == ""){
+					if(j->probe_oligo_str_index == INVALID_INDEX){
 						continue;
 					}
 					
-					hybrid_sig tmp(i->name + "+" + j->name + "(P)", 
-						i->forward_oligo, i->reverse_oligo, 
-						j->probe_oligo, id++);
+					hybrid_sig tmp(
+						str_to_index(
+							index_to_str(i->name_str_index, m_oligo_table) + "+" + 
+							index_to_str(j->name_str_index, m_oligo_table) + "(P)", m_str_table),
+						i->forward_oligo_str_index, i->reverse_oligo_str_index, 
+						j->probe_oligo_str_index, id++);
 					
 					ret_with_probe.push_back(tmp);
 				}
@@ -996,6 +1045,176 @@ void serve_sequence(const int &m_dest, const unsigned int &m_index, const sequen
 	delete [] buffer;
 	
 	delete [] bio_seq.second;
+}
+
+void distribute_string_table(const unordered_map<string, size_t> &m_table)
+{
+	const unsigned int num_str = m_table.size();
+
+	unsigned int buffer_size = mpi_size(num_str);
+
+	for(unordered_map<string, size_t>::const_iterator i = m_table.begin();i != m_table.end();++i){
+		buffer_size += mpi_size(i->first) + mpi_size(i->second);
+	}
+
+	MPI_Bcast(&buffer_size, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+	unsigned char* buffer = new unsigned char[buffer_size];
+
+	if(buffer == NULL){
+		throw __FILE__ ":distribute_string_table: Unable to allocate buffer";
+	}
+
+	unsigned char* ptr = buffer;
+
+	ptr = mpi_pack(ptr, num_str);
+
+	for(unordered_map<string, size_t>::const_iterator i = m_table.begin();i != m_table.end();++i){
+
+		ptr = mpi_pack(ptr, i->first);
+		ptr = mpi_pack(ptr, i->second);
+	}
+
+	MPI_Bcast(buffer, buffer_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+	delete [] buffer;
+}
+
+void receive_string_table(unordered_map<string, size_t> &m_table)
+{
+	unsigned int num_str;
+	unsigned int buffer_size;
+
+	MPI_Bcast(&buffer_size, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+	unsigned char* buffer = new unsigned char[buffer_size];
+
+	if(buffer == NULL){
+		throw __FILE__ ":receive_string_table: Unable to allocate buffer";
+	}
+
+	MPI_Bcast(buffer, buffer_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+	unsigned char* ptr = buffer;
+
+	ptr = mpi_unpack(ptr, num_str);
+
+	m_table.clear();
+
+	for(unsigned int i = 0;i < num_str;++i){
+
+		string key;
+		size_t value;
+
+		ptr = mpi_unpack(ptr, key);
+		ptr = mpi_unpack(ptr, value);
+
+		m_table[key] = value;
+	}
+
+	delete [] buffer;
+}
+
+vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
+{
+	set<string> unique_keys;
+
+	// Optimization for a single rank
+	if(mpi_numtasks == 1){
+
+		for(unordered_map<string, size_t>::const_iterator i = m_table.begin();i != m_table.end();++i){
+			unique_keys.insert(i->first);
+		}
+
+		return vector<string>(unique_keys.begin(), unique_keys.end() );
+	}
+
+	const size_t max_num_str = 10000;
+
+	for(int i = 0;i < mpi_numtasks;++i){
+
+		if(i == mpi_rank){
+
+			unsigned int num_chunk = m_table.size()/max_num_str + (m_table.size()%max_num_str != 0);
+
+			MPI_Bcast(&num_chunk, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
+
+			unordered_map<string, size_t>::const_iterator start_iter = m_table.begin();
+
+			for(unsigned int chunk = 0;chunk < num_chunk;++chunk){
+
+				unsigned int num_str = 0;
+				unsigned int buffer_size = mpi_size(num_str);
+
+				for(unordered_map<string, size_t>::const_iterator j = start_iter;(j != m_table.end()) && (num_str < max_num_str) ;++j, ++num_str){
+					buffer_size += mpi_size(j->first);
+				}
+
+				MPI_Bcast(&buffer_size, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
+
+				unsigned char *buffer = new unsigned char [buffer_size];
+
+				if(buffer == NULL){
+					throw __FILE__ ":synchronize_keys: Unable to allocate send buffer";
+				}
+
+				unsigned char* ptr = buffer;
+
+				ptr = mpi_pack(ptr, num_str);
+
+				num_str = 0;
+
+				for(;(start_iter != m_table.end()) && (num_str < max_num_str) ;++start_iter, ++num_str){
+					
+					ptr = mpi_pack(ptr, start_iter->first);
+					unique_keys.insert(start_iter->first);
+				}
+
+				MPI_Bcast(buffer, buffer_size, MPI_BYTE, i, MPI_COMM_WORLD);
+
+				delete [] buffer;
+			}
+		}
+		else{
+
+			unsigned int num_chunk;
+
+			MPI_Bcast(&num_chunk, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
+
+			for(unsigned int chunk = 0;chunk < num_chunk;++chunk){
+
+				unsigned int num_str;
+				unsigned int buffer_size;
+
+				MPI_Bcast(&buffer_size, 1, MPI_UNSIGNED, i, MPI_COMM_WORLD);
+
+				unsigned char *buffer = new unsigned char [buffer_size];
+
+				if(buffer == NULL){
+					throw __FILE__ ":synchronize_keys: Unable to allocate recv buffer";
+				}
+
+				MPI_Bcast(buffer, buffer_size, MPI_BYTE, i, MPI_COMM_WORLD);
+
+				unsigned char* ptr = buffer;
+
+				ptr = mpi_unpack(ptr, num_str);
+
+				for(unsigned int j = 0;j < num_str;++j){
+
+					string key;
+
+					ptr = mpi_unpack(ptr, key);
+					unique_keys.insert(key);
+				}
+
+				delete [] buffer;
+			}
+		}
+	}
+
+	// Every rank gets the same set of strings in the same order
+	return vector<string>(unique_keys.begin(), unique_keys.end() );
 }
 
 #endif // USE_MPI
@@ -1308,10 +1527,10 @@ void select_best_match(list<hybrid_sig> &m_results)
 // Make the output unique (since different workers can be sent overlapping
 // target sequences) and save only the highest scoring exactly overlapping matches.
 // Let me be the first to admit that this function is rather kludgy (especially the
-// use of the top_strand() function -- which is way to easily broken by a change in
+// use of the top_strand() function -- which is way too easily broken by a change in
 // output format). A better way to remove redundant matches induced by target sequence
 // fragmentation would be welcome!
-void uniquify_results(list<hybrid_sig> &m_results)
+void uniquify_results(list<hybrid_sig> &m_results, const vector<string> &m_index_table)
 {
 	// If we fewer than two elements, then the results list is already unique
 	if(m_results.size() < 2){
@@ -1355,9 +1574,14 @@ void uniquify_results(list<hybrid_sig> &m_results)
 			}
 			
 			// The size of the primers divided by 2 (which will be zero if only probes are present)
-			const int forward_primer_len = iter->forward_oligo.size()/2;
-			const int reverse_primer_len = iter->reverse_oligo.size()/2;
+			const int forward_primer_len = index_to_str(iter->forward_oligo_str_index, m_index_table).size()/2;
+			const int reverse_primer_len = index_to_str(iter->reverse_oligo_str_index, m_index_table).size()/2;
 			
+			// Inflate the alignment strings once
+			const string forward_alignment = iter->has_primers() ? inflate_dna_seq( index_to_str(iter->forward_align_str_index, m_index_table) ) : string();
+			const string reverse_alignment = iter->has_primers() ? inflate_dna_seq( index_to_str(iter->reverse_align_str_index, m_index_table) ) : string();
+			const string probe_alignment = iter->has_primers() ? string() : inflate_dna_seq( index_to_str(iter->probe_align_str_index, m_index_table) );
+
 			list<I> valid_update;
 			
 			MatchState match_status = NO_MATCH;
@@ -1384,11 +1608,17 @@ void uniquify_results(list<hybrid_sig> &m_results)
 					
 					if(primers_overlap){
 					
+						const string valid_forward_alignment = inflate_dna_seq( 
+								index_to_str( (*valid_iter)->forward_align_str_index, m_index_table) );
+
+						const string valid_reverse_alignment = inflate_dna_seq( 
+								index_to_str( (*valid_iter)->reverse_align_str_index, m_index_table) );
+
 						// Does iter contain (*valid_iter)?
 						if( (iter->amplicon_range.first <= (*valid_iter)->amplicon_range.first) && 
 						    (iter->amplicon_range.second >= (*valid_iter)->amplicon_range.second) &&
-						    ( top_strand(iter->forward_align).find( top_strand( (*valid_iter)->forward_align) ) != string::npos) &&
-						    ( top_strand(iter->reverse_align).find( top_strand( (*valid_iter)->reverse_align) ) != string::npos) ){
+						    ( top_strand(forward_alignment).find( top_strand(valid_forward_alignment) ) != string::npos) &&
+						    ( top_strand(reverse_alignment).find( top_strand(valid_reverse_alignment) ) != string::npos) ){
 
 						    same_match = A_CONTAINS_B;
 						}
@@ -1397,8 +1627,8 @@ void uniquify_results(list<hybrid_sig> &m_results)
 							// Does (*valid_iter) contain iter?
 							if( ( (*valid_iter)->amplicon_range.first <= iter->amplicon_range.first) &&
 							    ( (*valid_iter)->amplicon_range.second >= iter->amplicon_range.second) &&
-							    ( top_strand( (*valid_iter)->forward_align ).find( top_strand(iter->forward_align) ) != string::npos) &&
-							    ( top_strand( (*valid_iter)->reverse_align ).find( top_strand(iter->reverse_align) ) != string::npos) ){
+							    ( top_strand(valid_forward_alignment).find( top_strand(forward_alignment) ) != string::npos) &&
+							    ( top_strand(valid_reverse_alignment).find( top_strand(reverse_alignment) ) != string::npos) ){
 
 							    same_match = B_CONTAINS_A;
 							}
@@ -1407,16 +1637,19 @@ void uniquify_results(list<hybrid_sig> &m_results)
 						// If there is also a probe associated with these assays, make sure that the probes bind to the same location
 					    	// in the target sequence (otherwise, these matches are distinct).
 					    	if( iter->has_probe() && (*valid_iter)->has_probe() && (iter->probe_range != (*valid_iter)->probe_range) ){
-							same_match = NO_MATCH;
+								same_match = NO_MATCH;
 					    	}
 					}
 				}
 				else{ // Compare by probe
 					
+					const string valid_probe_alignment = 
+						inflate_dna_seq( index_to_str( (*valid_iter)->probe_align_str_index, m_index_table) );
+
 					// Does iter contain (*valid_iter)?
 					if( (iter->probe_range.first <= (*valid_iter)->probe_range.first) &&
 					    (iter->probe_range.second >= (*valid_iter)->probe_range.second) &&
-					    ( top_strand( (iter->probe_align ) ).find( top_strand( (*valid_iter)->probe_align ) ) != string::npos) ){
+					    ( top_strand(probe_alignment).find( top_strand(valid_probe_alignment) ) != string::npos) ){
 					    
 						same_match = A_CONTAINS_B;
 					}
@@ -1425,7 +1658,7 @@ void uniquify_results(list<hybrid_sig> &m_results)
 						// Does (*valid_iter) contain iter?
 						if( ( (*valid_iter)->probe_range.first <= iter->probe_range.first) &&
 						    ( (*valid_iter)->probe_range.second >= iter->probe_range.second) &&
-						    ( top_strand( (*valid_iter)->probe_align ).find(top_strand(iter->probe_align ) ) != string::npos) ){
+						    ( top_strand(valid_probe_alignment).find( top_strand(probe_alignment) ) != string::npos) ){
 
 						    same_match = B_CONTAINS_A;
 						}
@@ -1526,8 +1759,8 @@ unsigned int probe_only_count(const vector<hybrid_sig> &m_queries)
 	
 	for(iter = m_queries.begin();iter != m_queries.end();iter++){
 		
-		if( !iter->probe_oligo.empty() && 
-			iter->forward_oligo.empty() && iter->reverse_oligo.empty() ){
+		if( (iter->probe_oligo_str_index != INVALID_INDEX) && 
+			(iter->forward_oligo_str_index == INVALID_INDEX) && (iter->reverse_oligo_str_index == INVALID_INDEX) ){
 			count ++;
 		}
 	}
@@ -1535,8 +1768,8 @@ unsigned int probe_only_count(const vector<hybrid_sig> &m_queries)
 	return count;
 }
 
-bool query_sched(const unsigned int &m_num_target, 
-	const unsigned int &m_num_query, const unsigned int &m_num_worker,
+bool query_sched(const size_t &m_num_target, 
+	const size_t &m_num_query, const size_t &m_num_worker,
 	const float &m_S_div_H, const int &m_mode)
 {
 	if(m_mode == QUERY_SEGMENTATION_ON){
@@ -1572,9 +1805,13 @@ bool query_sched(const unsigned int &m_num_target,
 		return false;
 	}
 
+	// The following calculations initially used unsigned int to store m_num_target, m_num_worker and m_num_query.
+	// GenBank NT database is now large enough that m_num_target*(a smallish number of queries or workers) will exceed
+	// the maximum value for an unsigned int. Wow! Like a Y2K bug for genomics!
+
 	// The cost of segmenting queries
 	const float cost_seq = float( m_num_target*min(m_num_query, m_num_worker)*
-		(1.0f + m_S_div_H*max(1u, m_num_query/m_num_worker) ) )/
+		(1.0f + m_S_div_H*max(size_t(1), m_num_query/m_num_worker) ) )/
 		min(m_num_worker, m_num_target*m_num_query);
 	
 	// The cost of *not* segmenting queries

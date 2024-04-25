@@ -28,7 +28,11 @@ unsigned int num_minus_tm_eval = 0;
 int main(int argc, char *argv[])
 {	
 	int ret_value = EXIT_FAILURE;
-	
+
+	// Initialize for the case when we are not using MPI
+	mpi_numtasks = 1;
+	mpi_rank = 0;
+
 	#ifdef USE_MPI
 
 	MPI_Init(&argc, &argv);
@@ -36,6 +40,9 @@ int main(int argc, char *argv[])
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	
 	if(mpi_numtasks < 2){
+
+		// Shut down MPI right away
+		MPI_Finalize();
 
 		#ifdef _OPENMP
 		cout << "Running on local machine [" << omp_get_max_threads() << " thread(s)]" << endl;
@@ -52,9 +59,9 @@ int main(int argc, char *argv[])
 		else{ // Worker
 			ret_value = worker(argc, argv);
 		}
+
+		MPI_Finalize();
 	}
-	
-	MPI_Finalize();
 	#else // USE_MPI not defined
 	
 	#ifdef _OPENMP

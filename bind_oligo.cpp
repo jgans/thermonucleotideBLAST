@@ -131,7 +131,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
 		const unsigned int &m_max_mismatch)
-{		
+{
 	const unsigned int window = m_melt.size_query();
 
 	// How many target bases should we add to both the 5' and 3' tails of the target sequence? 
@@ -148,14 +148,14 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 		
 	// Iterate over all possible word arrangements within this fragment of window bases. Note that the prefix iterator
 	// increment (i.e. ++hash_iter) is more efficient than the postfix interator increment (i.e. hash_iter++) since the
-	// latter requires an addition iterator copy operation.
+	// latter requires an additional iterator copy operation.
 	for(DNAHash::iterator hash_iter = m_hash.find(m_oligo);hash_iter != m_hash.end();++hash_iter){
 		match_seed.push_back( make_pair(hash_iter.offset(), *hash_iter) );
 	}
 		
 	match_seed.sort( sort_by_delta() );
 	match_seed.unique( unique_by_delta() );
-		
+	
 	// Iterate over *unique* word arrangements within this fragment of window bases
 	for(list< pair<unsigned int, unsigned int> >::const_iterator match_iter = match_seed.begin();match_iter != match_seed.end();
 		++match_iter){
@@ -573,7 +573,7 @@ void bind_oligo_to_minus_strand(list<oligo_info> &info_list,
 			#ifdef PROFILE
 			num_minus_tm_eval ++;
 			#endif // PROFILE
-			
+
 			const float tm = m_melt.approximate_tm_heterodimer();
 
 			if( (tm < m_min_oligo_tm) || (tm > m_max_oligo_tm) ){

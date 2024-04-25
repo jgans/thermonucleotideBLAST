@@ -32,6 +32,11 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 	// Does this filename refer to a blast database?
 	try{
 
+		// Disable thread locking within CSeqDB, as all access will be protected by an OpenMP critical section.
+		// Update: Appears to be slower! Why?
+		//blast_db_ptr = new NCBI_NS_NCBI::CSeqDB(m_filename, NCBI_NS_NCBI::CSeqDB::eNucleotide, 
+		//	NULL, false /*disable thread locking*/);
+
 		blast_db_ptr = new NCBI_NS_NCBI::CSeqDB(m_filename, NCBI_NS_NCBI::CSeqDB::eNucleotide);
 
 		if(blast_db_ptr == NULL){
@@ -443,6 +448,9 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 		// There is at least one example of a blast 'nt' database (from May 10, 2021) for which at least
 		// one sequence index throws an error when we attempt to load the CBioseq. If this happens, return
 		// a zero length sequence.
+
+		const char* seq_buffer = NULL;
+
 		try{
 
 			ncbi::CRef<ncbi::objects::CBioseq> bs = blast_db_ptr->GetBioseqNoData(m_index);
@@ -489,7 +497,6 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 			}
 
 			// Extract the sequence data
-			const char* seq_buffer = NULL;
 			const int start = m_start;
 
 			// The stop value that we pass to GetAmbigSeq is not
@@ -598,11 +605,23 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 			}
 
 			blast_db_ptr->RetAmbigSeq(&seq_buffer);
+			seq_buffer = NULL;
 		}
 		catch(...){
 
 			m_seq.first = "Invalid";
+			
+			if(m_seq.second != NULL){
+				delete [] m_seq.second;
+			}
+
 			m_seq.second = NULL;
+
+			if(seq_buffer != NULL){
+
+				blast_db_ptr->RetAmbigSeq(&seq_buffer);
+				seq_buffer = NULL;
+			}
 		}
 	}
 	

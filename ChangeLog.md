@@ -1,10 +1,42 @@
+# Version 2.66 (April 24, 2024)
+- Fixed a bug that prevented matches to target sequences that contained degenerate nucleotides (thanks to
+  Kathleen Kolehmainen for pointing this out).
+
+# Version 2.65 (March 7, 2024)
+- Added additional tests to sequence_data::read_bio_seq_ncbi() to reduce the chance of leaking memory when a
+  BLAST-formatted sequence fails to load.
+- Explicitly close the seq_file in tntblast_worker() to attempt to free any memory that might be associated with a 
+  BLAST-formatted database.
+- Explicitly deallocate the str_table in tntblast_worker() before sending results to the master (to reduce total memory
+  consumption before we need to allocate memory for MPI transport buffers).
+- Remove the "alignment size = " field from the output (not needed and increases output size).
+- Changed inosine alignment symbol from '!' to '|' to reduce confusion and improve compression
+- Changed degenerate base alignment symbol from '*' to '|' to reduce confusion and improve compression
+- Added string compression using a simple version of Huffman encoding
+	- Amplicon sequences
+	- Primer and probe alignment strings
+- Fixed a subtle bug in `query_sched()` that caused the premature use of query segmentation. This bug was caused by
+  using `unsigned int` to store `m_num_target`, `m_num_worker`, and `m_num_query`. GenBank NT database is now large 
+  enough that `m_num_target`*(a smallish number of queries or workers) will exceeds the maximum value for an 
+  `unsigned int`. Wow! Like a Y2K bug for genomics!
+- Adaptive query segmentation does not appear to be working properly for BLAST NT -- change the default to "never"
+  (and perform additional tests to fix).
+- Restored the code allowed primer masking
+
+# Version 2.62 (December 10, 2023)
+- Reduced the memory footprint of the hybrid_sig class.
+	- Replaced std::string() member variables with indicies into a shared string table.
+	- Replaced some 4-byte integer values with smaller byte integers.
+	- Still have primer/probe-specific values (like forward_hairpin_tm, reverse_hairpin_tm, ...) which could be pulled
+	  out of hybrid_sig (and recomputed when results are output to the user).
+
 # Version 2.61 (September 1, 2023)
-- Fixed a multi-threading race condition when reading BLAST-formatted databases (thanks to Steven Higgins for pointing this out!).
+- Fixed multi-threading race condition when reading BLAST-formatted databases (thanks to Steven Higgins for pointing this out).
 
 # Version 2.6 (August 4, 2023)
 - Updated command line options output to indicate optional arguments
-- Fixed algorithm that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
-  There was a bug that had the side effect of removing matches to primers with more than 50% unalignable bases.
+- Fixed test that was intended to remove spurious matches to target sequences with a large fraction of degerate bases.
+  This poorly implemented test had the side effect of removing matches to primers with more than 50% unalignable bases.
   This test has been fixed and the `num_read_bases()` member function in `nuc_cruc.h` has been replaced by the `fraction_aligned_real_base_pairs()` member function. The test for fraction of aligned real bases in applied in the
   `bind_oligo_to_*()` functions contained in `bind_oligo.cpp`.
 - Fixed bug in the display of unaligned bases in primer alignments (in `nuc_cruc_output.cpp`). 

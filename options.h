@@ -83,10 +83,10 @@ struct Options
 		// Set sensible default values for program parameters
 		void default_values()
 		{
-			dbase_filename = "";
-			local_dbase_filename = "";
-			output_filename = "";
-			input_filename = "";
+			dbase_filename = std::string();
+			local_dbase_filename = std::string();
+			output_filename = std::string();
+			input_filename = std::string();
 
 			// Maximum amplicon length
 			max_len = DEFAULT_MAX_LEN;
@@ -151,7 +151,9 @@ struct Options
 			
 			// Use the adaptive algorithm (in query_sched() -- see tntblast_util.cpp)
 			// to decide when to start segmenting queries
-			query_segmentation = QUERY_SEGMENTATION_ADAPTIVE;
+			// Update: February 29, 2024 Adaptive query segmentation is currently not working for
+			// the BLAST NT database. Disable by default until fixed!
+			query_segmentation = QUERY_SEGMENTATION_OFF;
 			
 			// Use the SantaLucia hybridization parameters
 			melting_param = DEFAULT_MELT_PARAM;
@@ -217,9 +219,9 @@ struct Options
 				(assay_format == ASSAY_PADLOCK);
 		};
 		
-		size_t max_product_length() const;
+		size_t max_product_length(const std::vector<std::string> &m_oligo_table) const;
 		
-		void write_queries(std::ostream &s);
+		void write_queries(std::ostream &s, const std::vector<std::string> &m_str_table);
 		
 		friend std::ostream& operator << (std::ostream &s, const Options &m_opt);
 

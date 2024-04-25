@@ -58,7 +58,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 					s << '|';
 					break;
 				case INOSINE_MATCH:
-					s << '!';
+					s << '|';
 					break;
 			};
 		}
@@ -69,7 +69,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 			s << base_map[*q_iter];
 		}
 
-		s << "\nhairpin";
+		//s << "\nhairpin";
 	}
 	else{ // m_melt.tm_mode != NucCruc::HAIRPIN
 
@@ -113,7 +113,7 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 
 		// The prefix is formally unaligned. However, there may be complementary
 		// bases between the query and target (that were not thermodynamically favorable, and hence
-		// not aligned). Indicate complementary, but unaigned, bases with a ':'.
+		// not aligned). Indicate complementary, but unaligned, bases with a ':'.
 
 		for(int i = 0;i < prefix_len;++i){
 
@@ -161,10 +161,10 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 					s << '|';
 					break;
 				case INOSINE_MATCH:
-					s << '!';
+					s << '|';
 					break;
 				case DEGENERATE_MATCH:
-					s << '*';
+					s << '|';
 					break;
 			};
 		}
@@ -201,12 +201,13 @@ ostream& operator << (ostream &s, const NucCruc &m_melt)
 			s << base_map[ m_melt.target[m_melt.curr_align.last_match.second - i] ];
 		}
 
-		s << " 5'" << endl;
+		s << " 5'";
+		//s << " 5'" << endl;
 
-		s << "dimer";
+		//s << "dimer";
 	}
 	
-	s << " alignment size = " << m_melt.curr_align.query_align.size();
+	//s << " alignment size = " << m_melt.curr_align.query_align.size();
 	
 	return s;
 }
