@@ -974,7 +974,7 @@ int master(int argc, char *argv[])
 							(*ptr_out) << "max 3' clamp = " << iter->max_primer_clamp() << endl;
 						}
 
-						if(opt.assay_format == ASSAY_PADLOCK){
+						if( (opt.assay_format == ASSAY_PADLOCK) || (opt.assay_format == ASSAY_MIPS) ){
 
 							(*ptr_out) << "5' probe 3' ligation clamp = " << int(iter->forward_primer_clamp)
 								<< endl;
@@ -1058,7 +1058,7 @@ int master(int argc, char *argv[])
 						}
 						else{
 							
-							if(opt.assay_format == ASSAY_PADLOCK){
+							if( (opt.assay_format == ASSAY_PADLOCK) || (opt.assay_format == ASSAY_MIPS) ){
 								(*ptr_out) << "product range = " << iter->amplicon_range.first 
 									<< " .. " << iter->amplicon_range.second  << endl;
 								(*ptr_out) << "product length = " << amplicon_seq.size() << endl;

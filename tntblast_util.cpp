@@ -724,18 +724,26 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 	// b) are contiguous
 	int id = 0;
 	
-	if(m_format == ASSAY_PADLOCK){
+	if( (m_format == ASSAY_PADLOCK) || (m_format == ASSAY_MIPS) ){
 		
-		// Assume that all Padlock/MOLpcr probes are stored
-		// as forward-reverse pairs in the input file
+		// Assume that all Padlock/MOLpcr probes are stored as forward-reverse pairs in the input file.
+		//
+		// MIP assay oligos are tethered togther by a linker, so no multiplexing is needed.
+		// It is possible to ligate *different* MIPS to form a single DNA molecule:
+		//	- When a linear DNA molecule is created by ligating two MIPS together, this molecule will not be sequenced
+		//	  and could mask an intended MIPS product (false negative)
+		//	- When a pair of *nested* MIPS are ligated to form a circular DNA molecule, the expected target sequence
+		//	  of the outer MIP can be masked (partial negative).
 		for(vector<hybrid_sig>::const_iterator i = m_sig.begin();i != m_sig.end();i++){
 		
 			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
+				const string assay_name = (i == j) ?  index_to_str(i->name_str_index, m_oligo_table)
+					: index_to_str(i->name_str_index, m_oligo_table) + "(5')/" + 
+					  index_to_str(j->name_str_index, m_oligo_table) + "(3')";
+
 				hybrid_sig tmp( 
-					str_to_index(
-						index_to_str(i->name_str_index, m_oligo_table) + "(5')/" + 
-						index_to_str(j->name_str_index, m_oligo_table) + "(3')", m_str_table), 
+					str_to_index(assay_name, m_str_table), 
 					i->forward_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
@@ -1115,19 +1123,28 @@ void receive_string_table(unordered_map<string, size_t> &m_table)
 	delete [] buffer;
 }
 
+#endif // USE_MPI
+
 vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
 {
 	set<string> unique_keys;
 
+	#ifdef USE_MPI
 	// Optimization for a single rank
 	if(mpi_numtasks == 1){
+	#endif // USE_MPI
 
 		for(unordered_map<string, size_t>::const_iterator i = m_table.begin();i != m_table.end();++i){
 			unique_keys.insert(i->first);
 		}
 
 		return vector<string>(unique_keys.begin(), unique_keys.end() );
+
+	#ifdef USE_MPI
 	}
+	#endif // USE_MPI
+
+	#ifdef USE_MPI
 
 	const size_t max_num_str = 10000;
 
@@ -1215,9 +1232,8 @@ vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
 
 	// Every rank gets the same set of strings in the same order
 	return vector<string>(unique_keys.begin(), unique_keys.end() );
+	#endif // USE_MPI
 }
-
-#endif // USE_MPI
 
 unsigned int write_inverse_matches(ostream &m_fout, const sequence_data &m_data,
 	set<string> &m_targets)

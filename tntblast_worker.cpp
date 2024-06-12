@@ -318,7 +318,21 @@ int worker(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
-								opt.target_strand,
+								opt.target_strand, 0 /*max len*/,
+								oligo_table,
+								str_table);
+
+							break;
+						case ASSAY_MIPS:
+
+							local_results = padlock(dbase, bio_seq,
+								sig_ref, melt, plus_strand_melt_cache, minus_strand_melt_cache,
+								forward_primer_strand, reverse_primer_strand, 
+								opt.min_probe_tm, opt.max_probe_tm,
+								opt.min_probe_dg, opt.max_probe_dg,
+								opt.probe_clamp_5, opt.probe_clamp_3, 
+								opt.max_gap, opt.max_mismatch,
+								opt.target_strand, opt.max_len,
 								oligo_table,
 								str_table);
 

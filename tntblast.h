@@ -338,9 +338,9 @@ void serve_sequence(const int &m_dest,
 	const unsigned int &m_index, const sequence_data &m_data);
 void distribute_string_table(const std::unordered_map<std::string, size_t> &m_table);
 void receive_string_table(std::unordered_map<std::string, size_t> &m_table);
-std::vector<std::string> synchronize_keys(const std::unordered_map<std::string, size_t> &str_table);
-
 #endif // USE_MPI
+
+std::vector<std::string> synchronize_keys(const std::unordered_map<std::string, size_t> &str_table);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Im tntblast_local.cpp
@@ -438,7 +438,7 @@ std::list<hybrid_sig> padlock(DNAHash &m_hash, const std::pair<std::string, SEQP
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3, 
 	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
-	const int &m_target_strand,
+	const int &m_target_strand, const int &m_max_len,
 	const std::vector<std::string> &m_oligo_table,
 	std::unordered_map<std::string, size_t> &m_str_table);
 

@@ -15,7 +15,7 @@
 #define	COMMENT_SYMBOL						'#'
 
 // What assay are we simulating?
-enum {ASSAY_PCR, ASSAY_PROBE, ASSAY_PADLOCK, ASSAY_AFFYMETRIX, ASSAY_NONE};
+enum {ASSAY_PCR, ASSAY_PROBE, ASSAY_PADLOCK, ASSAY_MIPS, ASSAY_AFFYMETRIX, ASSAY_NONE};
 
 // We need to protect any commas that appear in template variables
 // if we are going to combine them with X Macros

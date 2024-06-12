@@ -428,7 +428,7 @@ void Options::parse_command_line(int argc, char *argv[])
 		cerr << "\t[-t <primer strand concentration (in MOL)>] (default is " << DEFAULT_PRIMER_STRAND << " M)" << endl;
 		cerr << "\t[-T <Probe strand concentration (in MOL)>] (default is " << DEFAULT_PROBE_STRAND << " M)" << endl;
 		cerr << "\t[-y <ratio of forward/reverse strand concentrations>] (default is 1, i.e. symmetric PCR)" << endl;
-		cerr << "\t[-A <PCR | PROBE | PADLOCK | AFFY>] (assay format, default is PCR)" << endl;
+		cerr << "\t[-A <PCR | PROBE | PADLOCK | MIPS | AFFY>] (assay format, default is PCR)" << endl;
 		cerr << "\t[-W <2-8>] (hash word length, default is " << DEFAULT_HASH_WORD_SIZE << ")" << endl;
 		cerr << "\t[-m <output format>] " << endl;
 		cerr << "\t\t0 = verbose output file (default)" << endl;
@@ -502,6 +502,10 @@ unsigned int Options::parse_assay_format(string m_opt)
 	if(m_opt == "PADLOCK"){
 		return ASSAY_PADLOCK;
 	}
+
+	if( (m_opt == "MIPS") || (m_opt == "MIP") ){
+		return ASSAY_MIPS;
+	}
 	
 	if( (m_opt == "AFFYMETRIX") || (m_opt == "AFFY") ){
 		return ASSAY_AFFYMETRIX;
@@ -522,8 +526,8 @@ void Options::validate_parameters()
 	
 	if(ignore_probe){
 	
-		if(assay_format == ASSAY_PROBE){
-			throw "Error: Ignore probes (i.e. -p T) can not be used with the probe assay format";
+		if(assay_format != ASSAY_PCR){
+			throw "Error: Ignore probes (i.e. -p T) can only be used with a PCR-based assay format";
 		}
 		
 		if(verbose){
@@ -851,17 +855,42 @@ void Options::validate_search_threshold()
 			
 			if( !(threshold_format & THRESHOLD_PROBE_DELTA_G) &&
 			    !(threshold_format & THRESHOLD_PROBE_TM) ){
-			    	
-				throw "Please specify probe search bounds in Tm and/or Delta G";
+			    
+				// Check to see if the user has specified primer constraints. Since this assay format is 
+				// only has probes, we can set the probe constraints to the user-specified primer constraints
+				if( (threshold_format & THRESHOLD_PRIMER_DELTA_G) || (threshold_format & THRESHOLD_PRIMER_TM) ){
+
+					min_probe_dg = min_primer_dg;
+					max_probe_dg = max_primer_dg;
+
+					min_probe_tm = min_primer_tm;
+					max_probe_tm = max_primer_tm;
+				}
+				else{
+					throw "Please specify probe search bounds in Tm and/or Delta G";
+				}
 			}
 			
 			break;
 		case ASSAY_PADLOCK:
+		case ASSAY_MIPS:
 			
 			if( !(threshold_format & THRESHOLD_PROBE_DELTA_G) &&
 			    !(threshold_format & THRESHOLD_PROBE_TM) ){
-			    	
-				throw "Please specify probe search bounds in Tm and/or Delta G";
+			    
+				// Check to see if the user has specified primer constraints. Since this assay format is 
+				// only has probes, we can set the probe constraints to the user-specified primer constraints
+				if( (threshold_format & THRESHOLD_PRIMER_DELTA_G) || (threshold_format & THRESHOLD_PRIMER_TM) ){
+
+					min_probe_dg = min_primer_dg;
+					max_probe_dg = max_primer_dg;
+
+					min_probe_tm = min_primer_tm;
+					max_probe_tm = max_primer_tm;
+				}
+				else{
+					throw "Please specify probe search bounds in Tm and/or Delta G";
+				}
 			}
 			
 			break;
