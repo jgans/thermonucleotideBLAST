@@ -68,7 +68,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	const float &m_min_probe_dg, const float &m_max_probe_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
-	const int &m_target_strand,
+	const int &m_target_strand, const int &m_max_len,
 	const std::vector<std::string> &m_oligo_table,
 	std::unordered_map<std::string, size_t> &m_str_table)
 {	
@@ -140,8 +140,13 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			//cerr << "\tdown = [" << down_iter->loc_5 << ", " << down_iter->loc_3 << "]" << endl;
 			//cerr << "\tup = [" << up_iter->loc_5 << ", " << up_iter->loc_3 << "]" << endl;
 			
+			const int len = up_iter->loc_5 - down_iter->loc_3 - 1;
+
 			// loc coordinates are measured in the target plus strand
-			if( (down_iter->loc_3 + 1) == up_iter->loc_5){
+			// Update May 31, 2024:
+			//	- Padlock and MOL-PCR assays use m_max_len == 0
+			//	- MIPS assays allow a user-specified m_max_len >= 0
+			if( (len >= 0) && (len <= m_max_len) ){
 				
 				// DEBUG
 				//cerr << "\t21-" << endl;
