@@ -1,3 +1,10 @@
+# Version 2.67 (May 31, 2024)
+- Added support for Molecular Inversion Probes (MIPS). These assays have the same geometry as Padlock/MOL-PCR assays
+  but allows amplicon lengths > 0.
+- Allow user to specify melting temperature and delta G search constraints using either primer (-e/-g) or probe (-E/-G)
+  command line arguments when the assay format is unambiguous (i.e. all primer or all probe; not TaqMan PCR)
+- Fixed compile-time error ("synchronize_keys was not declared in this scope") when not using MPI (thanks to Stefan Rooke).
+
 # Version 2.66 (April 24, 2024)
 - Fixed a bug that prevented matches to target sequences that contained degenerate nucleotides (thanks to
   Kathleen Kolehmainen for pointing this out).
