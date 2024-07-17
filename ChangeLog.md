@@ -1,3 +1,8 @@
+# Version 2.68 (July 16, 2024)
+- Fixed a bug in the GBK file parsing code (in annontation_gbk.cpp) that caused a spurious error to be thrown when reading
+  the file https://ftp.ncbi.nlm.nih.gov/genomes/refseq/mitochondrion/mitochondrion.1.genomic.gbff.gz (thanks to Steven Higgins 
+  for pointing this out!).
+
 # Version 2.67 (May 31, 2024)
 - Added support for Molecular Inversion Probes (MIPS). These assays have the same geometry as Padlock/MOL-PCR assays
   but allows amplicon lengths > 0.
