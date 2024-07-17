@@ -103,7 +103,7 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 				// Read and throw away the line
 				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
 					//throw error_msg("Error reading GBK_NO_KEY");
-					return false; // We have readed the end of the file
+					return false; // We have reached the end of the file
 				}
 
 				line_number ++;
@@ -112,7 +112,8 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 
 				// Read and throw away the line
 				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-					throw error_msg("Error reading GBK_UNKNOWN_KEY");
+					//throw error_msg("Error reading GBK_UNKNOWN_KEY");
+					return false; // We have reached the end of the file
 				}
 
 				line_number ++;
