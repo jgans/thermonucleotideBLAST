@@ -6,68 +6,67 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 	annotation_gbk.o annotation_util.o \
 	sequence_data_fastx.o tntblast_timer.o mpi_util.o
 
-CC = mpic++
+# -----------------------
+# Toolchain defaults (override from CLI / CI)
+# -----------------------
+CC ?= g++
+BIN ?= tntblast
 
-PROFILE = #-g -pg
+PROFILE ?= # -g -pg
+OPENMP ?=
+FLAGS_EXTRA ?=
 
-# If you're using gcc and would like to enable single computer multi-threading,
-# uncomment this OPENMP variable
-OPENMP = -fopenmp
+# Set to 1 to compile with MPI support (will switch compiler to mpic++ unless CC is explicitly set)
+USE_MPI ?= 0
 
-# If you're using the clang C++ compiler on OS X and would like to enable single 
-# computer multi-threading, please uncomment this CLANG_OPENMP variable.
-#	- Before attemping to compile tntblast, please read the very helpfull
-# 		blog post at https://iscinumpy.gitlab.io/post/omp-on-high-sierra/
-# 	- Follow the process documented in the above blog post to install the required
-#		OpenMP libraries that are needed by the Clang compiler.
-#	- When running tntblast on OS X, please note that DYLD_LIBRARY_PATH must be set 
-#		to the directory that contains the OpenMP libomp.dylib file, i.e., :
-#	
-#		export DYLD_LIBRARY_PATH=/$HOME/llvm-project/build-openmp/runtime/src
-# With the introduction of ncbi-blast-2.11, we must specify -std=c++14 (as opposed to the
-# -std=c++11 that was used for ncbi-blast-2.10
+# Optional: set BLAST_DIR to enable BLAST DB support; default is empty (disabled)
+BLAST_DIR ?=
 
-#CLANG_OPENMP = -Xpreprocessor -fopenmp
+# -----------------------
+# Flags
+# -----------------------
+BASE_FLAGS = $(PROFILE) -O3 -Wall -std=c++14
+FLAGS = $(BASE_FLAGS) $(OPENMP) $(FLAGS_EXTRA)
 
-# Define USE_MPI to enable MPI
-FLAGS = $(PROFILE) -O3 -Wall $(OPENMP) -std=c++14 -DUSE_MPI
-
-INC = -I. 
+INC = -I.
 LIBS = -lm -lz
 
+# If MPI requested and user didn't override CC, use mpic++
+ifeq ($(USE_MPI),1)
+  ifeq ($(origin CC), default)
+    CC = mpic++
+  endif
+  FLAGS += -DUSE_MPI
+endif
+
+# -----------------------
+# Clang OpenMP (optional)
+# -----------------------
 ifdef CLANG_OPENMP
 	OPENMP = $(CLANG_OPENMP)
 	INC += -I$(HOME)/llvm-project/build-openmp/runtime/src
 	LIBS += -L$(HOME)/llvm-project/build-openmp/runtime/src -lomp
 endif
 
-# The BLAST_DIR variable should only be defined if you wish to be able to
-# read NCBI BLAST-formatted database files. This functionality is optional, and
-# can be disabled by commenting out the BLAST_DIR variable by adding the '#' symbol
-# to the start of the line below (i.e. "#BLAST_DIR").
-BLAST_DIR = $(HOME)/ncbi-blast-2.12.0+-src
-
-ifdef BLAST_DIR
-
+# -----------------------
+# Optional BLAST DB support
+# -----------------------
+ifneq ($(strip $(BLAST_DIR)),)
 	FLAGS += -DUSE_BLAST_DB
-
-	# Compile with the NCBI C++ toolkit (tntblast will be able to read BLAST-formatted databases)
 	INC += -I$(BLAST_DIR)/include/ncbi-tools++
 	LIBS += -L $(BLAST_DIR)/lib \
 		-lseqdb -lxobjmgr -lblastdb -lgeneral -lgenome_collection -llmdb \
 		-lseq -lpub -lmedline -lseqcode -lseqset -lsequtil -lxser -lxutil -lxncbi -lsubmit -lbiblio -ldl
-
 endif
 
 .SUFFIXES : .o .cpp .c
-.cpp.o:	
+.cpp.o:
 	$(CC) $(FLAGS) $(INC) -c $<
 
-all: tntblast
+all: $(BIN)
 
-tntblast : $(OBJS)
-	$(CC) $(PROFILE) -o tntblast $(OBJS) $(LIBS) $(OPENMP)
+$(BIN): $(OBJS)
+	$(CC) $(PROFILE) -o $(BIN) $(OBJS) $(LIBS) $(OPENMP)
 
 clean:
-	-rm -f *.o
-
+	-rm -f *.o $(BIN)
