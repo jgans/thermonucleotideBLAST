@@ -89,12 +89,15 @@ jobs:
           mpirun -np 2 ./dist/tntblast_mpi -h || true
 
       - name: Package
+        shell: bash
         run: |
-          set -euxo pipefail
-          VERSION="${GITHUB_REF_NAME:-dev}"
-          VERSION_SAFE="${VERSION//\//_}"
-          OUT="tntblast-${VERSION_SAFE}-${{ matrix.name }}-x86_64.tar.gz"
-          tar -czf "$OUT" -C dist .
+            set -euxo pipefail
+            RAW_VERSION="${GITHUB_REF_NAME:-dev}"
+            # sanitize: replace slashes and spaces with hyphens
+            VERSION="$(echo "$RAW_VERSION" | tr '/ ' '--')"
+            OUT="tntblast-${VERSION}-${{ matrix.name }}-x86_64.tar.gz"
+            tar -czf "$OUT" -C dist .
+            sha256sum "$OUT" > "$OUT.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
