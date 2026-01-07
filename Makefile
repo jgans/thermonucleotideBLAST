@@ -9,9 +9,8 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 # -----------------------
 # Toolchain defaults (override from CLI / CI)
 # -----------------------
-
-# GNU Make sets CC=cc by default, so ?= won't override it.
-# Force g++ unless user explicitly sets CC.
+# NOTE: GNU Make sets CC=cc by default, so "CC ?= g++" will NOT override it.
+# Force g++ unless the user explicitly sets CC (e.g., CC=clang++).
 ifeq ($(origin CC), default)
 CC = g++
 endif
@@ -22,7 +21,7 @@ PROFILE ?= # -g -pg
 OPENMP ?=
 FLAGS_EXTRA ?=
 
-# Set to 1 to compile with MPI support (will switch compiler to mpic++ unless CC is explicitly set)
+# Set to 1 to compile with MPI support (will switch compiler to mpic++ unless user overrides CC on command line)
 USE_MPI ?= 0
 
 # Optional: set BLAST_DIR to enable BLAST DB support; default is empty (disabled)
@@ -37,16 +36,19 @@ FLAGS = $(BASE_FLAGS) $(OPENMP) $(FLAGS_EXTRA)
 INC = -I.
 LIBS = -lm -lz
 
-# If MPI requested and user didn't override CC, use mpic++
+# -----------------------
+# MPI support
+# -----------------------
+# If MPI requested, use mpic++ unless user explicitly set CC on the command line.
 ifeq ($(USE_MPI),1)
-  ifeq ($(origin CC), default)
+  ifneq ($(origin CC), command line)
     CC = mpic++
   endif
   FLAGS += -DUSE_MPI
 endif
 
 # -----------------------
-# Clang OpenMP (optional)
+# Clang OpenMP (optional; macOS users)
 # -----------------------
 ifdef CLANG_OPENMP
 	OPENMP = $(CLANG_OPENMP)
@@ -55,7 +57,7 @@ ifdef CLANG_OPENMP
 endif
 
 # -----------------------
-# Optional BLAST DB support
+# Optional BLAST DB support (disabled unless BLAST_DIR is set)
 # -----------------------
 ifneq ($(strip $(BLAST_DIR)),)
 	FLAGS += -DUSE_BLAST_DB
@@ -66,6 +68,7 @@ ifneq ($(strip $(BLAST_DIR)),)
 endif
 
 .SUFFIXES : .o .cpp .c
+
 .cpp.o:
 	$(CC) $(FLAGS) $(INC) -c $<
 
