@@ -92,9 +92,9 @@ jobs:
         run: |
           set -euxo pipefail
           VERSION="${GITHUB_REF_NAME:-dev}"
-          OUT="tntblast-${VERSION}-${{ matrix.name }}-x86_64.tar.gz"
+          VERSION_SAFE="${VERSION//\//_}"
+          OUT="tntblast-${VERSION_SAFE}-${{ matrix.name }}-x86_64.tar.gz"
           tar -czf "$OUT" -C dist .
-          sha256sum "$OUT" > "$OUT.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
