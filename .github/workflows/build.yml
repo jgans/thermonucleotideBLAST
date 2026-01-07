@@ -1,4 +1,4 @@
-name: build-lbinaries
+name: build-linux-binaries
 
 on:
   push:
@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
