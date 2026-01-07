@@ -21,6 +21,7 @@ jobs:
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 ca-certificates git make g++ file \
+                zlib1g-dev \
                 openmpi-bin libopenmpi-dev
 
           - name: ubuntu-22.04
@@ -29,12 +30,14 @@ jobs:
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 ca-certificates git make g++ file \
+                zlib1g-dev \
                 openmpi-bin libopenmpi-dev
 
           - name: rocky-8
             container: rockylinux:8
             install: |
               dnf -y install git make gcc-c++ file which \
+                zlib-devel \
                 openmpi openmpi-devel
               echo "/usr/lib64/openmpi/bin" >> $GITHUB_PATH
               echo "LD_LIBRARY_PATH=/usr/lib64/openmpi/lib:\$LD_LIBRARY_PATH" >> $GITHUB_ENV
@@ -43,6 +46,7 @@ jobs:
             container: rockylinux:9
             install: |
               dnf -y install git make gcc-c++ file which \
+                zlib-devel \
                 openmpi openmpi-devel
               echo "/usr/lib64/openmpi/bin" >> $GITHUB_PATH
               echo "LD_LIBRARY_PATH=/usr/lib64/openmpi/lib:\$LD_LIBRARY_PATH" >> $GITHUB_ENV
