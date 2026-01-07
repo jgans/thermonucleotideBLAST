@@ -89,19 +89,20 @@ jobs:
           set -euxo pipefail
           ./dist/tntblast_omp -h || true
           mpirun --version || true
-          mpirun -np 2 ./dist/tntblast_mpi -h || true
+          mpirun --allow-run-as-root -np 2 ./dist/tntblast_mpi -h || true
 
       - name: Package
-        shell: bash
         run: |
-            set -euxo pipefail
-            RAW_VERSION="${GITHUB_REF_NAME:-dev}"
-            # sanitize: replace slashes and spaces with hyphens
-            VERSION="$(echo "$RAW_VERSION" | tr '/ ' '--')"
-            OUT="tntblast-${VERSION}-${{ matrix.name }}-x86_64.tar.gz"
-            tar -czf "$OUT" -C dist .
-            sha256sum "$OUT" > "$OUT.sha256"
+          set -euxo pipefail
+          RAW_VERSION="${GITHUB_REF_NAME:-dev}"
+          VERSION="$(echo "$RAW_VERSION" | sed 's#[^A-Za-z0-9._-]#-#g')"
 
+          DISTRO="${{ matrix.name }}"
+          DISTRO_NORM="$(echo "$DISTRO" | sed 's/-//g')"
+
+          OUT="tntblast_${VERSION}_linux_${DISTRO_NORM}_x86_64.tar.gz"
+          tar -czf "$OUT" -C dist .
+          sha256sum "$OUT" > "$OUT.sha256"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -109,3 +110,28 @@ jobs:
           path: |
             *.tar.gz
             *.sha256
+    
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_artifacts
+
+      - name: Flatten artifacts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p out
+          find release_artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -print -exec cp -v {} out/ \;
+          ls -lah out
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
