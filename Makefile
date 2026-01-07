@@ -9,7 +9,13 @@ OBJS = tntblast.o degenerate_na.o primer.o input.o nuc_cruc_anchor.o \
 # -----------------------
 # Toolchain defaults (override from CLI / CI)
 # -----------------------
-CC ?= g++
+
+# GNU Make sets CC=cc by default, so ?= won't override it.
+# Force g++ unless user explicitly sets CC.
+ifeq ($(origin CC), default)
+CC = g++
+endif
+
 BIN ?= tntblast
 
 PROFILE ?= # -g -pg
@@ -66,7 +72,7 @@ endif
 all: $(BIN)
 
 $(BIN): $(OBJS)
-	$(CC) $(PROFILE) -o $(BIN) $(OBJS) $(LIBS) $(OPENMP)
+	$(CC) $(FLAGS) -o $(BIN) $(OBJS) $(LIBS)
 
 clean:
 	-rm -f *.o $(BIN)
