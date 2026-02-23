@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include "compress.h"
+#include "throw.h"
 
 // Provide a mapping back to ATGC
 #define	DB_MASK			3
@@ -35,8 +36,8 @@
 
 // Sequence orientation (borrowed from the original NCBI C toolkit)
 enum{
-	Seq_strand_plus = 1,
-	Seq_strand_minus = 2,
+	Seq_strand_plus = (1 << 0),
+	Seq_strand_minus = (1 << 1),
 	Seq_strand_both = (Seq_strand_plus | Seq_strand_minus)
 };
 
@@ -92,7 +93,7 @@ inline char hash_base_to_ascii(const unsigned char &m_base)
 		case DB_GAP:
 			return '-';
 		default:
-			throw ":hash_base_to_ascii: Illegal base";
+			THROW(":hash_base_to_ascii: Illegal base");
 	};
 	
 	// Should never get here
@@ -137,7 +138,7 @@ inline char hash_base_to_ascii_complement(const unsigned char &m_base)
 		case DB_GAP:
 			return '-';
 		default:
-			throw ":hash_base_to_ascii_complement: Illegal base";
+			THROW(":hash_base_to_ascii_complement: Illegal base");
 	};
 	
 	// Should never get here

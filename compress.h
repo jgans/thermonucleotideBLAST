@@ -2,64 +2,66 @@
 #define __COMPRESS_DNA
 
 #include <string>
+#include <cstdint> // For uint8_t
+#include "throw.h"
 
 // Compress DNA sequences using the restricted alphabet defined in seq.h and "hand carved" Huffman encoding
 // (based on estimated symbol frequencies, not actual measurements).
 
 // Real bases (these are most common, 3 bits per base)
-#define     HUFFMAN_A       0b000
-#define     HUFFMAN_T       0b001
-#define     HUFFMAN_G       0b010
-#define     HUFFMAN_C       0b011
-#define     HUFFMAN_END     0b100       // Every compressed sequence requries a termination symbol
+#define     HUFFMAN_A       0b000U
+#define     HUFFMAN_T       0b001U
+#define     HUFFMAN_G       0b010U
+#define     HUFFMAN_C       0b011U
+#define     HUFFMAN_END     0b100U          // Every compressed sequence requries a termination symbol
 
 // Less common symbols, 6 bit
-#define     HUFFMAN_N       0b101000       // The completely degenerate base is often used to mask unknown sequences 
-#define     HUFFMAN_3       0b101001
-#define     HUFFMAN_5       0b101010
-#define     HUFFMAN_SPACE   0b101011
-#define     HUFFMAN_EOL     0b101100
-#define     HUFFMAN_PRIME   0b101101
-#define     HUFFMAN_PIPE    0b101110
-#define     HUFFMAN_COLON   0b101111
+#define     HUFFMAN_N       0b101000U       // The completely degenerate base is often used to mask unknown sequences 
+#define     HUFFMAN_3       0b101001U
+#define     HUFFMAN_5       0b101010U
+#define     HUFFMAN_SPACE   0b101011U
+#define     HUFFMAN_EOL     0b101100U
+#define     HUFFMAN_PRIME   0b101101U
+#define     HUFFMAN_PIPE    0b101110U
+#define     HUFFMAN_COLON   0b101111U
 
 // Rarely used degenerate bases and other symbols, 7 bits per symbol
-#define     HUFFMAN_GAP     0b1100000
-#define     HUFFMAN_M       0b1100001
-#define     HUFFMAN_R       0b1100010
-#define     HUFFMAN_S       0b1100011
-#define     HUFFMAN_V       0b1100100
-#define     HUFFMAN_W       0b1100101
-#define     HUFFMAN_Y       0b1100110
-#define     HUFFMAN_H       0b1100111
-#define     HUFFMAN_K       0b1101000
-#define     HUFFMAN_D       0b1101001
-#define     HUFFMAN_B       0b1101010
-#define     HUFFMAN_I       0b1101011
+#define     HUFFMAN_GAP     0b1100000U
+#define     HUFFMAN_M       0b1100001U
+#define     HUFFMAN_R       0b1100010U
+#define     HUFFMAN_S       0b1100011U
+#define     HUFFMAN_V       0b1100100U
+#define     HUFFMAN_W       0b1100101U
+#define     HUFFMAN_Y       0b1100110U
+#define     HUFFMAN_H       0b1100111U
+#define     HUFFMAN_K       0b1101000U
+#define     HUFFMAN_D       0b1101001U
+#define     HUFFMAN_B       0b1101010U
+#define     HUFFMAN_I       0b1101011U
 // Lower case bases are used to indicate binding sites, also 7 bits per symbol
-#define     HUFFMAN_a       0b1101100
-#define     HUFFMAN_t       0b1101101
-#define     HUFFMAN_g       0b1101110
-#define     HUFFMAN_c       0b1101111
-#define     HUFFMAN_n       0b1110000
-#define     HUFFMAN_m       0b1110001
-#define     HUFFMAN_r       0b1110010
-#define     HUFFMAN_s       0b1110011
-#define     HUFFMAN_v       0b1110100
-#define     HUFFMAN_w       0b1110101
-#define     HUFFMAN_y       0b1110110
-#define     HUFFMAN_h       0b1110111
-#define     HUFFMAN_k       0b1111000
-#define     HUFFMAN_d       0b1111001
-#define     HUFFMAN_b       0b1111010
-#define     HUFFMAN_i       0b1111011
+#define     HUFFMAN_a       0b1101100U
+#define     HUFFMAN_t       0b1101101U
+#define     HUFFMAN_g       0b1101110U
+#define     HUFFMAN_c       0b1101111U
+#define     HUFFMAN_n       0b1110000U
+#define     HUFFMAN_m       0b1110001U
+#define     HUFFMAN_r       0b1110010U
+#define     HUFFMAN_s       0b1110011U
+#define     HUFFMAN_v       0b1110100U
+#define     HUFFMAN_w       0b1110101U
+#define     HUFFMAN_y       0b1110110U
+#define     HUFFMAN_h       0b1110111U
+#define     HUFFMAN_k       0b1111000U
+#define     HUFFMAN_d       0b1111001U
+#define     HUFFMAN_b       0b1111010U
+#define     HUFFMAN_i       0b1111011U
 
 // Compress a DNA sequence
 inline std::string deflate_dna_seq(const std::string &m_seq)
 {
     std::string ret;
 
-    char c = 0x0;
+    uint8_t c = 0x0;
     uint8_t bit = 0;
 
     #define PACK(VALUE, NUM_BITS) \
@@ -197,13 +199,13 @@ inline std::string deflate_dna_seq(const std::string &m_seq)
                 PACK(HUFFMAN_i, 7);
                 break;
             default:
-                throw __FILE__ ":deflate_dna_seq: Unknown symbol";
+                THROW(__FILE__ ":deflate_dna_seq: Unknown symbol");
         }
     }
     
     PACK(HUFFMAN_END, 3);
 
-    // Make the bits left-aligned within the terminall byte
+    // Make the bits left-aligned within the terminal byte
     if(bit != 0){
 
         c = c << (8 - bit);
@@ -216,7 +218,7 @@ inline std::string deflate_dna_seq(const std::string &m_seq)
 // Decompress a DNA sequence
 inline bool pop_bit(std::string::const_iterator &m_iter, char &m_offset)
 {
-    const bool ret = (*m_iter >> m_offset) & 1;
+    const bool ret = ( static_cast<uint8_t>(*m_iter) >> static_cast<uint8_t>(m_offset) ) & 1;
     
     --m_offset;
 
@@ -444,7 +446,7 @@ inline std::string inflate_dna_seq(const std::string &m_bits)
                             }
                         }
                         else{ // 0b11111
-                            throw __FILE__ ":inflate_dna_seq: Unexpected symbol";
+                            THROW(__FILE__ ":inflate_dna_seq: Unexpected symbol");
                         }
                     }
                 }

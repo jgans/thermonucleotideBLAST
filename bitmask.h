@@ -61,6 +61,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include "throw.h"
 
 class __bitelem{
 	private:
@@ -168,7 +169,7 @@ class bitmask {
 			mask = new unsigned char [len];
 			
 			if(mask == NULL){
-				throw "bitmask: Unable to allocate memory!";
+				THROW("bitmask: Unable to allocate memory!");
 			}
 			
 			// Flip bits to either all 1's or all 0's
@@ -194,7 +195,7 @@ class bitmask {
 			mask = new unsigned char [len];
 			
 			if(mask == NULL){
-				throw "bitmask: Unable to allocate memory!";
+				THROW("bitmask: Unable to allocate memory!");
 			}
 			
 			// Copy the memory
@@ -230,7 +231,7 @@ class bitmask {
 		inline __bitelem at(const unsigned int &m_index)
 		{
 			if(m_index >= bits){
-				throw "bitmask:at: index out of bounds!";
+				THROW("bitmask:at: index out of bounds!");
 			}
 			
 			const unsigned int core = m_index/BITS_PER_BYTE;
@@ -242,7 +243,7 @@ class bitmask {
 		inline bool at(const unsigned int &m_index) const
 		{
 			if(m_index >= bits){
-				throw "bitmask:at: index out of bounds!";
+				THROW("bitmask:at: index out of bounds!");
 			}
 			
 			const unsigned int core = m_index/BITS_PER_BYTE;
@@ -375,7 +376,7 @@ class bitmask {
 			mask = new unsigned char [len];
 			
 			if(mask == NULL){
-				throw "bitmask: Unable to allocate memory!";
+				THROW("bitmask: Unable to allocate memory!");
 			}
 			
 			// Flip bits to either all 1's or all 0's
@@ -405,7 +406,7 @@ class bitmask {
 			mask = new unsigned char [len];
 			
 			if(mask == NULL){
-				throw "bitmask: Unable to allocate memory!";
+				THROW("bitmask: Unable to allocate memory!");
 			}
 			
 			// Copy the memory
@@ -483,7 +484,7 @@ class bitmask {
 			mask = new unsigned char [len];
 
 			if(mask == NULL){
-				throw "bitmask:mpi_unpack: Unable to allocate memory!";
+				THROW("bitmask:mpi_unpack: Unable to allocate memory!");
 			}
 
 			// Copy the bit array
@@ -522,7 +523,7 @@ class bitmask {
 			mask = new unsigned char [len];
 
 			if(mask == NULL){
-				throw "bitmask:read: Unable to allocate memory!";
+				THROW("bitmask:read: Unable to allocate memory!");
 			}
 			
 			// The bit array

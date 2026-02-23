@@ -1,4 +1,5 @@
 #include "annotation.h"
+#include "throw.h"
 
 #include <sstream>
 #include <string.h>
@@ -20,7 +21,7 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 	char buffer[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-		throw __FILE__ ":read_range: Unable to read line";
+		THROW(__FILE__ ":read_range: Unable to read line");
 	}
 
 	++line_number;
@@ -158,13 +159,13 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 		char tmp[MAX_LINE_LEN];
 
 		if( (gzgets(m_fin, tmp, MAX_LINE_LEN) == NULL) || !strip_eol(tmp, MAX_LINE_LEN) ){
-			throw __FILE__ ":read_range: Unable to read tmp line";
+			THROW(__FILE__ ":read_range: Unable to read tmp line");
 		}
 
 		line_number ++;
 
 		if( ( strlen(buffer) + strlen(tmp) ) >= MAX_LINE_LEN){
-			throw __FILE__ ":read_range: Ran out of room to store range!";
+			THROW(__FILE__ ":read_range: Ran out of room to store range!");
 		}
 
 		strcat(buffer, tmp);
@@ -206,7 +207,7 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 			i += 6; // + strlen( "order(" )
 		}
 		else{
-			throw error_msg(":read_range: Did not find expected \"join\"");
+			THROW( error_msg(":read_range: Did not find expected \"join\"") );
 		}
 	}
 	
@@ -275,7 +276,7 @@ bool read_range(gzFile m_fin, pair<unsigned int, unsigned int> &m_range,
 	}
 
 	if(m_seg_list.empty()){
-		throw error_msg("read_range: Unable to read join(...)");
+		THROW( error_msg("read_range: Unable to read join(...)") );
 	}
 
 	// Sort the seg list (important for annotations that span the origin)
@@ -295,7 +296,7 @@ unsigned int list_to_int(list<char> &m_number)
 {
 #ifdef _DEBUG
 	if(m_number.empty()){
-		throw error_msg("Empty number list!");
+		THROW( error_msg("Empty number list!") );
 	}
 #endif // _DEBUG
 

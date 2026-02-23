@@ -6,6 +6,7 @@
 
 #include "degenerate_na.h"
 #include "primer.h"
+#include "throw.h"
 
 using namespace std;
 
@@ -227,7 +228,7 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	// What is the range of target bases that have been bound? The 
 	// maximum range is [0, oligo_len].
 	pair<unsigned int, unsigned int> range = m_melt.alignment_range_target();
-	
+
 	range.first = gap_offset + target_len - range.first - 1;
 	range.second = gap_offset + target_len - range.second - 1;
 	
@@ -245,7 +246,7 @@ void mask_primer_5(string &m_amp, const string &m_oligo, NucCruc &m_melt,
 	}
 	else{
 		if(m_mask){
-			
+
 			// Mask this region of the amplicon
 			for(int j = (int)range.second;j <= (int)range.first;j++){
 				m_amp[j] = tolower(m_amp[j]);
@@ -582,14 +583,12 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 {
 	vector<hybrid_sig> ret;
 	
-	vector<hybrid_sig>::const_iterator iter;
-	
-	// Renumber all of the assay id's to insure that 
+	// Renumber all of the assay id's to ensure that 
 	// a) they start at 0
 	// b) are contiguous
 	int id = 0;
 		
-	for(iter = m_sig.begin();iter != m_sig.end();iter++){
+	for(vector<hybrid_sig>::const_iterator iter = m_sig.begin();iter != m_sig.end();iter++){
 	
 		list< pair<string, string> > primers;
 		
@@ -605,7 +604,7 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 		catch(const char* error){
 		
 			cerr << "Error expanding primers in assay: " << index_to_str(iter->name_str_index, m_oligo_table) << endl;
-			throw error;
+			THROW(error);
 		}
 		
 		list<string> probes;
@@ -618,7 +617,7 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 		catch(const char* error){
 		
 			cerr << "Error expanding probe in assay: " << index_to_str(iter->name_str_index, m_oligo_table) << endl;
-			throw error;
+			THROW(error);
 		}
 		
 		const size_t num_expanded_assays = primers.size() * probes.size();
@@ -714,7 +713,7 @@ vector<hybrid_sig> expand_degenerate_signatures(const vector<hybrid_sig> &m_sig,
 }
 
 vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig, 
-	const unsigned int &m_format, vector<string> &m_oligo_table, 
+	const unsigned int &m_format, vector<string> &m_index_table, 
 	unordered_map<string, size_t> &m_str_table)
 {
 	vector<hybrid_sig> ret;
@@ -738,9 +737,9 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 		
 			for(vector<hybrid_sig>::const_iterator j = m_sig.begin();j != m_sig.end();j++){
 		
-				const string assay_name = (i == j) ?  index_to_str(i->name_str_index, m_oligo_table)
-					: index_to_str(i->name_str_index, m_oligo_table) + "(5')/" + 
-					  index_to_str(j->name_str_index, m_oligo_table) + "(3')";
+				const string assay_name = (i == j) ?  index_to_str(i->name_str_index, m_index_table)
+					: index_to_str(i->name_str_index, m_index_table) + "(5')/" + 
+					  index_to_str(j->name_str_index, m_index_table) + "(3')";
 
 				hybrid_sig tmp( 
 					str_to_index(assay_name, m_str_table), 
@@ -779,10 +778,11 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 					continue;
 				}
 				
+				const string assay_name = index_to_str(i->name_str_index, m_index_table) + "(F)/" + 
+						index_to_str(j->name_str_index, m_index_table) + "(R)";
+
 				hybrid_sig tmp( 
-					str_to_index(
-						index_to_str(i->name_str_index, m_oligo_table) + "(F)/" + 
-						index_to_str(j->name_str_index, m_oligo_table) + "(R)", m_str_table), 
+					str_to_index(assay_name, m_str_table), 
 					i->forward_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
@@ -805,10 +805,11 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 					continue;
 				}
 				
+				const string assay_name = index_to_str(i->name_str_index, m_index_table) + "(F)/" + 
+						index_to_str(j->name_str_index, m_index_table) + "(F)";
+
 				hybrid_sig tmp(
-					str_to_index(
-						index_to_str(i->name_str_index, m_oligo_table) + "(F)/" + 
-						index_to_str(j->name_str_index, m_oligo_table) + "(F)", m_str_table), 
+					str_to_index(assay_name, m_str_table), 
 					i->forward_oligo_str_index, j->forward_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
@@ -831,10 +832,11 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 					continue;
 				}
 				
+				const string assay_name = index_to_str(i->name_str_index, m_index_table) + "(R)/" + 
+						index_to_str(j->name_str_index, m_index_table) + "(R)";
+
 				hybrid_sig tmp(
-					str_to_index(
-						index_to_str(i->name_str_index, m_oligo_table) + "(R)/" + 
-						index_to_str(j->name_str_index, m_oligo_table) + "(R)", m_str_table),
+					str_to_index(assay_name, m_str_table),
 					i->reverse_oligo_str_index, j->reverse_oligo_str_index, id++);
 				
 				ret.push_back(tmp);
@@ -850,7 +852,7 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 			id = 0;
 			
 			// Update the oligo table to account for the new names referenced in ret
-			m_oligo_table = ordered_keys(m_str_table);
+			m_index_table = ordered_keys(m_str_table);
 
 			for(vector<hybrid_sig>::const_iterator i = ret.begin();i != ret.end();i++){
 				
@@ -863,10 +865,11 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 						continue;
 					}
 					
+					const string assay_name = index_to_str(i->name_str_index, m_index_table) + "+" + 
+							index_to_str(j->name_str_index, m_index_table) + "(P)";
+
 					hybrid_sig tmp(
-						str_to_index(
-							index_to_str(i->name_str_index, m_oligo_table) + "+" + 
-							index_to_str(j->name_str_index, m_oligo_table) + "(P)", m_str_table),
+						str_to_index(assay_name, m_str_table),
 						i->forward_oligo_str_index, i->reverse_oligo_str_index, 
 						j->probe_oligo_str_index, id++);
 					
@@ -874,6 +877,9 @@ vector<hybrid_sig> multiplex_expansion(const vector<hybrid_sig> &m_sig,
 				}
 			}
 			
+			// Update the oligo table (again!) to account for the assay names that now include probes
+			m_index_table = ordered_keys(m_str_table);
+
 			ret = ret_with_probe;
 		}
 	}
@@ -955,7 +961,7 @@ void distribute_queries(const vector<hybrid_sig> &m_sig)
 	unsigned char *buffer = new unsigned char [buffer_size];
 
 	if(buffer == NULL){
-		throw __FILE__ "distribute_queries: Unable to allocate send buffer";
+		THROW(__FILE__ "distribute_queries: Unable to allocate send buffer");
 	}
 	
 	unsigned char *ptr = buffer;
@@ -982,7 +988,7 @@ void receive_queries(vector<hybrid_sig> &m_sig)
 	unsigned char *buffer = new unsigned char [buffer_size];
 	
 	if(buffer == NULL){
-		throw __FILE__ "receive_queries: Unable to allocate send buffer";
+		THROW(__FILE__ "receive_queries: Unable to allocate send buffer");
 	}
 	
 	MPI_Bcast(buffer, buffer_size, MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -1011,7 +1017,7 @@ void serve_sequence(const int &m_dest, const unsigned int &m_index, const sequen
 	if(MPI_Recv(range, 2, MPI_INT, m_dest, 
 	   SEQ_REQUEST, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-	   throw __FILE__ ":serve_sequence: Error receiving SEQ_REQUEST";
+	   THROW(__FILE__ ":serve_sequence: Error receiving SEQ_REQUEST");
 	}
 	
 	// Read this sequence from the database file
@@ -1030,7 +1036,7 @@ void serve_sequence(const int &m_dest, const unsigned int &m_index, const sequen
 	unsigned char *buffer = new unsigned char [buffer_size];
 	
 	if(!buffer){
-		throw __FILE__ ":serve_sequence: Unable to allocate buffer";
+		THROW(__FILE__ ":serve_sequence: Unable to allocate buffer");
 	}
 	
 	unsigned char *ptr = buffer;
@@ -1047,7 +1053,7 @@ void serve_sequence(const int &m_dest, const unsigned int &m_index, const sequen
 	if(MPI_Send(buffer, buffer_size, MPI_BYTE, m_dest, 
 	   SEQ_REQUEST, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-	   throw __FILE__ ":serve_sequence: Error sending sequence data";
+	   THROW(__FILE__ ":serve_sequence: Error sending sequence data");
 	}
 	
 	delete [] buffer;
@@ -1070,7 +1076,7 @@ void distribute_string_table(const unordered_map<string, size_t> &m_table)
 	unsigned char* buffer = new unsigned char[buffer_size];
 
 	if(buffer == NULL){
-		throw __FILE__ ":distribute_string_table: Unable to allocate buffer";
+		THROW(__FILE__ ":distribute_string_table: Unable to allocate buffer");
 	}
 
 	unsigned char* ptr = buffer;
@@ -1098,7 +1104,7 @@ void receive_string_table(unordered_map<string, size_t> &m_table)
 	unsigned char* buffer = new unsigned char[buffer_size];
 
 	if(buffer == NULL){
-		throw __FILE__ ":receive_string_table: Unable to allocate buffer";
+		THROW(__FILE__ ":receive_string_table: Unable to allocate buffer");
 	}
 
 	MPI_Bcast(buffer, buffer_size, MPI_BYTE, 0, MPI_COMM_WORLD);
@@ -1138,7 +1144,7 @@ vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
 			unique_keys.insert(i->first);
 		}
 
-		return vector<string>(unique_keys.begin(), unique_keys.end() );
+		return vector<string>( unique_keys.begin(), unique_keys.end() );
 
 	#ifdef USE_MPI
 	}
@@ -1172,7 +1178,7 @@ vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
 				unsigned char *buffer = new unsigned char [buffer_size];
 
 				if(buffer == NULL){
-					throw __FILE__ ":synchronize_keys: Unable to allocate send buffer";
+					THROW(__FILE__ ":synchronize_keys: Unable to allocate send buffer");
 				}
 
 				unsigned char* ptr = buffer;
@@ -1208,7 +1214,7 @@ vector<string> synchronize_keys(const unordered_map<string, size_t> &m_table)
 				unsigned char *buffer = new unsigned char [buffer_size];
 
 				if(buffer == NULL){
-					throw __FILE__ ":synchronize_keys: Unable to allocate recv buffer";
+					THROW(__FILE__ ":synchronize_keys: Unable to allocate recv buffer");
 				}
 
 				MPI_Bcast(buffer, buffer_size, MPI_BYTE, i, MPI_COMM_WORLD);
@@ -1268,7 +1274,7 @@ unsigned int write_inverse_matches(ostream &m_fout, const sequence_data &m_data,
 float gc_content(const string &m_seq)
 {
 	if(m_seq.empty() == true){
-		throw __FILE__ ":gc_content: empty sequence!";
+		THROW(__FILE__ ":gc_content: empty sequence!");
 	}
 	
 	size_t len = m_seq.size();
@@ -1456,7 +1462,7 @@ void test_memory(const int &m_num_mb)
 	unsigned char* ptr = new unsigned char [len];
 	
 	if(ptr == NULL){
-		throw "Unable to allocate memory for memory check";
+		THROW("Unable to allocate memory for memory check");
 	}
 	
 	// Make sure that we can write to every byte of allocated memory
@@ -1466,7 +1472,7 @@ void test_memory(const int &m_num_mb)
 	for(unsigned int i = 0;i < len;i++){
 		
 		if(c != ptr[i]){
-			throw "Corrupted byte found in memory check";
+			THROW("Corrupted byte found in memory check");
 		}
 	}
 	
@@ -1754,7 +1760,7 @@ string top_strand(const string &m_align)
 	string::size_type start = m_align.find("5' ");
 	
 	if(start == string::npos){
-		throw __FILE__ ":top_strand: Unable to parse alignment";
+		THROW(__FILE__ ":top_strand: Unable to parse alignment");
 	}
 	
 	start += 3; // strlen("5' ") == 3
@@ -1762,7 +1768,7 @@ string top_strand(const string &m_align)
 	const string::size_type stop = m_align.find(" 3'");
 	
 	if(stop == string::npos){
-		throw __FILE__ ":top_strand: Unable to parse alignment";
+		THROW(__FILE__ ":top_strand: Unable to parse alignment");
 	}
 	
 	return m_align.substr(start, stop - start);
@@ -1812,7 +1818,7 @@ bool query_sched(const size_t &m_num_target,
 	}
 	
 	if(m_num_worker == 0){
-		throw ":query_sched: m_num_worker == 0";
+		THROW(":query_sched: m_num_worker == 0");
 	}
 	
 	// Don't segment queries if we only have a single worker

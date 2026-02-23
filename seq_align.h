@@ -8,6 +8,7 @@
 #include <vector>
 #include <deque>
 #include <algorithm>
+#include "throw.h"
 
 #define	SEQ_ALIGN_VERSION	"1.1 (sse/avx)"
 
@@ -686,11 +687,11 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(!is_na){
-				throw __FILE__ ":translate_na_seq: Only valid for NA sequences";
+				THROW(__FILE__ ":translate_na_seq: Only valid for NA sequences");
 			}
 			
 			if( m_input.size() != m_output.size() ){
-				throw __FILE__ ":translate_na_seq: input/output size mismatch";
+				THROW(__FILE__ ":translate_na_seq: input/output size mismatch");
 			}
 			#endif // _DEBUG
 			
@@ -747,7 +748,7 @@ class SeqAlign{
 						*o = NA::N;
 						break;
 					default:
-						throw __FILE__ ":translate_na_seq: Illegal base";
+						THROW(__FILE__ ":translate_na_seq: Illegal base");
 						break;
 				};
 			}
@@ -757,11 +758,11 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(is_na){
-				throw __FILE__ ":translate_aa_seq: Only valid for AA sequences";
+				THROW(__FILE__ ":translate_aa_seq: Only valid for AA sequences");
 			}
 			
 			if( m_input.size() != m_output.size() ){
-				throw __FILE__ ":translate_aa_seq: input/output size mismatch";
+				THROW(__FILE__ ":translate_aa_seq: input/output size mismatch");
 			}
 			#endif // _DEBUG
 			
@@ -845,7 +846,7 @@ class SeqAlign{
 						*o = AA::X;
 						break;
 					default:
-						throw __FILE__ ":translate_aa_seq: Illegal base";
+						THROW(__FILE__ ":translate_aa_seq: Illegal base");
 						break;
 				};
 			}
@@ -872,7 +873,7 @@ class SeqAlign{
 			simd_elem *ptr_new_seq = (simd_elem*)SIMD_MALLOC(new_len*sizeof(simd_elem), MEMORY_ALIGNMENT);
 
 			if(ptr_new_seq == NULL){
-				throw __FILE__ ":SeqAlign::resize_sequence: Unable to allocate sequence memory";
+				THROW(__FILE__ ":SeqAlign::resize_sequence: Unable to allocate sequence memory");
 			}				
 
 			// Copy any existing query data
@@ -935,7 +936,7 @@ class SeqAlign{
 					align_smith_waterman();
 					break;
 				default:
-					throw __FILE__ ":align: Unknown mode";
+					THROW(__FILE__ ":align: Unknown mode");
 			};
 			
 			for(unsigned int i = 0;i < SA_LEN;i++){
@@ -972,7 +973,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":pack_query: m_index > SA_LEN";
+				THROW(__FILE__ ":pack_query: m_index > SA_LEN");
 			}
 			#endif // _DEBUG
 			
@@ -1035,7 +1036,7 @@ class SeqAlign{
 			query = (simd_elem*)SIMD_MALLOC(len*sizeof(simd_elem), MEMORY_ALIGNMENT);
 			
 			if(query == NULL){
-				throw __FILE__ ":SeqAlign::pack_query: Unable to allocate sequence memory";
+				THROW(__FILE__ ":SeqAlign::pack_query: Unable to allocate sequence memory");
 			}
 			
 			// Set the query lengths
@@ -1084,7 +1085,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":pack_target: m_index > SA_LEN";
+				THROW(__FILE__ ":pack_target: m_index > SA_LEN");
 			}
 			#endif // _DEBUG
 			
@@ -1149,7 +1150,7 @@ class SeqAlign{
 			target = (simd_elem*)SIMD_MALLOC(len*sizeof(simd_elem), MEMORY_ALIGNMENT);
 			
 			if(target == NULL){
-				throw __FILE__ ":SeqAlign::pack_target: Unable to allocate sequence memory";
+				THROW(__FILE__ ":SeqAlign::pack_target: Unable to allocate sequence memory");
 			}
 			
 			// Set the target lengths
@@ -1197,7 +1198,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":query_seq: Index out of bounds";
+				THROW(__FILE__ ":query_seq: Index out of bounds");
 			}
 			#endif // _DEBUG
 			
@@ -1231,7 +1232,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":target_seq: Index out of bounds";
+				THROW(__FILE__ ":target_seq: Index out of bounds");
 			}
 			#endif // _DEBUG
 			
@@ -1265,7 +1266,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":get_alignment: Index out of bounds";
+				THROW(__FILE__ ":get_alignment: Index out of bounds");
 			}
 			#endif // _DEBUG
 			
@@ -1287,7 +1288,7 @@ class SeqAlign{
 		{
 			#ifdef _DEBUG
 			if(m_index > SA_LEN){
-				throw __FILE__ ":score: Index out of bounds";
+				THROW(__FILE__ ":score: Index out of bounds");
 			}
 			#endif // _DEBUG
 			

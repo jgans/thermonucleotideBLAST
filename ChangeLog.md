@@ -1,3 +1,50 @@
+# Version 2.77 (February 19, 2026)
+- Fixed bug in compress.h due to the assumption that `char` is signed. In general, this is compiler dependent! (Mostly true for x86 but varies for ARM).
+
+# Version 2.76 (February 2, 2026)
+- Fixed bug in bind_oligo.cpp due to failure to test previously cached anchor_3 values.
+
+# Version 2.75 (December 12, 2025)
+- Fixed GenBank flat file (GBK) parsing to allow empty records and records containing the "WGS" annotation key
+
+# Version 2.74 (August 6, 2025)
+- Fixed an OpenMP race condition in tntblast_local.cpp that was triggered by searching small databases with a large number of threads.
+  The underlying cause was failure to protect the copying of a global variable to a thread-local variable before the variable was modified.
+
+# Version 2.73 (July 31, 2025)
+- Changed the limit on the maximum number of contiguous fully degenerate bases (i.e., "--max-poly-N") to be a limit on the number of contiguous
+  partially *or* fully degenerate bases: "--max-poly-degen". The default maximum run length is still 3. This change is needed to accomodate the
+  increasing number of GenBank sequences that contain long streaches of partially degenerate nucleotides. For example:
+	- 454 contiguous partially degenerate bases in CP118237 Kluyveromyces marxianus strain DMKU3-1042 chromosome 2
+	- 1150 contiguous partially degenerate bases in CP147450 Candidozyma auris strain B11220 isolate Sample16 chromosome 2
+	- 1278 contiguous partially degenerate bases in CP092704 Escherichia coli strain S-P-N-045.01 chromosome
+	- 5567 contiguous partially degenerate bases in CP176538 Bifidobacterium longum strain NBC2255 chromosome
+	- 11560 contiguous partially degenerate bases in CP176540 Streptococcus thermophilus strain NBC5527 chromosome
+
+# Version 2.72 (March 21, 2025)
+- Fixed bug that corrupted the screen output when outputting an assay summary ("-S T"). The opt.sig_list variable 
+  needed to be reindexed to use the updated string table.
+- Fixed bug in the bind_oligo.cpp:bind_oligo_to_minus_strand() function that used a now invalid comparison for the fraction of
+  'N' nucleotides in a previously cached match. This bug was caused by my failure to update the comparison in all of the relevant
+  locations!
+
+# Version 2.71 (December 19, 2024)
+- Implemented a new stratgey for removing spurious matches to target sequences with a large fraction of degerate bases. Instead
+  of requiring >50% "real" (i.e., ATGC) bases in an oligo alignment, a user-defined option, `--max-poly-N`, is used to remove
+  matches that contain more than the allowed number of contiguous full-degenerate (N) bases in the target strand of 
+  an oligo-target alignment. This change is indended to reduce the number of false positive assay matches to sequence that
+  contain long streatches of poly-N bases.
+- Fixed bug that prevented oligo-template matches from being identified when an oligo binding site was adjacent to a long run 
+  of gap symbols in template sequence (see bind_oligo.cpp).
+- Updated fasta file parsing: gap characters in input template sequences are no longer included in the sequence (they are
+  stripped out when input sequences are parsed).
+
+# Version 2.70 (September 1, 2024)
+- Fixed bug due to failure to update string index table after TaqMan PCR multiplex assay expansion.
+
+# Version 2.69 (August 13, 2024)
+- Fixed bug in Padlock/MOLPCR/MIPS search algorithm that prevented matches on negative target strands from being found.
+
 # Version 2.68 (July 16, 2024)
 - Fixed a bug in the GBK file parsing code (in annontation_gbk.cpp) that caused a spurious error to be thrown when reading
   the file https://ftp.ncbi.nlm.nih.gov/genomes/refseq/mitochondrion/mitochondrion.1.genomic.gbff.gz (thanks to Steven Higgins 

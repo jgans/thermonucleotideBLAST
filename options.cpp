@@ -1,4 +1,5 @@
 #include "options.h"
+#include "throw.h"
 
 #ifdef WIN32
 extern "C" {
@@ -58,7 +59,7 @@ void Options::parse_command_line(int argc, char *argv[])
 	// --target-strand <sense|antisense|both>
 	// --plex <T|F> (All input assays in a single multiple reaction)
 	// --single-primer-pcr <T|F> (Allow amplicons produced by a single PCR primer
-	// binding in both forward and reverse orientation?)
+	//   binding in both forward and reverse orientation?)
 	// --temperature <temperature for computing Delta G (in Kelvin)>
 	// --hash-size <max size> (max number of hash elements)
 	// --max-target-len <max len> (max sequence length, in bases, before targets are split)
@@ -67,6 +68,7 @@ void Options::parse_command_line(int argc, char *argv[])
 	// --dinkelbach <T|F> (Use the Dinkelbach fractional programming algorithm)
 	// --max-gap <number of gaps> (maximum number of gaps allowed in a DNA duplex)
 	// --max-mismatch <number of mismatches> (maximum number of mismatches allowed in a DNA duplex)
+	// --max-poly-N <number of bases> (maximum number of contiguous, fully degenerate bases to allow in an oligo alignment)
 	// --rescale-ct <T|F> (Use of degenerate bases results in rescaling of oligo concentration)
 	// --best-match (Only report the best match, in Tm, between an assay and a target)
 	// --blast-include <Accession or NCBI TaxId to include from BLAST database>
@@ -99,6 +101,7 @@ void Options::parse_command_line(int argc, char *argv[])
 		{"best-match", false, &config_opt, 21},
 		{"blast-include", true, &config_opt, 22},
 		{"blast-exclude", true, &config_opt, 23},
+		{"max-poly-degen", true, &config_opt, 24},
 		{0,0,0,0} // Terminate options list
 	};
 
@@ -176,7 +179,7 @@ void Options::parse_command_line(int argc, char *argv[])
 					fragment_target_threshold = atoi(optarg);
 					
 					if(fragment_target_threshold <= 1){
-						throw "Error: --max-target-len is <= 1";
+						THROW("Error: --max-target-len is <= 1");
 					}
 					
 					break;
@@ -261,6 +264,13 @@ void Options::parse_command_line(int argc, char *argv[])
 				if(config_opt == 23){
 				
 					blast_exclude.push_back(optarg);
+					break;
+				}
+
+				// --max-poly-degen
+				if(config_opt == 24){
+				
+					max_poly_degen = abs( atoi(optarg) );
 					break;
 				}
 
@@ -472,6 +482,8 @@ void Options::parse_command_line(int argc, char *argv[])
 			<< DEFAULT_MAX_GAP << ")" << endl;
 		cerr << "\t[--max-mismatch <number of mismatches>] (Max number of allowed mismatches in a DNA duplex, default is "
 			<< DEFAULT_MAX_MISMATCH << ")" << endl;
+		cerr << "\t[--max-poly-degen <number of bases>] (maximum number of contiguous, fully or partially degenerate bases to allow in an "
+			<< "oligo alignment, default is " << DEFAULT_MAX_POLY_DEGEN << ")" << endl;
 		cerr << "\t[--rescale-ct <T|F>] (Use of degenerate bases results in rescaling of oligo concentration, default is "
 			<< (DEFAULT_RESCALE_CT ? "T" : "F") << ")" << endl;
 		cerr << "\t[--best-match] (Only save the best match, in Tm, between a query and target)" << endl;
@@ -517,17 +529,17 @@ unsigned int Options::parse_assay_format(string m_opt)
 void Options::validate_parameters()
 {
 	if( (dbase_filename == "") && (local_dbase_filename == "") ){
-		throw "Unable to read either dbase or local_dbase";
+		THROW("Unable to read either dbase or local_dbase");
 	}
 	
 	if( (dbase_filename != "") && (local_dbase_filename != "") ){
-		throw "Please specify either dbase or local_dbase (but not both)";
+		THROW("Please specify either dbase or local_dbase (but not both)");
 	}
 	
 	if(ignore_probe){
 	
 		if(assay_format != ASSAY_PCR){
-			throw "Error: Ignore probes (i.e. -p T) can only be used with a PCR-based assay format";
+			THROW("Error: Ignore probes (i.e. -p T) can only be used with a PCR-based assay format");
 		}
 		
 		if(verbose){
@@ -536,19 +548,19 @@ void Options::validate_parameters()
 	}
 	
 	if(salt <= 0.0f){
-		throw "[Na+] (i.e. \"salt\") is less than zero";
+		THROW("[Na+] (i.e. \"salt\") is less than zero");
 	}
 
 	if(salt >= 1.0f){
-		throw "[Na+] (i.e. \"salt\") is greater than 1M";
+		THROW("[Na+] (i.e. \"salt\") is greater than 1M");
 	}
 	
 	if(primer_strand <= 0.0f){
-		throw "[Ct] (i.e. \"primer_strand\") is less than zero";
+		THROW("[Ct] (i.e. \"primer_strand\") is less than zero");
 	}
 
 	if(primer_strand > 10.0f){
-		throw "[Ct] (i.e. \"primer_strand\") is greater than 10M";
+		THROW("[Ct] (i.e. \"primer_strand\") is greater than 10M");
 	}
 	
 	if(probe_strand < 0.0f){
@@ -561,87 +573,86 @@ void Options::validate_parameters()
 	}
 	
 	if(probe_strand <= 0.0f){
-		throw "[Ct] (i.e. \"probe_strand\") is less than zero";
+		THROW("[Ct] (i.e. \"probe_strand\") is less than zero");
 	}
 
 	if(probe_strand > 10.0f){
-		throw "[Ct] (i.e. \"probe_strand\") is greater than 10M";
+		THROW("[Ct] (i.e. \"probe_strand\") is greater than 10M");
 	}
 	
 	if(asymmetric_strand_ratio <= 0.0){
-		throw "The ratio of forward to reverse primer [Ct] is <= 0";
+		THROW("The ratio of forward to reverse primer [Ct] is <= 0");
 	}
 	 
 	if(min_primer_tm < 0.0f){
-		throw "min_primer_tm is less than zero";
+		THROW("min_primer_tm is less than zero");
 	}
 
 	if(min_primer_tm > 200.0f){
-		throw "min_primer_tm is greater than 200 C -- that's too hot!";
+		THROW("min_primer_tm is greater than 200 C -- that's too hot!");
 	}
 	
 	if(max_primer_tm < 0.0f){
-		throw "max_primer_tm is less than zero";
+		THROW("max_primer_tm is less than zero");
 	}
 	
 	if(min_primer_tm > max_primer_tm){
-		throw "min_primer_tm > max_primer_tm. Please use consistent values!";
+		THROW("min_primer_tm > max_primer_tm. Please use consistent values!");
 	}
 	
 	if(min_probe_tm < 0.0f){
-		throw "min_probe_tm is less than zero";
+		THROW("min_probe_tm is less than zero");
 	}
 
 	if(min_probe_tm > 200.0f){
-		throw "min_probe_tm is greater than 200 C -- that's too hot!";
+		THROW("min_probe_tm is greater than 200 C -- that's too hot!");
 	}
 	
 	if(max_probe_tm < 0.0f){
-		throw "max_probe_tm is less than zero";
+		THROW("max_probe_tm is less than zero");
 	}
 
 	if(min_probe_tm > max_probe_tm){
-		throw "min_probe_tm > max_probe_tm. Please use consistent values!";
+		THROW("min_probe_tm > max_probe_tm. Please use consistent values!");
 	}
 	
 	if(max_len <= 0){
-		throw "max_len is less than 1 base -- too small!";
+		THROW("max_len is less than 1 base -- too small!");
 	}
 	
 	if(primer_clamp < 0){
-		throw "primer_clamp is less than 0 -- too small!";
+		THROW("primer_clamp is less than 0 -- too small!");
 	}
 	
 	if(probe_clamp_5 < 0){
-		throw "probe_clamp_5 is less than 0 -- too small!";
+		THROW("probe_clamp_5 is less than 0 -- too small!");
 	}
 	
 	if(probe_clamp_3 < 0){
-		throw "probe_clamp_3 is less than 0 -- too small!";
+		THROW("probe_clamp_3 is less than 0 -- too small!");
 	}
 	
 	if(assay_format == ASSAY_NONE){
-		throw "Please specify a valid assay format";
+		THROW("Please specify a valid assay format");
 	}
 	
 	if( (hash_word_size < 3) || (hash_word_size > 8) ){
-		throw "Please specify a valid hash word size";
+		THROW("Please specify a valid hash word size");
 	}
 	
 	if(output_format & OUTPUT_NETWORK){
 		
 		if(output_filename == ""){
-			throw "Please specify an output filename when writing "
-				"network files";
+			THROW("Please specify an output filename when writing network files");
 		}
 	}
 	
 	if(max_gap < 0){
-		throw "Error: --max-gap < 0";
+		THROW("Error: --max-gap < 0");
 	}
 	
 	if(max_mismatch < 0){
-		throw "Error: --max-mismatch < 0";
+		THROW("Error: --max-mismatch < 0");
 	}
 
 	if(verbose){
@@ -657,7 +668,7 @@ void Options::validate_parameters()
 				cout << "Query segmentation: adaptive" << endl;
 				break;
 			default:
-				throw "Unknown option for query segmentation";
+				THROW("Unknown option for query segmentation");
 				break;
 		};
 	}
@@ -691,7 +702,7 @@ void Options::parse_output_file(const string &m_format)
 			output_format |= OUTPUT_INVERSE_QUERY;
 			break;
 		default:
-			throw "Unknown output format. Please specify a number between 0-3";
+			THROW("Unknown output format. Please specify a number between 0-3");
 			break;
 	};
 }
@@ -711,7 +722,7 @@ bool Options::parse_bool(string m_opt)
 		return false;
 	}
 	
-	throw "Unknown boolean options -- please use \"T\" or \"F\"";
+	THROW("Unknown boolean options -- please use \"T\" or \"F\"");
 	
 	return false;
 }
@@ -741,7 +752,7 @@ int Options::parse_strand(string m_opt)
 	cerr << "Use \"both\" for both sense and antisense strands" << endl;
 	
 	// If we get here, we could not identify the users input
-	throw "Unknown target-strand option";
+	THROW("Unknown target-strand option");
 }
 
 int Options::parse_query_seg(string m_opt)
@@ -772,7 +783,7 @@ int Options::parse_query_seg(string m_opt)
 	cerr << "Use \"adaptive\" for an adaptive algorithm" << endl;
 	
 	// If we get here, we could not identify the users input
-	throw "Unknown query segmentation option";
+	THROW("Unknown query segmentation option");
 
 }
 
@@ -835,7 +846,7 @@ void Options::validate_search_threshold()
 					if( !(threshold_format & THRESHOLD_PRIMER_DELTA_G) &&
 					    !(threshold_format & THRESHOLD_PRIMER_TM) ){
 
-						throw "Please specify primer search bounds in Tm and/or Delta G";
+						THROW("Please specify primer search bounds in Tm and/or Delta G");
 					}
 				}
 				
@@ -844,7 +855,7 @@ void Options::validate_search_threshold()
 					if( !(threshold_format & THRESHOLD_PROBE_DELTA_G) &&
 					    !(threshold_format & THRESHOLD_PROBE_TM) ){
 
-						throw "Please specify probe search bounds in Tm and/or Delta G";
+						THROW("Please specify probe search bounds in Tm and/or Delta G");
 					}
 				}
 			}
@@ -867,7 +878,7 @@ void Options::validate_search_threshold()
 					max_probe_tm = max_primer_tm;
 				}
 				else{
-					throw "Please specify probe search bounds in Tm and/or Delta G";
+					THROW("Please specify probe search bounds in Tm and/or Delta G");
 				}
 			}
 			
@@ -889,17 +900,17 @@ void Options::validate_search_threshold()
 					max_probe_tm = max_primer_tm;
 				}
 				else{
-					throw "Please specify probe search bounds in Tm and/or Delta G";
+					THROW("Please specify probe search bounds in Tm and/or Delta G");
 				}
 			}
 			
 			break;
 		case ASSAY_NONE:
 			
-			throw "No assay format has been specified!";
+			THROW("No assay format has been specified!");
 			break;
 		default:
-			throw __FILE__ ":validate_search_threshold: Unknown assay format!";
+			THROW(__FILE__ ":validate_search_threshold: Unknown assay format!");
 			break;
 	};
 }

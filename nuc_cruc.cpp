@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+#include "throw.h"
 
 using namespace std;
 using namespace BASE;
@@ -304,7 +305,7 @@ NucCruc::NucCruc(const unsigned int &m_param_set /*= SANTA_LUCIA*/, const float 
 			init_param_Santa_Lucia();
 			break;
 		default:
-			throw "NucCruc: Unknowm parameter set!";
+			THROW("NucCruc: Unknowm parameter set!");
 	};
 	
 	target_T = -1.0f;
@@ -340,11 +341,11 @@ void NucCruc::update_dp_param()
 {
 
 	if(target_T < 0.0f){
-		throw "update_dp_param: target_T < 0";
+		THROW("update_dp_param: target_T < 0");
 	}
 	
 	if(na_concentration <= 0.0f){
-		throw "update_dp_param: na_concentration <= 0";
+		THROW("update_dp_param: na_concentration <= 0");
 	}
 	
 	// The total salt correction has the form:
@@ -781,7 +782,7 @@ NC_Score NucCruc::align_hairpin(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LE
 	const unsigned int query_len = m_q.size();
 	
 	if(query_len == 0){
-		throw ":NucCruc::align_hairpin: Empty query sequence";
+		THROW(":NucCruc::align_hairpin: Empty query sequence");
 	}
 	
 	int max_stem_len = (int)query_len - (int)steric_limit;
@@ -1139,7 +1140,7 @@ void NucCruc::enumerate_dimer_alignments(NC_Elem *m_dp_matrix, NC_Elem *m_max_pt
 
 		#ifdef __DEBUG
 		if( align_size != local_align.target_align.size() ){
-			throw __FILE__ ":NucCruc::tm_dimer: alignment size mismatch!";
+			THROW(__FILE__ ":NucCruc::tm_dimer: alignment size mismatch!");
 		}
 		#endif //__DEBUG
 
@@ -1518,11 +1519,11 @@ void NucCruc::trace_back(NC_Elem *m_dp_matrix, NC_Elem *m_cell_ptr,
 
 					#ifdef __DEBUG
 					if(last_i > query_len){
-						throw "last_i > query_len";
+						THROW("last_i > query_len");
 					}
 
 					if(last_j < 1){
-						throw "last_j < 1";
+						THROW("last_j < 1");
 					}
 					#endif // __DEBUG
 
@@ -1556,7 +1557,7 @@ void NucCruc::trace_back(NC_Elem *m_dp_matrix, NC_Elem *m_cell_ptr,
 
 					#ifdef __DEBUG
 					if(last_j < 1){
-						throw "last_j < 1";
+						THROW("last_j < 1");
 					}
 					#endif // __DEBUG
 
@@ -1582,7 +1583,7 @@ void NucCruc::trace_back(NC_Elem *m_dp_matrix, NC_Elem *m_cell_ptr,
 
 					#ifdef __DEBUG
 					if(last_i > query_len){
-						throw "last_i > query_len";
+						THROW("last_i > query_len");
 					}
 					#endif // __DEBUG
 
@@ -1600,7 +1601,7 @@ void NucCruc::trace_back(NC_Elem *m_dp_matrix, NC_Elem *m_cell_ptr,
 				}
 				break;
 			default:
-				throw "invalid_match in trace back";
+				THROW("invalid_match in trace back");
 		};
 		
 		if(!valid_alignment){
@@ -2112,7 +2113,7 @@ bool NucCruc::evaluate_alignment(alignment &local_align, const mode &m_mode)
 						cout << "t = " << target_seq() << endl;
 						cout << print_alignment(local_align.query_align, local_align.target_align);
 						
-						throw __FILE__ ":NucCruc::evaluate_alignment: (num_query_gap > 0) && (num_target_gap > 0)";
+						THROW(__FILE__ ":NucCruc::evaluate_alignment: (num_query_gap > 0) && (num_target_gap > 0)");
 					}
 					#endif // __DEBUG
 
@@ -2520,11 +2521,11 @@ float NucCruc::tm_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH> &m
 	// Assume that the alignment(s) have already been computed (but have not been enumerated)
 	
 	if(na_concentration <= 0.0f){
-		throw ":NucCruc::tm_dimer: Invalid na_concentration";
+		THROW(":NucCruc::tm_dimer: Invalid na_concentration");
 	}
 	
 	if(strand_concentration <= 0.0f){
-		throw ":NucCruc::tm_dimer: Invalid strand_concentration";
+		THROW(":NucCruc::tm_dimer: Invalid strand_concentration");
 	}
 	
 	vector<NC_Elem*>::const_iterator max_iter;
@@ -2541,7 +2542,7 @@ float NucCruc::tm_dimer(const CircleBuffer<nucleic_acid, MAX_SEQUENCE_LENGTH> &m
 float NucCruc::approximate_tm_hairpin()
 {
 	if(na_concentration <= 0.0f){
-		throw ":NucCruc::approximate_tm_hairpin: Invalid na_concentration";
+		THROW(":NucCruc::approximate_tm_hairpin: Invalid na_concentration");
 	}
 
 	if(use_dinkelbach){

@@ -1,4 +1,5 @@
 #include "tntblast.h"
+#include "throw.h"
 
 using namespace std;
 
@@ -71,6 +72,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_poly_degen,
 	const unsigned int &m_max_amplicon_len,
 	const bool &m_single_primer_pcr,
 	const int &m_mask_options,
@@ -90,7 +92,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 	
 	// Assemble a list of hash matches so we can cull *before* computing sequence alignments
 	list<oligo_info> match_list;
-	
+
 	match_oligo_to_minus_strand(match_list, m_hash, index_to_str(m_sig.forward_oligo_str_index, m_oligo_table), oligo_info::F);
 	match_oligo_to_minus_strand(match_list, m_hash, index_to_str(m_sig.reverse_oligo_str_index, m_oligo_table), oligo_info::R);
 	
@@ -127,7 +129,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
 
 	if(strand_count.first < strand_count.second){ // num minus < num plus
-		
+
 		m_melt.set_query(index_to_str(m_sig.forward_oligo_str_index, m_oligo_table));
 
 		// Assume that the primer oligos are in vast excess to the target strands
@@ -143,7 +145,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
@@ -167,7 +169,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 		
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
@@ -191,7 +193,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
@@ -211,7 +213,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 	}
 	else{ // num plus >= num minus
 
@@ -230,7 +232,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
@@ -254,11 +256,11 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 		
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
-		
+
 		if( match_list.empty() ){
 			return sig_list;
 		}
@@ -278,7 +280,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 
 		// Cull orphaned primers and probes
 		cull_oligo_match(match_list, m_max_amplicon_len, m_sig.has_probe(), m_single_primer_pcr);
@@ -302,7 +304,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_primer_dg, m_max_primer_dg,
 			0, // no 5' clamp for primers
 			m_primer_clamp,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 	}
 
 	// Reuse the melting engine for binding a probe (if present)
@@ -337,7 +339,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 		
 		// Does the probe bind to the plus strand?
 		bind_oligo_to_plus_strand(match_list,
@@ -347,7 +349,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch, m_max_poly_degen);
 	}
 	
 	// We need one final sort before testing for assay matches
@@ -408,7 +410,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 						const int amp_stop = r->loc_3;
 
 						if(amp_start > amp_stop){
-							throw __FILE__ ":amplicon: amp_start > amp_stop";
+							THROW(__FILE__ ":amplicon: amp_start > amp_stop");
 						}
 						
 						// The original version only checked that the probe
@@ -561,7 +563,7 @@ list<hybrid_sig> amplicon(DNAHash &m_hash,
 				const int amp_stop = r->loc_3;
 
 				if(amp_start > amp_stop){
-					throw __FILE__ ":amplicon: amp_start > amp_stop";
+					THROW(__FILE__ ":amplicon: amp_start > amp_stop");
 				}
 
 				const unsigned int amp_len = amp_stop - amp_start + 1;

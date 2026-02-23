@@ -3,6 +3,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include "throw.h"
 
 using namespace std;
 using namespace SA;
@@ -83,7 +84,7 @@ void SeqAlign::align_overlap()
 		MEMORY_ALIGNMENT);
 	
 	if(dp_matrix == NULL){
-		throw __FILE__ ":SeqAlign::align_overlap: Unable to allocate dp_matrix";
+		THROW(__FILE__ ":SeqAlign::align_overlap: Unable to allocate dp_matrix");
 	}
 	
 	// Initialize the dynamic programming matrix to have zeros along the first row and first column
@@ -247,7 +248,7 @@ void SeqAlign::align_global()
 		MEMORY_ALIGNMENT);
 	
 	if(dp_matrix == NULL){
-		throw __FILE__ ":SeqAlign::align_global: Unable to allocate dp_matrix";
+		THROW(__FILE__ ":SeqAlign::align_global: Unable to allocate dp_matrix");
 	}
 	
 	// Initialize the dynamic programming matrix for a global alignment
@@ -422,7 +423,7 @@ void SeqAlign::align_smith_waterman()
 		MEMORY_ALIGNMENT);
 	
 	if(dp_matrix == NULL){
-		throw __FILE__ ":SeqAlign::align_smith_waterman: Unable to allocate dp_matrix";
+		THROW(__FILE__ ":SeqAlign::align_smith_waterman: Unable to allocate dp_matrix");
 	}
 	
 	// Initialize the dynamic programming matrix to have zeros along the first row and first column
@@ -623,16 +624,16 @@ void SeqAlign::compute_score(const unsigned int &m_index)
 
 				break;
 			default:
-				throw __FILE__ ":SeqAlign::compute_score: Unknown mode";
+				THROW(__FILE__ ":SeqAlign::compute_score: Unknown mode");
 		};
 
 		// Can we normalize the relative score?
 		if(best_possible_score <= worst_possible_score){
-			throw __FILE__ ":SeqAlign::compute_score: best_possible_score <= worst_possible_score";	
+			THROW(__FILE__ ":SeqAlign::compute_score: best_possible_score <= worst_possible_score");
 		}
 
 		if(align_ref.get_score() < worst_possible_score){
-			throw __FILE__ ":SeqAlign::compute_score: best_possible_score <= worst_possible_score";	
+			THROW(__FILE__ ":SeqAlign::compute_score: best_possible_score <= worst_possible_score");
 		}
 
 		align_ref.set_relative_score(
@@ -647,7 +648,7 @@ void SeqAlign::compute_score(const unsigned int &m_index)
 void SeqAlign::trace_back(const unsigned int &m_index)
 {		
 	if( (max_loc.v[m_index] < 0) ){
-		throw __FILE__ ":SeqAlign::trace_back: Invalid pointer";
+		THROW(__FILE__ ":SeqAlign::trace_back: Invalid pointer");
 	}
 
 	Alignment &align_ref = curr_align[m_index];
@@ -810,7 +811,7 @@ void SeqAlign::trace_back(const unsigned int &m_index)
 				//cerr << "last_i = " << last_i << endl;
 				//cerr << "last_j = " << last_j << endl;
 				
-				throw __FILE__ ":SeqAlign::trace_back: Invalid_match in trace back";
+				THROW(__FILE__ ":SeqAlign::trace_back: Invalid_match in trace back");
 		};
 		
 		align_ref.set_query_start(last_i);
@@ -821,7 +822,7 @@ void SeqAlign::trace_back(const unsigned int &m_index)
 			//cerr << "last_i = " << last_i << endl;
 			//cerr << "last_j = " << last_j << endl;
 
-			throw __FILE__ ":SeqAlign::trace_back: Index underflow in trace back";
+			THROW(__FILE__ ":SeqAlign::trace_back: Index underflow in trace back");
 		}
 		
 		// DEBUG
@@ -851,7 +852,7 @@ void SeqAlign::trace_back(const unsigned int &m_index)
 	}
 
 	// It's an error if we get here
-	throw __FILE__ ":trace_back: Error in trace_back";
+	THROW(__FILE__ ":trace_back: Error in trace_back");
 }
 
 string Alignment::print() const
@@ -1009,7 +1010,7 @@ char SA::bits_to_na(base_type m_bits)
 			return '-';
 	};
 
-	throw __FILE__ ":bit_to_na: Unknown base!";
+	THROW(__FILE__ ":bit_to_na: Unknown base!");
 	return 'X'; // Keep the compiler happy
 };
 
@@ -1050,7 +1051,7 @@ base_type SA::na_to_bits(char m_base)
 			return NA::GAP;
 	};
 
-	throw __FILE__ ":na_to_bits: Unknown base!";
+	THROW(__FILE__ ":na_to_bits: Unknown base!");
 	return NA::GAP; // Keep the compiler happy
 };
 
@@ -1107,7 +1108,7 @@ char SA::bits_to_aa(base_type m_bits)
 			return '-';
 	};
 
-	throw __FILE__ ":bit_to_aa: Unknown base!";
+	THROW(__FILE__ ":bit_to_aa: Unknown base!");
 	return '?'; // Keep the compiler happy
 };
 
@@ -1164,7 +1165,7 @@ base_type SA::aa_to_bits(char m_base)
 			return AA::GAP;
 	};
 
-	throw __FILE__ ":aa_to_bit: Unknown base!";
+	THROW(__FILE__ ":aa_to_bit: Unknown base!");
 	return AA::GAP; // Keep the compiler happy
 };
 
@@ -1172,7 +1173,7 @@ base_type SA::complement(base_type m_base)
 {
 	#ifdef _DEBUG
 	if(!is_na){
-		throw __FILE__ ":complement: Only valid for NA sequences";
+		THROW(__FILE__ ":complement: Only valid for NA sequences");
 	}
 	#endif // _DEBUG
 
@@ -1211,7 +1212,7 @@ base_type SA::complement(base_type m_base)
 			return NA::GAP;
 	};
 
-	throw __FILE__ ":complement: Unknown base";
+	THROW(__FILE__ ":complement: Unknown base");
 	return NA::GAP; // Keep the compiler happy
 };
 

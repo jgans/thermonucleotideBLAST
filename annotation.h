@@ -9,6 +9,7 @@
 #include <list>
 #include <iostream>
 #include <sstream>
+#include "throw.h"
 
 // OS specific defines and includes
 #ifdef WIN32
@@ -182,7 +183,7 @@ public:
 		if(m_str != NULL){
 
 			if(m_key >= LAST_INFO){
-				throw "info:: key out of bounds";
+				THROW("info:: key out of bounds");
 			}
 
 			info_map[m_key] = m_str;
@@ -192,7 +193,7 @@ public:
 	inline void info(unsigned int m_key, const std::string &m_str)
 	{
 		if(m_key >= LAST_INFO){
-			throw "info:: key out of bounds";
+			THROW("info:: key out of bounds");
 		}
 
 		info_map[m_key] = m_str;
@@ -311,7 +312,7 @@ public:
 		if(gene_start > gene_stop){
 			
 			if(m_seq_len < gene_start){
-				throw __FILE__ ":length: gene_start is out of bounds!";
+				THROW(__FILE__ ":length: gene_start is out of bounds!");
 			}
 			
 			return (m_seq_len - gene_start) + gene_stop + 1;
@@ -337,7 +338,7 @@ public:
 	inline void type(const unsigned int &m_type)
 	{
 		if(m_type > NONE){
-			throw "GeneAnnotation: Unknown gene type";
+			THROW("GeneAnnotation: Unknown gene type");
 		}
 		
 		gene_type = m_type;
@@ -474,7 +475,7 @@ public:
 		
 		// Avoid shallow copy errors -- need to write a copy constructor
 		if(m_copy.seq != NULL){
-			throw ":DNAMol: Copy constructor has not been provided";
+			THROW(":DNAMol: Copy constructor has not been provided");
 		}
 	};
 	
@@ -484,7 +485,7 @@ public:
 	
 	inline DNAMol& operator=(const DNAMol &m_copy)
 	{
-		throw ":DNAMol: Copy constructor has not been provided";
+		THROW(":DNAMol: Copy constructor has not been provided");
 	};
 	
 	// A helper function for processing gene annotation lists
@@ -562,7 +563,7 @@ public:
 	inline std::string info(unsigned int m_key) const
 	{
 		if(m_key >= LAST_INFO){
-			throw "info: key out of bounds";
+			THROW("info: key out of bounds");
 		}
 
 		return info_map[m_key];

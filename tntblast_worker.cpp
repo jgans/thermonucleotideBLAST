@@ -7,6 +7,7 @@
 #include "options.h"
 #include "mpi_util.h"
 #include "bitmask.h"
+#include "throw.h"
 
 using namespace std;
 
@@ -156,7 +157,7 @@ int worker(int argc, char *argv[])
 				if(MPI_Recv(&msg, 1, MPI_INT, status.MPI_SOURCE, 
 					SEARCH_COMPLETE, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-					throw __FILE__ ":worker: Error receiving SEARCH_COMPLETE";
+					THROW(__FILE__ ":worker: Error receiving SEARCH_COMPLETE");
 				}
 				
 				break;
@@ -166,7 +167,7 @@ int worker(int argc, char *argv[])
 			if(status.MPI_TAG != SEARCH_QUERY){
 			
 				cerr << "[" << mpi_rank << "] got an unknown message tag: " << status.MPI_TAG << endl;
-				throw __FILE__ ":worker: Unknown message tag";
+				THROW(__FILE__ ":worker: Unknown message tag");
 			}
 			
 			unsigned int buffer[SEARCH_QUERY_BUFFER_SIZE];
@@ -174,7 +175,7 @@ int worker(int argc, char *argv[])
 			if(MPI_Recv(buffer, SEARCH_QUERY_BUFFER_SIZE, MPI_UNSIGNED, status.MPI_SOURCE, 
 				SEARCH_QUERY, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-				throw __FILE__ ":worker: Error receiving SEARCH_QUERY";
+				THROW(__FILE__ ":worker: Error receiving SEARCH_QUERY");
 			}
 			
 			unsigned int cur_query = buffer[0];
@@ -237,7 +238,7 @@ int worker(int argc, char *argv[])
 					if(MPI_Send( (void*)&num_query, 1, MPI_UNSIGNED, 0, 
 					   STATUS_UPDATE, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-					   throw __FILE__ ":worker: Error sending STATUS_UPDATE to master";
+					   THROW(__FILE__ ":worker: Error sending STATUS_UPDATE to master");
 					}
 					
 					// There is no stored sequence
@@ -279,7 +280,7 @@ int worker(int argc, char *argv[])
 			for(unsigned int i = 0;i < num_query;i++, cur_query++){
 			
 				if(cur_query >= num_sig){
-					throw __FILE__ ": cur_query >= num_sig";
+					THROW(__FILE__ ": cur_query >= num_sig");
 				}
 				
 				list<hybrid_sig> local_results;
@@ -302,6 +303,7 @@ int worker(int argc, char *argv[])
 								opt.primer_clamp, opt.min_max_primer_clamp,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.max_len,
 								opt.single_primer_pcr,
 								opt.mask_options,
@@ -318,6 +320,7 @@ int worker(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.target_strand, 0 /*max len*/,
 								oligo_table,
 								str_table);
@@ -332,6 +335,7 @@ int worker(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.target_strand, opt.max_len,
 								oligo_table,
 								str_table);
@@ -348,7 +352,8 @@ int worker(int argc, char *argv[])
 							opt.min_probe_tm, opt.max_probe_tm, 
 							opt.min_probe_dg, opt.max_probe_dg, 
 							opt.probe_clamp_5, opt.probe_clamp_3,
-							opt.max_gap, opt.max_mismatch, 
+							opt.max_gap, opt.max_mismatch,
+							opt.max_poly_degen,
 							opt.target_strand,
 							oligo_table,
 							str_table);
@@ -457,7 +462,7 @@ int worker(int argc, char *argv[])
 			if(MPI_Send((void*)&QT, sizeof(float), MPI_BYTE, 0, 
 			   STATUS_UPDATE, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-			   throw __FILE__ ":worker: Error sending STATUS_UPDATE to master";
+			   THROW(__FILE__ ":worker: Error sending STATUS_UPDATE to master");
 			}
 			
 			#ifdef PROFILE
@@ -487,7 +492,7 @@ int worker(int argc, char *argv[])
 		if(MPI_Send(profile_time, NUM_PROFILE, MPI_DOUBLE, 0, 
 		   PROFILE_INFO, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-		   throw __FILE__ ":worker: Error sending PROFILE_INFO to master";
+		   THROW(__FILE__ ":worker: Error sending PROFILE_INFO to master");
 		}
 		#endif // PROFILE
 		
@@ -504,7 +509,7 @@ int worker(int argc, char *argv[])
 			vector<string>::const_iterator iter = lower_bound(index_table.begin(), index_table.end(), i->first);
 
 			if( ( iter == index_table.end() ) || (*iter != i->first) ){
-				throw __FILE__ ":worker: Unable to look up string for reindexing";
+				THROW(__FILE__ ":worker: Unable to look up string for reindexing");
 			}
 
 			old_to_new[i->second] = iter - index_table.begin();
@@ -531,7 +536,7 @@ int worker(int argc, char *argv[])
 			unsigned char* buffer = new unsigned char [buffer_size];
 		
 			if(buffer == NULL){
-				throw __FILE__ ":worker: Error allocating send buffer for bitmask";
+				THROW(__FILE__ ":worker: Error allocating send buffer for bitmask");
 			}
 			
 			sig_match.mpi_pack(buffer);
@@ -539,7 +544,7 @@ int worker(int argc, char *argv[])
 			if(MPI_Ssend(buffer, buffer_size, MPI_BYTE, 0, 
 			   SIGNATURE_RESULTS, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-			   throw __FILE__ ":worker: Error sending SIGNATURE_RESULTS (bitmask) to master";
+			   THROW(__FILE__ ":worker: Error sending SIGNATURE_RESULTS (bitmask) to master");
 			}
 			
 			delete [] buffer;
@@ -578,7 +583,7 @@ int worker(int argc, char *argv[])
 			unsigned char* buffer = new unsigned char [buffer_size];
 		
 			if(buffer == NULL){
-				throw __FILE__ ":worker: Error allocating send buffer";
+				THROW(__FILE__ ":worker: Error allocating send buffer");
 			}
 
 			unsigned char *ptr = buffer;
@@ -597,7 +602,7 @@ int worker(int argc, char *argv[])
 			if(MPI_Ssend(buffer, buffer_size, MPI_BYTE, 0, 
 			   SIGNATURE_RESULTS, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-			   throw __FILE__ ":worker: Error sending SIGNATURE_RESULTS to master";
+			   THROW(__FILE__ ":worker: Error sending SIGNATURE_RESULTS to master");
 			}
 
 			delete [] buffer;		
@@ -611,8 +616,7 @@ int worker(int argc, char *argv[])
 		}
 		
 		if(results_list.empty() == false){
-			
-			throw __FILE__ ":worker: results_list still has entries!";
+			THROW(__FILE__ ":worker: results_list still has entries!");
 		}
 		
 	}

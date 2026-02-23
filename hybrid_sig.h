@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "mpi_util.h"
+#include "throw.h"
 
 // The symbol defined by COMMENT_SYMBOL is used to comment out
 // lines in the assya input file
@@ -225,7 +226,7 @@ class hybrid_sig {
 		{
 			// Id's must be >= 0
 			if(m_id < 0){
-				throw __FILE__ ":my_id: m_id < 0";
+				THROW(__FILE__ ":my_id: m_id < 0");
 			}
 
 			id = m_id;
@@ -235,7 +236,7 @@ class hybrid_sig {
 		{
 			// Id's must be >= 0
 			if(m_id < 0){
-				throw __FILE__ ":my_degen_id: m_id < 0";
+				THROW(__FILE__ ":my_degen_id: m_id < 0");
 			}
 			
 			degen_id = m_id;
@@ -428,7 +429,7 @@ class hybrid_sig {
 			#define REINDEX(VAR) \
 				iter = m_old_to_new.find(VAR); \
 				if(iter == m_old_to_new.end()){ \
-					throw __FILE__ ":hybrid_sig::reindex_str: Unable to reindex " # VAR; \
+					THROW(__FILE__ ":hybrid_sig::reindex_str: Unable to reindex " # VAR); \
 				} \
 				VAR = iter->second;
 
@@ -545,7 +546,7 @@ inline std::string index_to_str(const size_t &m_index, const std::vector<std::st
 		std::cerr << "m_index = " << m_index << std::endl;
 		std::cerr << "|table| = " << m_str_table.size() << std::endl;
 
-		throw __FILE__ ":index_to_str: Index out of bounds";
+		THROW(__FILE__ ":index_to_str: Index out of bounds");
 	}
 
 	return m_str_table[m_index];
@@ -555,7 +556,7 @@ inline size_t str_to_index(const std::string &m_str, std::unordered_map<std::str
 {
 	std::unordered_map<std::string, size_t>::const_iterator iter = m_str_table.find(m_str);
 
-	if(iter == m_str_table.end()){
+	if( iter == m_str_table.end() ){
 
 		// Add the string to the database
 		const size_t ret = m_str_table.size();
@@ -575,7 +576,7 @@ inline std::vector<std::string> ordered_keys(const std::unordered_map<std::strin
 	for(std::unordered_map<std::string, size_t>::const_iterator i = m_str_table.begin();i != m_str_table.end();++i){
 		
 		if( i->second >= ret.size() ){
-			throw __FILE__ ":ordered_keys: Key index is out of bounds";
+			THROW(__FILE__ ":ordered_keys: Key index is out of bounds");
 		}
 
 		ret[i->second] = i->first;

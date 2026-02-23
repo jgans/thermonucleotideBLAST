@@ -33,6 +33,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "bitmask.h"
+#include "throw.h"
 
 using namespace std;
 
@@ -61,7 +62,7 @@ void bitmask::reset(const unsigned int &m_num_bits, const std::set<unsigned int>
 		mask = new unsigned char [len];
 
 		if(mask == NULL){
-			throw "bitmask::reset: Unable to allocate memory!";
+			THROW("bitmask::reset: Unable to allocate memory!");
 		}
 	}
 	
@@ -89,7 +90,7 @@ bool bitmask::includes(const bitmask &m_set) const
 	// will allow use to efficiently search both sets with a single for-
 	// loop).
 	if(m_set.bits != bits){
-		throw "bitmask::includes: bit length mis-match";
+		THROW("bitmask::includes: bit length mis-match");
 	}
 	
 	unsigned char *ptr_super = mask;
@@ -129,7 +130,7 @@ bitmask& bitmask::operator += (const bitmask &m_set)
 	// will allow use to efficiently search both sets with a single for-
 	// loop).
 	if(m_set.bits != bits){
-		throw "bitmask::operator |=: bit length mis-match";
+		THROW("bitmask::operator |=: bit length mis-match");
 	}
 	
 	for(unsigned int i = 0;i < len;i++){
@@ -147,7 +148,7 @@ bitmask& bitmask::operator &= (const bitmask &m_set)
 	// will allow use to efficiently search both sets with a single for-
 	// loop).
 	if(m_set.bits != bits){
-		throw "bitmask::operator &=: bit length mis-match";
+		THROW("bitmask::operator &=: bit length mis-match");
 	}
 	
 	for(unsigned int i = 0;i < len;i++){
@@ -163,7 +164,7 @@ bool bitmask::operator==(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(m_mask.bits != bits){
-		throw "bitmask::operator==: bit length mis-match";
+		THROW("bitmask::operator==: bit length mis-match");
 	}
 	
 	return (memcmp(mask,  m_mask.mask, len) == 0);	
@@ -185,7 +186,7 @@ bool bitmask::operator==(const set<unsigned int> &m_mask) const
 			// Instead of simply returning false, throw an error 
 			// to let the user know that set dimensions are not equal!
 			// return false;
-			throw "bitmask::operator==: set element out of bounds";
+			THROW("bitmask::operator==: set element out of bounds");
 		}
 		
 		// Is the element (*iter) present in the bitstring?
@@ -210,7 +211,7 @@ bool bitmask::operator<(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(m_mask.bits != bits){
-		throw "bitmask::operator<: bit length mis-match";
+		THROW("bitmask::operator<: bit length mis-match");
 	}
 	
 	return (memcmp(mask,  m_mask.mask, len) < 0);	
@@ -222,7 +223,7 @@ bool bitmask::operator>(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(m_mask.bits != bits){
-		throw "bitmask::operator>: bit length mis-match";
+		THROW("bitmask::operator>: bit length mis-match");
 	}
 	
 	return (memcmp(mask,  m_mask.mask, len) > 0);	
@@ -236,7 +237,7 @@ bitmask bitmask::operator-(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(bits != m_mask.bits){
-		throw "bitmask::operator-: bit length mis-match";
+		THROW("bitmask::operator-: bit length mis-match");
 	}
 	
 	bitmask tmp(bits, false);
@@ -255,7 +256,7 @@ bitmask bitmask::operator+(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(bits != m_mask.bits){
-		throw "bitmask::operator+: bit length mis-match";
+		THROW("bitmask::operator+: bit length mis-match");
 	}
 	
 	bitmask tmp(bits, false);
@@ -274,7 +275,7 @@ bitmask bitmask::operator&(const bitmask &m_mask) const
 	// (not formally required, but in practice a good reality check and
 	// will allow use to efficiently compare both sets with memcmp);
 	if(bits != m_mask.bits){
-		throw "bitmask::operator&: bit length mis-match";
+		THROW("bitmask::operator&: bit length mis-match");
 	}
 	
 	bitmask tmp(bits, false);
@@ -308,7 +309,7 @@ bitmask& bitmask::operator=(const string &m_mask)
 	mask = new unsigned char [len];
 
 	if(mask == NULL){
-		throw "bitmask: Unable to allocate memory!";
+		THROW("bitmask: Unable to allocate memory!");
 	}
 	
 	// Flip bits to all 0's
@@ -326,7 +327,7 @@ bitmask& bitmask::operator=(const string &m_mask)
 				(*this)[i] = false;
 				break;
 			default:
-				throw "bitmask::operator=: Illegal string character!";
+				THROW("bitmask::operator=: Illegal string character!");
 		};
 	}
 	
@@ -353,7 +354,7 @@ bitmask& bitmask::operator=(const char* m_mask)
 	mask = new unsigned char [len];
 
 	if(mask == NULL){
-		throw "bitmask: Unable to allocate memory!";
+		THROW("bitmask: Unable to allocate memory!");
 	}
 	
 	// Flip bits to all 0's
@@ -371,7 +372,7 @@ bitmask& bitmask::operator=(const char* m_mask)
 				(*this)[i] = false;
 				break;
 			default:
-				throw "bitmask::operator=: Illegal string character!";
+				THROW("bitmask::operator=: Illegal string character!");
 		};
 	}
 	

@@ -33,6 +33,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "degenerate_na.h"
+#include "throw.h"
 
 #include <ctype.h>
 #include <vector>
@@ -129,7 +130,7 @@ list<string> expand_nucleic_acid(const string &m_seq)
 			default:
 			
 				cerr << "Found the unknown letter \"" << m_seq[i] << "\"" << endl;
-				throw "Unknown base!";
+				THROW("Unknown base!");
 		};
 	}
 	
@@ -206,7 +207,7 @@ unsigned int degeneracy(const std::string &m_oligo)
 			default:
 			
 				cerr << "Found the unknown letter '" << *i << "'" << endl;
-				throw "Unknown base!";
+				THROW("Unknown base!");
 		};
 	}
 

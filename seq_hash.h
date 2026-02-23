@@ -34,6 +34,7 @@
 #include <string.h> // for memset
 #include <vector>
 #include "seq.h"
+#include "throw.h"
 
 #define	SEQ_HASH_END	0xffffffff
 
@@ -80,7 +81,7 @@ class DNAHash {
 			word_length = m_word_length;
 
 			if( (word_length < 2) || (word_length > 8) ){
-				throw __FILE__ ":DNAHash: Unsupported word length";
+				THROW(__FILE__ ":DNAHash: Unsupported word length");
 			}
 
 			hash_table = NULL;
@@ -222,7 +223,7 @@ class DNAHash_iterator
 			#ifdef _DEBUG
 			// Is the user trying to end()++ ?
 			if(hash_table == NULL){
-				throw __FILE__ ":operator*: hash_ptr == NULL";
+				THROW(__FILE__ ":operator*: hash_ptr == NULL");
 			}
 			#endif // _DEBUG
 
@@ -245,7 +246,7 @@ class DNAHash_iterator
 			#ifdef _DEBUG
 			// Is the user trying to end()++ ?
 			if(hash_table == NULL){
-				throw __FILE__ ":++DNAHash_iterator: hash_table == NULL";
+				THROW(__FILE__ ":++DNAHash_iterator: hash_table == NULL");
 			}
 			#endif // _DEBUG
 			
@@ -289,7 +290,7 @@ class DNAHash_iterator
 			#ifdef _DEBUG
 			// Is the user trying to end()++ ?
 			if(hash_table == NULL){
-				throw __FILE__ ":build_word_list: hash_table == NULL";
+				THROW(__FILE__ ":build_word_list: hash_table == NULL");
 			}
 			#endif // _DEBUG
 
@@ -381,11 +382,11 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 {
 	#ifdef _DEBUG
 	if(m_start > m_stop){
-		throw __FILE__ ":DNAHash::hash: m_start > m_stop";
+		THROW(__FILE__ ":DNAHash::hash: m_start > m_stop");
 	}
 	
 	if(m_stop > m_len){
-		throw __FILE__ ":DNAHash::hash: m_stop > m_len";
+		THROW(__FILE__ ":DNAHash::hash: m_stop > m_len");
 	}
 	#endif // _DEBUG
 	
@@ -398,7 +399,7 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 		hash_table = new hash_pair [table_size];
 		
 		if(hash_table == NULL){
-			throw __FILE__ ":DNAHash::hash: Unable to allocate hash_table";
+			THROW(__FILE__ ":DNAHash::hash: Unable to allocate hash_table");
 		}
 		
 	}
@@ -473,7 +474,7 @@ inline void DNAHash::hash(const SEQ &m_seq, const size_t &m_len,
 		index_table = new size_t [index_table_size];
 		
 		if(index_table == NULL){
-			throw __FILE__ ":DNAHash::hash: Unable to allocate index_table";
+			THROW(__FILE__ ":DNAHash::hash: Unable to allocate index_table");
 		}
 	}
 	
@@ -526,11 +527,11 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 {
 	#ifdef _DEBUG
 	if(m_start > m_stop){
-		throw __FILE__ ":DNAHash::hash: m_start > m_stop";
+		THROW(__FILE__ ":DNAHash::hash: m_start > m_stop");
 	}
 	
 	if(m_stop > m_len){
-		throw __FILE__ ":DNAHash::hash: m_stop > m_len";
+		THROW(__FILE__ ":DNAHash::hash: m_stop > m_len");
 	}
 	#endif // _DEBUG
 	
@@ -543,7 +544,7 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 		hash_table = new hash_pair [table_size];
 		
 		if(hash_table == NULL){
-			throw __FILE__ ":DNAHash::hash: Unable to allocate hash_table";
+			THROW(__FILE__ ":DNAHash::hash: Unable to allocate hash_table");
 		}
 	}
 	
@@ -605,7 +606,7 @@ inline void DNAHash::hash(const SEQPTR &m_seq, const size_t &m_len,
 		index_table = new size_t [index_table_size];
 		
 		if(index_table == NULL){
-			throw __FILE__ ":DNAHash::hash: Unable to allocate index_table";
+			THROW(__FILE__ ":DNAHash::hash: Unable to allocate index_table");
 		}
 	}
 	
@@ -646,7 +647,7 @@ inline void DNAHash_iterator::build_word_list(const SEQPTR &m_seq, const size_t 
 	#ifdef _DEBUG
 	// Is the user trying to end()++ ?
 	if(hash_table == NULL){
-		throw __FILE__ ":build_word_list: hash_table == NULL";
+		THROW(__FILE__ ":build_word_list: hash_table == NULL");
 	}
 	#endif // _DEBUG
 

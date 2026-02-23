@@ -38,6 +38,7 @@
 
 #include "circle_buffer.h"
 #include <vector>
+#include "throw.h"
 
 // This class encapsulates heuristic rules for PCR primer design
 // There are currently 5 heuristic criteria that are considered:
@@ -163,23 +164,23 @@ public:
 	inline void gc_range(const float &m_min_gc, const float &m_max_gc)
 	{
 		if(m_min_gc > 1.0f){
-			throw "GC min out of bounds (> 1.0)";
+			THROW("GC min out of bounds (> 1.0)");
 		}
 
 		if(m_min_gc < 0.0f){
-			throw "GC min out of bounds (< 0.0)";
+			THROW("GC min out of bounds (< 0.0)");
 		}
 		
 		if(m_max_gc > 1.0f){
-			throw "GC max out of bounds (> 1.0)";
+			THROW("GC max out of bounds (> 1.0)");
 		}
 
 		if(m_max_gc < 0.0f){
-			throw "GC max out of bounds (< 0.0)";
+			THROW("GC max out of bounds (< 0.0)");
 		}
 		
 		if(m_max_gc < m_min_gc){
-			throw "GC range out of bounds (max < min)";
+			THROW("GC range out of bounds (max < min)");
 		}
 
 		gc_min = m_min_gc;

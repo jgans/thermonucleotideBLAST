@@ -15,6 +15,7 @@
 #include <deque>
 
 #include "circle_buffer.h"
+#include "throw.h"
 
 #define	NUC_CRUC_VERSION	"5.6"
 
@@ -166,8 +167,7 @@ inline A max(const A &m_a, const A &m_b)
 	#define	NC_INV_SCORE_SCALE(X)	( float(X)/10000.0f )
 #endif // FLOATING_POINT_ALIGNMENT
 
-// Allowed bases, no 'N' for now
-// These values have been chosen to
+// Allowed bases with values have been chosen to
 // match nuc_cruc.h and hash_db.h (up to 'T').
 //	A = adenine
 //	C = cytosine
@@ -224,7 +224,7 @@ namespace BASE {
 			case 'N': case 'n': // A or T or G or C
 				return BASE::N;
 			default:
-				throw __FILE__ ":char_to_nucleic_acid: Illegal base";
+				THROW(__FILE__ ":char_to_nucleic_acid: Illegal base");
 		};
 
 		return BASE::N; // We should never get here!
@@ -267,7 +267,7 @@ namespace BASE {
 			case 'N': case 'n': // A or T or G or C
 				return BASE::N;
 			default:
-				throw __FILE__ ":char_to_complement_nucleic_acid: Illegal base";
+				THROW(__FILE__ ":char_to_complement_nucleic_acid: Illegal base");
 		};
 
 		return BASE::N; // We should never get here!
@@ -313,7 +313,7 @@ class trace_branch{
 		inline bool next_trace()
 		{
 			if(mask_ptr == NULL){
-				throw "mask_ptr == NULL";
+				THROW("mask_ptr == NULL");
 			}
 			
 			while( (curr_trace = curr_trace << 1) < invalid_trace){
@@ -431,7 +431,7 @@ struct alignment {
 		}
 		
 		if(m_query_len < num_aligned_query_bases){
-			throw __FILE__ ":num_mismatch_by_query: m_query_len < num_aligned_query_bases";
+			THROW(__FILE__ ":num_mismatch_by_query: m_query_len < num_aligned_query_bases");
 		}
 		
 		mismatch_count += m_query_len - num_aligned_query_bases;
@@ -460,6 +460,26 @@ struct alignment {
 		}
 		
 		return (num_aligned == 0) ? 0.0f : float(num_real)/num_aligned;
+	};
+
+	inline unsigned int max_contiguous_target_degen() const
+	{
+		unsigned int max_poly_degen = 0;
+		unsigned int num_poly_degen = 0;
+
+		for(std::deque<BASE::nucleic_acid>::const_iterator t = target_align.begin();t != target_align.end();++t){
+
+			if( (*t >= BASE::M) && (*t <= BASE::N) ){
+
+				++num_poly_degen;
+				max_poly_degen = std::max(max_poly_degen, num_poly_degen);
+			}
+			else{
+				num_poly_degen = 0;
+			}
+		}
+		
+		return max_poly_degen;
 	};
 };
 
@@ -758,7 +778,7 @@ class NucCruc{
 		{
 			
 			if( m_query_align.size() != m_target_align.size() ){
-				throw "query target size mismatch";
+				THROW("query target size mismatch");
 			}
 			
 			curr_align.clear();
@@ -801,7 +821,7 @@ class NucCruc{
 						curr_align.target_align.push_back(BASE::G);
 						break;
 					default:
-						throw "Unknown base in tm_pm_duplex";
+						THROW("Unknown base in tm_pm_duplex");
 				};
 			}
 			
@@ -832,11 +852,11 @@ class NucCruc{
 		inline void salt(const float &m_na_concentration)
 		{
 			if(m_na_concentration < 1.0e-6f){
-				throw ":salt: [Na+] < 1.0e-6f";
+				THROW(":salt: [Na+] < 1.0e-6f");
 			}
 			
 			if(m_na_concentration > 1.0f){
-				throw ":salt: [Na+] > 1.0f";
+				THROW(":salt: [Na+] > 1.0f");
 			}
 			
 			na_concentration = m_na_concentration;
@@ -859,7 +879,7 @@ class NucCruc{
 		inline void strand(const float &m_strand_concentration)
 		{
 			if(m_strand_concentration < 0.0f){
-				throw ":strand: strand_concentration < 0.0f";
+				THROW(":strand: strand_concentration < 0.0f");
 			}
 			
 			strand_concentration = m_strand_concentration;
@@ -870,11 +890,11 @@ class NucCruc{
 		inline void strand(const float &m_c_a, const float &m_c_b)
 		{
 			if(m_c_a < 0.0f){
-				throw ":strand: m_c_a < 0.0f";
+				THROW(":strand: m_c_a < 0.0f");
 			}
 			
 			if(m_c_b < 0.0f){
-				throw ":strand: m_c_b < 0.0f";
+				THROW(":strand: m_c_b < 0.0f");
 			}
 			
 			// For A + B -> D,
@@ -929,7 +949,7 @@ class NucCruc{
 			const size_t query_len = m_query.size();
 			
 			if(query_len > MAX_SEQUENCE_LENGTH){
-				throw __FILE__ ":set_query: Query size out of bounds";
+				THROW(__FILE__ ":set_query: Query size out of bounds");
 			}
 			
 			query.clear();
@@ -944,7 +964,7 @@ class NucCruc{
 			const size_t query_len = m_query.size();
 			
 			if(query_len > MAX_SEQUENCE_LENGTH){
-				throw __FILE__ ":set_query_reverse_complement: Query size out of bounds";
+				THROW(__FILE__ ":set_query_reverse_complement: Query size out of bounds");
 			}
 			
 			query.clear();
@@ -959,7 +979,7 @@ class NucCruc{
 			const size_t target_len = m_target.size();
 			
 			if(target_len > MAX_SEQUENCE_LENGTH){
-				throw __FILE__ ":set_target: Target size out of bounds";
+				THROW(__FILE__ ":set_target: Target size out of bounds");
 			}
 			
 			target.clear();
@@ -974,7 +994,7 @@ class NucCruc{
 			const size_t target_len = m_target.size();
 			
 			if(target_len > MAX_SEQUENCE_LENGTH){
-				throw __FILE__ ":set_target_reverse_complement: Target size out of bounds";
+				THROW(__FILE__ ":set_target_reverse_complement: Target size out of bounds");
 			}
 			
 			target.clear();
@@ -991,7 +1011,7 @@ class NucCruc{
 			const size_t seq_len = m_seq.size();
 			
 			if(seq_len > MAX_SEQUENCE_LENGTH){
-				throw __FILE__ ":set_duplex: m_seq size out of bounds";
+				THROW(__FILE__ ":set_duplex: m_seq size out of bounds");
 			}
 			
 			query.clear();
@@ -1010,7 +1030,7 @@ class NucCruc{
 			// test for any illegal attempts to add a dangling base here
 			// (this check can be removed after all dependent code has been corrected)
 			if(m_base == BASE::E){
-				throw __FILE__ ":push_back_query: Illegal push of '$'";
+				THROW(__FILE__ ":push_back_query: Illegal push of '$'");
 			}
 			
 			query.push_back(m_base);
@@ -1032,7 +1052,7 @@ class NucCruc{
 			// test for any illegal attempts to add a dangling base here
 			// (this check can be removed after all dependent code has been corrected)
 			if(m_base == BASE::E){
-				throw __FILE__ ":push_front_query: Illegal push of '$'";
+				THROW(__FILE__ ":push_front_query: Illegal push of '$'");
 			}
 			
 			query.push_front(m_base);
@@ -1054,7 +1074,7 @@ class NucCruc{
 			// test for any illegal attempts to add a dangling base here
 			// (this check can be removed after all dependent code has been corrected)
 			if(m_base == BASE::E){
-				throw __FILE__ ":push_back_target: Illegal push of '$'";
+				THROW(__FILE__ ":push_back_target: Illegal push of '$'");
 			}
 			
 			target.push_back(m_base);
@@ -1076,7 +1096,7 @@ class NucCruc{
 			// test for any illegal attempts to add a dangling base here
 			// (this check can be removed after all dependent code has been corrected)
 			if(m_base == BASE::E){
-				throw __FILE__ ":push_front_target: Illegal push of '$'";
+				THROW(__FILE__ ":push_front_target: Illegal push of '$'");
 			}
 			
 			target.push_front(m_base);
@@ -1156,6 +1176,11 @@ class NucCruc{
 			return curr_align.fraction_aligned_real_base_pairs();
 		};
 
+		inline unsigned int max_contiguous_target_degen() const
+		{
+			return curr_align.max_contiguous_target_degen();
+		};
+
 		inline void dangle(const bool &m_dangle_5, const bool &m_dangle_3)
 		{
 			enable_dangle = std::make_pair(m_dangle_5, m_dangle_3);
@@ -1207,7 +1232,7 @@ class NucCruc{
 		inline void temperature(const float &m_tm)
 		{
 			if(m_tm < 0.0f){
-				throw "temperature: tm < 0";
+				THROW("temperature: tm < 0");
 			}
 
 			target_T = m_tm;

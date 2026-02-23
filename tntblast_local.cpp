@@ -4,6 +4,7 @@
 #include "degenerate_na.h"
 #include "primer.h"
 #include "bitmask.h"
+#include "throw.h"
 
 #include <stdlib.h>
 #include <time.h>
@@ -70,7 +71,6 @@ int local_main(int argc, char *argv[])
 		
 		// Bind either stdout of fout to ptr_out
 		if(opt.output_filename == ""){
-		
 			ptr_out = &cout;
 		}
 		else{
@@ -83,7 +83,7 @@ int local_main(int argc, char *argv[])
 					fout.open( opt.output_filename.c_str() );
 
 					if(!fout){
-						throw "Unable to open output file";
+						THROW("Unable to open output file");
 					}
 				}
 				
@@ -96,7 +96,7 @@ int local_main(int argc, char *argv[])
 					if(!fout_sif){
 					
 						cerr << "Unable to open " << filename_sif << endl;
-						throw ":local_main: I/O error";
+						THROW(":local_main: I/O error");
 					}
 				}
 			}
@@ -112,7 +112,7 @@ int local_main(int argc, char *argv[])
 				if(!fout_atr){
 
 					cerr << "Unable to open " << filename_atr << endl;
-					throw ":local_main: I/O error";
+					THROW(":local_main: I/O error");
 				}
 
 				// Write the attribute header
@@ -125,7 +125,7 @@ int local_main(int argc, char *argv[])
 				fout.open( opt.output_filename.c_str() );
 
 				if(!fout){
-					throw "Unable to open output file";
+					THROW("Unable to open output file");
 				}
 			}
 
@@ -140,12 +140,15 @@ int local_main(int argc, char *argv[])
 			// Expand multiplex assays and update index_table and str_table as needed
 			opt.sig_list = multiplex_expansion(opt.sig_list, opt.assay_format, 
 				index_table, str_table);
+			
+			// Every time we potentially create new strings, we must update the index_table
+			index_table = ordered_keys(str_table);
 		}
 		
 		// Expand the primers/probes (if needed);
 		opt.sig_list = expand_degenerate_signatures(opt.sig_list, opt.degen_rescale_ct,
-			index_table, str_table);
-		
+			index_table, str_table);	
+
 		// Every time we potentially create new strings, we must update the index_table
 		index_table = ordered_keys(str_table);
 
@@ -162,7 +165,7 @@ int local_main(int argc, char *argv[])
 		const size_t num_sig = opt.sig_list.size();
 		
 		if(num_sig == 0){
-			throw __FILE__ ":local_main: No primers or probes found!";
+			THROW(__FILE__ ":local_main: No primers or probes found!");
 		}
 		
 		// Count the number of probe only queries in the list of queries
@@ -196,7 +199,7 @@ int local_main(int argc, char *argv[])
 		const size_t num_seq = seq_file.size();
 		
 		if(num_seq == 0){
-			throw __FILE__ ":local_main: Empty database -- no sequences found!";
+			THROW(__FILE__ ":local_main: Empty database -- no sequences found!");
 		}
 		
 		// If we take into account target sequence fragmentation, how many sequences
@@ -309,7 +312,7 @@ int local_main(int argc, char *argv[])
 			num_probes*( (opt.target_strand == Seq_strand_both) ?  2.0f: 1.0f) +
 			(num_sig - num_probes)*4.0f
 			)/num_sig;
-			
+
 #pragma omp parallel
 {
 		// Parallelization strategy: 
@@ -379,6 +382,9 @@ int local_main(int argc, char *argv[])
 		
 		tnt_time T_time;
 		
+		#pragma omp barrier //  Wait to make sure all local copying of global variables has completed
+							// (Failure to wait caused a hard-to-fix race condition when searching small databases!)
+
 		while(true){
 
 			unsigned int local_target;
@@ -539,7 +545,7 @@ int local_main(int argc, char *argv[])
 			
 			if(single_query == false){
 				
-				// Since we're searching will all queries, reset the query counter to 0
+				// Since we're searching with all queries, reset the query counter to 0
 				local_query = 0;
 			}
 			
@@ -567,6 +573,7 @@ int local_main(int argc, char *argv[])
 								opt.primer_clamp, opt.min_max_primer_clamp, 
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.max_len,
 								opt.single_primer_pcr, opt.mask_options,
 								local_index_table, local_str_table);
@@ -581,6 +588,7 @@ int local_main(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.target_strand, 0 /*max amplicon length is zero*/, 
 								local_index_table, local_str_table);
 
@@ -594,6 +602,7 @@ int local_main(int argc, char *argv[])
 								opt.min_probe_dg, opt.max_probe_dg,
 								opt.probe_clamp_5, opt.probe_clamp_3, 
 								opt.max_gap, opt.max_mismatch,
+								opt.max_poly_degen,
 								opt.target_strand, opt.max_len,
 								local_index_table, local_str_table);
 
@@ -610,6 +619,7 @@ int local_main(int argc, char *argv[])
 							opt.min_probe_dg, opt.max_probe_dg, 
 							opt.probe_clamp_5, opt.probe_clamp_3, 
 							opt.max_gap, opt.max_mismatch,
+							opt.max_poly_degen,
 							opt.target_strand,
 							local_index_table, local_str_table);
 					}
@@ -806,7 +816,7 @@ int local_main(int argc, char *argv[])
 			vector<string>::const_iterator iter = lower_bound(index_table.begin(), index_table.end(), i->first);
 
 			if( ( iter == index_table.end() ) || (*iter != i->first) ){
-				throw __FILE__ ":Unable to look up string for reindexing";
+				THROW(__FILE__ ":Unable to look up string for reindexing");
 			}
 
 			old_to_new[i->second] = iter - index_table.begin();
@@ -820,6 +830,12 @@ int local_main(int argc, char *argv[])
 			for(list<hybrid_sig>::iterator j = i->begin();j != i->end();++j){
 				j->reindex_str(old_to_new);
 			}
+		}
+
+		// One worker needs to reindex the original assay signatures
+		#pragma omp single
+		for(vector<hybrid_sig>::iterator i = opt.sig_list.begin();i != opt.sig_list.end();++i){
+			i->reindex_str(old_to_new);
 		}
 
 		// Merge the search results
@@ -885,7 +901,7 @@ int local_main(int argc, char *argv[])
 				(*ptr_out) << *i << endl;
 			}
 		}
-		
+
 		// Track the number of unique targets "detected" by each signature
 		set<string> total_unique_targets;
 		vector<unsigned int> match_count(num_sig);
@@ -928,7 +944,7 @@ int local_main(int argc, char *argv[])
 					if(!fout){
 					
 						cerr << "Unable to open " << filename << endl;
-						throw ":master: I/O error";
+						THROW(":master: I/O error");
 					}
 				}
 				
@@ -943,7 +959,7 @@ int local_main(int argc, char *argv[])
 					if(!fout_sif){
 					
 						cerr << "Unable to open " << filename_sif << endl;
-						throw ":master: I/O error";
+						THROW(":master: I/O error");
 					}
 				}
 			}
@@ -1329,7 +1345,7 @@ int local_main(int argc, char *argv[])
 		}
 		
 		if(opt.assay_summary && !(opt.output_format & OUTPUT_INVERSE_QUERY) ){
-			
+
 			cout << "*** Assay Summary ***" << endl;
 			
 			// Print the number of matches found for each assay

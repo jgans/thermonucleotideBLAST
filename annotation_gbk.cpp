@@ -1,4 +1,5 @@
 #include "annotation.h"
+#include "throw.h"
 
 #include <sstream>
 #include <string.h>
@@ -43,7 +44,8 @@ enum{	GBK_EOF = 0,
 		GBK_FEATURES,
 		GBK_ORIGIN,
 		GBK_CONTIG,
-		GBK_BASE_COUNT
+		GBK_BASE_COUNT,
+		GBK_WGS
 };
 
 // Enumerate all annotation keys
@@ -56,6 +58,7 @@ enum {
 	GBK_ANNOT_tRNA,
 	GBK_ANNOT_IMP,
 	GBK_ANNOT_USER,
+	GBK_ANNOT_WGS,
 	GBK_ANNOT_UNKNOWN,
 	GBK_ANNOT_NONE
 };
@@ -182,9 +185,17 @@ bool DNAMol::loadGBK(gzFile m_fin, size_t &m_pos)
 
 				seq = read_base_count_GBK(m_fin, seq_len);
 				break;
+			case GBK_WGS:
 
+				// Read and throw away the line
+				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
+					return false; // We have reached the end of the file
+				}
+
+				line_number ++;
+				break;
 			default:
-				throw error_msg("loadGBK: Unknown key encountered");
+				THROW( error_msg("loadGBK: Unknown key encountered") );
 		};
 	}
 
@@ -198,7 +209,7 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 	char buffer[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-		throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading first line";
+		THROW(__FILE__ ":DNAMol::loadGBKFeatures: Error reading first line");
 	}
 
 	line_number ++;
@@ -223,7 +234,7 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 				// Skip the source feature for now. We'll need to parse
 				// this feature to extract the taxon id).
 				if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-					throw __FILE__ ":DNAMol::loadGBKFeatures: Error reading GBK_ANNOT_SOURCE";
+					THROW(__FILE__ ":DNAMol::loadGBKFeatures: Error reading GBK_ANNOT_SOURCE");
 				}
 
 				line_number ++;
@@ -308,6 +319,16 @@ void DNAMol::loadGBKFeatures(gzFile m_fin)
 
 				// Save this gene
 				gene_list.push_back(tmp_gene);
+				break;
+			case GBK_ANNOT_WGS:
+				
+				if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
+					THROW(__FILE__ ":DNAMol::loadGBKFeatures: Error reading GBK_ANNOT_WGS");
+				}
+
+				annot_key = next_key_GBK(m_fin);
+
+				line_number ++;
 				break;
 			case GBK_ANNOT_UNKNOWN:
 				// Do nothing for now
@@ -839,7 +860,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 	int paren_count = 0;
 
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":parse_field_GBK: Error reading line (1)";
+		THROW(__FILE__ ":parse_field_GBK: Error reading line (1)");
 	}
 
 	line_number ++;
@@ -851,7 +872,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 	start_ptr = strchr(buffer, '/');
 
 	if(start_ptr == NULL){
-		throw error_msg(":parse_field: Unable to find key start");
+		THROW( error_msg(":parse_field: Unable to find key start") );
 	}
 	
 	// Skip the '/' character
@@ -997,7 +1018,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 
 		// Read another line
 		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-			throw __FILE__ ":parse_field_GBK: Error reading line (2)";
+			THROW(__FILE__ ":parse_field_GBK: Error reading line (2)");
 		}
 
 		line_number ++;
@@ -1006,7 +1027,7 @@ int parse_field_GBK(gzFile m_fin, pair<string, string> &m_field)
 		
 		// Empty lines are not allowed!
 		if(len == 0){
-			throw error_msg("Unexpected blank line or end of file encountered");
+			THROW( error_msg("Unexpected blank line or end of file encountered") );
 		}
 
 		start_ptr = buffer;
@@ -1031,10 +1052,10 @@ int next_key_GBK(gzFile m_fin, const bool &m_clear_line /* = true */)
 	// Terminate the array
 	buffer[buffer_size] = '\0';
 
-	if( gzread(m_fin, buffer, buffer_size) != buffer_size ){
-		throw error_msg("Unable to read next annotation key");
+	if( gzread(m_fin, buffer, buffer_size) == 0 ){
+		THROW( error_msg(":next_key_GBK: Unable to read next annotation key") );
 	}
-	
+
 	// Find the start of the string
 	while(isspace(*start_ptr)){
 		start_ptr++;
@@ -1047,7 +1068,7 @@ int next_key_GBK(gzFile m_fin, const bool &m_clear_line /* = true */)
 			char buffer[MAX_LINE_LEN];
 
 			if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-				throw __FILE__ ":next_key_GBK: Unable to discard remaining characters";
+				THROW(__FILE__ ":next_key_GBK: Unable to discard remaining characters");
 			}
 
 			line_number ++;
@@ -1114,6 +1135,14 @@ int next_key_GBK(gzFile m_fin, const bool &m_clear_line /* = true */)
 		return GBK_ANNOT_USER;
 	}
 	
+	if(strncmp(start_ptr, "WGS", 3 /*strlen("WGS")*/) == 0){
+
+		// Rewind the stream by buffer_size characters
+		gzseek(m_fin, -buffer_size, SEEK_CUR);
+
+		return GBK_ANNOT_WGS;
+	}
+
 	// Did not match this key
 	return GBK_ANNOT_IMP;
 }
@@ -1126,7 +1155,7 @@ SEQPTR read_base_count_GBK(gzFile m_fin, unsigned int &m_seq_len)
 	char *start_ptr, *stop_ptr;
 
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":read_base_count_GBK: Unable to read line";
+		THROW(__FILE__ ":read_base_count_GBK: Unable to read line");
 	}
 
 	line_number ++;
@@ -1226,7 +1255,7 @@ SEQPTR read_base_count_GBK(gzFile m_fin, unsigned int &m_seq_len)
 	SEQPTR seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 	
 	if(!seq){
-		throw __FILE__ ": Unable to allocate memory for sequence data";
+		THROW(__FILE__ ": Unable to allocate memory for sequence data");
 	}
 	
 	return seq;
@@ -1250,7 +1279,7 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 		seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 		
 		if(!seq){
-			throw __FILE__ ":read_sequence_GBK: Unable to allocate memory for sequence data";
+			THROW(__FILE__ ":read_sequence_GBK: Unable to allocate memory for sequence data");
 		}
 
 		SEQPTR iter = seq;
@@ -1291,7 +1320,7 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 	
 	// First, throw away the line that contains "ORIGIN"
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":read_sequence_GBK: Error reading ORIGIN";
+		THROW(__FILE__ ":read_sequence_GBK: Error reading ORIGIN");
 	}
 
 	line_number ++;
@@ -1312,7 +1341,7 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 			
 				// all done!
 				if( base_count != m_seq_len ){					
-					throw __FILE__ ":read_sequence_GBK: Did not read enough bases";
+					THROW(__FILE__ ":read_sequence_GBK: Did not read enough bases");
 				}
 				
 				pos += i;
@@ -1391,7 +1420,7 @@ SEQPTR read_sequence_GBK(gzFile m_fin, SEQPTR m_seq, unsigned int &m_seq_len)
 		pos += len;
 	}
 
-	throw error_msg(":read_sequence: Could not find end-of-sequence terminator");
+	THROW( error_msg(":read_sequence: Could not find end-of-sequence terminator") );
 	
 	return NULL;
 }
@@ -1408,7 +1437,7 @@ unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 	
 	// First, throw away the line that contains "ORIGIN"
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":count_bases_GBK: Unable to read line (1)";
+		THROW(__FILE__ ":count_bases_GBK: Unable to read line (1)");
 	}
 	
 	// We're going to rewind, so don't increment the line number counter
@@ -1417,7 +1446,7 @@ unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 	while( gzeof(m_fin) == 0 ){
 	
 		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-			throw __FILE__ ":count_bases_GBK: Unable to read line (2)";
+			THROW(__FILE__ ":count_bases_GBK: Unable to read line (2)");
 		}
 
 		ptr = buffer;
@@ -1444,7 +1473,7 @@ unsigned int count_bases_GBK(gzFile m_fin, deque<char> &m_seq)
 		}
 	}
 
-	throw error_msg(":count_bases: Could not find end-of-sequence terminator");
+	THROW( error_msg(":count_bases: Could not find end-of-sequence terminator") );
 
 	return 0;
 }
@@ -1457,7 +1486,7 @@ string read_source_GBK(gzFile m_fin)
 	char line[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-		throw __FILE__ ":read_source_GBK: Unable to read line";
+		THROW(__FILE__ ":read_source_GBK: Unable to read line");
 	}
 
 	buffer = line;
@@ -1501,7 +1530,7 @@ bool read_locus_GBK(gzFile m_fin)
 	char line[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-		throw __FILE__ ":read_locus_GBK: Unable to read line";
+		THROW(__FILE__ ":read_locus_GBK: Unable to read line");
 	}
 	
 	const int len = strlen(line);
@@ -1582,6 +1611,10 @@ int read_gbk_key(gzFile m_fin)
 	
 	if(key == "BASE"){
 		return GBK_BASE_COUNT;
+	}
+
+	if(key == "WGS"){
+		return GBK_WGS;
 	}
 
 	// Did not match this key

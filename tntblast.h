@@ -66,6 +66,8 @@
 // The maximum number of mismatched allowed in DNA duplex
 #define	DEFAULT_MAX_MISMATCH					999
 
+#define DEFAULT_MAX_POLY_DEGEN					3
+
 // By default, rescale the strand concentration to reflect the use of degenerate bases
 #define	DEFAULT_RESCALE_CT						true
 
@@ -90,7 +92,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.68 (July 16, 2024)"
+#define		TNTBLAST_VERSION		"2.76 (February 2, 2026)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
@@ -292,7 +294,7 @@ struct BindCacheValue
 	unsigned int target_3;
 	unsigned int num_mismatch;
 	unsigned int num_gap;
-	float fraction_real_base_pairs;
+	unsigned int target_max_poly_degen;
 	std::string seq_align;
 
 	BindCacheValue()
@@ -310,11 +312,11 @@ struct BindCacheValue
 		const unsigned int &m_target_3,
 		const unsigned int &m_num_mismatch,
 		const unsigned int &m_num_gap,
-		const float &m_fraction_real_base_pairs,
+		const unsigned int &m_target_max_poly_degen,
 		const std::string &m_seq_align) :
 			tm(m_tm), dg(m_dg), dH(m_dH), dS(m_dS), anchor_5(m_anchor_5),
 			anchor_3(m_anchor_3), target_5(m_target_5), target_3(m_target_3),
-			num_mismatch(m_num_mismatch), num_gap(m_num_gap), fraction_real_base_pairs(m_fraction_real_base_pairs),
+			num_mismatch(m_num_mismatch), num_gap(m_num_gap), target_max_poly_degen(m_target_max_poly_degen),
 			seq_align(m_seq_align)
 	{
 
@@ -420,6 +422,7 @@ std::list<hybrid_sig> amplicon(DNAHash &m_hash, const std::pair<std::string, SEQ
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_poly_degen,
 	const unsigned int &m_max_amplicon_len,
 	const bool &m_single_primer_pcr,
 	const int &m_mask_options,
@@ -437,7 +440,8 @@ std::list<hybrid_sig> padlock(DNAHash &m_hash, const std::pair<std::string, SEQP
 	const float &m_min_primer_tm, const float &m_max_primer_tm,
 	const float &m_min_primer_dg, const float &m_max_primer_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3, 
-	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch, 
+	const unsigned int &m_max_poly_degen,
 	const int &m_target_strand, const int &m_max_len,
 	const std::vector<std::string> &m_oligo_table,
 	std::unordered_map<std::string, size_t> &m_str_table);
@@ -462,6 +466,7 @@ std::list<hybrid_sig> hybrid(DNAHash &m_hash, const std::pair<std::string, SEQPT
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_poly_degen,
 	const int &m_target_strand,
 	const std::vector<std::string> &m_oligo_table,
 	std::unordered_map<std::string, size_t> &m_str_table);
@@ -480,7 +485,8 @@ void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list,
 		const unsigned int &m_clamp_5,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
-		const unsigned int &m_max_mismatch);
+		const unsigned int &m_max_mismatch,
+		const unsigned int &m_max_poly_degen);
 
 void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list, 
 		DNAHash &m_hash, SEQPTR m_seq, 
@@ -491,7 +497,8 @@ void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list,
 		const unsigned int &m_clamp_5,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
-		const unsigned int &m_max_mismatch);
+		const unsigned int &m_max_mismatch,
+		const unsigned int &m_max_poly_degen);
 
 void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
@@ -502,7 +509,8 @@ void bind_oligo_to_minus_strand(std::list<oligo_info> &info_list,
 		const unsigned int &m_clamp_5,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
-		const unsigned int &m_max_mismatch);
+		const unsigned int &m_max_mismatch,
+		const unsigned int &m_max_poly_degen);
 
 void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list, 
 		const unsigned char &m_oligo_mask, SEQPTR m_seq, 
@@ -513,7 +521,8 @@ void bind_oligo_to_plus_strand(std::list<oligo_info> &info_list,
 		const unsigned int &m_clamp_5,
 		const unsigned int &m_clamp_3,
 		const unsigned int &m_max_gap,
-		const unsigned int &m_max_mismatch);
+		const unsigned int &m_max_mismatch,
+		const unsigned int &m_max_poly_degen);
 		
 void match_oligo_to_minus_strand(std::list<oligo_info> &info_list, 
 		DNAHash &m_hash, const std::string &m_oligo, const unsigned char &m_mask);

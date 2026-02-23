@@ -37,6 +37,7 @@ struct Options
 		VARIABLE(int, probe_clamp_3) \
 		VARIABLE(int, max_gap) \
 		VARIABLE(int, max_mismatch) \
+		VARIABLE(int, max_poly_degen) \
 		VARIABLE(int, target_strand) \
 		VARIABLE(int, melting_param) \
 		VARIABLE(int, mask_options) \
@@ -99,7 +100,8 @@ struct Options
 			
 			max_gap = DEFAULT_MAX_GAP;
 			max_mismatch = DEFAULT_MAX_MISMATCH;
-		
+			max_poly_degen = DEFAULT_MAX_POLY_DEGEN;
+			
 			target_strand = Seq_strand_both;
 			
 			min_primer_tm = DEFAULT_MIN_PRIMER_TM;

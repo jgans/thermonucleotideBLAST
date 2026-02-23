@@ -8,6 +8,7 @@
 #include "primer.h"
 #include "mpi_util.h"
 #include "bitmask.h"
+#include "throw.h"
 
 #include <stdlib.h>
 #include <time.h>
@@ -107,7 +108,7 @@ int master(int argc, char *argv[])
 
 					if(!fout){
 						cerr << "Unable to open " << opt.output_filename << endl;
-						throw "Unable to open output file";
+						THROW("Unable to open output file");
 					}
 				}
 				
@@ -120,7 +121,7 @@ int master(int argc, char *argv[])
 					if(!fout_sif){
 					
 						cerr << "Unable to open " << filename_sif << endl;
-						throw ":master: I/O error";
+						THROW(":master: I/O error");
 					}
 				}
 			}
@@ -136,7 +137,7 @@ int master(int argc, char *argv[])
 				if(!fout_atr){
 
 					cerr << "Unable to open " << filename_atr << endl;
-					throw ":master: I/O error";
+					THROW(":master: I/O error");
 				}
 
 				// Write the attribute header
@@ -150,7 +151,7 @@ int master(int argc, char *argv[])
 
 				if(!fout){
 					cerr << "Unable to open " << opt.output_filename << endl;
-					throw "Unable to open output file";
+					THROW("Unable to open output file");
 				}
 			}
 
@@ -187,7 +188,7 @@ int master(int argc, char *argv[])
 		const unsigned long int num_sig = opt.sig_list.size();
 		
 		if(num_sig == 0){
-			throw __FILE__ ":master: No assay oligos found!";
+			THROW(__FILE__ ":master: No assay oligos found!");
 		}
 		
 		// Count the number of probe only queries in the list of queries
@@ -223,7 +224,7 @@ int master(int argc, char *argv[])
 		const unsigned long int num_seq = seq_file.size();
 		
 		if(num_seq == 0){
-			throw __FILE__ ":master: Empty database -- no sequences found!";
+			THROW(__FILE__ ":master: Empty database -- no sequences found!");
 		}
 		
 		// If we take into account target sequence fragmentation, how many sequences
@@ -456,7 +457,7 @@ int master(int argc, char *argv[])
 				if(MPI_Send(buffer, SEARCH_QUERY_BUFFER_SIZE, MPI_UNSIGNED, node, 
 				   SEARCH_QUERY, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-				   throw __FILE__ ":master: Error sending SEARCH_QUERY";
+				   THROW(__FILE__ ":master: Error sending SEARCH_QUERY");
 				}
 				
 				// DEBUG
@@ -513,7 +514,7 @@ int master(int argc, char *argv[])
 			if(MPI_Recv(&ret, sizeof(ret), MPI_BYTE, MPI_ANY_SOURCE, 
 				MPI_ANY_TAG, MPI_COMM_WORLD, &status) != MPI_SUCCESS){
 
-				throw __FILE__ ":master: Error receiving worker info";
+				THROW(__FILE__ ":master: Error receiving worker info");
 			}
 						
 			if(status.MPI_TAG == STATUS_UPDATE){
@@ -576,7 +577,7 @@ int master(int argc, char *argv[])
 			}
 			
 			if(status.MPI_TAG != SEQ_REQUEST){
-				throw __FILE__ ":master: Unexpected message";
+				THROW(__FILE__ ":master: Unexpected message");
 			}
 						
 			// Send the sequence "ret" to worker "status.MPI_SOURCE"
@@ -608,7 +609,7 @@ int master(int argc, char *argv[])
 			if(MPI_Send(&msg, 1, MPI_INT, j, 
 			   SEARCH_COMPLETE, MPI_COMM_WORLD) != MPI_SUCCESS){
 
-			   throw __FILE__ ":master: Error sending SEARCH_COMPLETE";
+			   THROW(__FILE__ ":master: Error sending SEARCH_COMPLETE");
 			}
 		}
 		
@@ -648,7 +649,7 @@ int master(int argc, char *argv[])
 			if(MPI_Recv(buffer, NUM_PROFILE, MPI_DOUBLE, worker, 
 				PROFILE_INFO, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-				throw __FILE__ ":master: Error receiving buffer";
+				THROW(__FILE__ ":master: Error receiving buffer");
 			}
 			
 			work_time += buffer[PROFILE_WORK];
@@ -667,6 +668,27 @@ int master(int argc, char *argv[])
 		// using the same string table.
 		index_table = synchronize_keys(str_table);
 
+		// Reindex the original assay signatures (in case the user has requested a summary of assay results)
+		unordered_map<size_t, size_t> old_to_new;
+
+		// Invalid indicies are still invalid indicies
+		old_to_new[INVALID_INDEX] = INVALID_INDEX;
+
+		for(unordered_map<string, size_t>::const_iterator i = str_table.begin();i != str_table.end();++i){
+
+			vector<string>::const_iterator iter = lower_bound(index_table.begin(), index_table.end(), i->first);
+
+			if( ( iter == index_table.end() ) || (*iter != i->first) ){
+				THROW(__FILE__ ":Unable to look up string for reindexing");
+			}
+
+			old_to_new[i->second] = iter - index_table.begin();
+		}
+
+		for(vector<hybrid_sig>::iterator i = opt.sig_list.begin();i != opt.sig_list.end();++i){
+			i->reindex_str(old_to_new);
+		}
+
 		// We no longer need the string table
 		unordered_map<string, size_t>().swap(str_table); // Force the memory to be deallocated
 
@@ -684,7 +706,7 @@ int master(int argc, char *argv[])
 			unsigned char* buffer = new unsigned char [buffer_size];
 			
 			if(buffer == NULL){
-				throw __FILE__ ":master: Unable to allocate bitmask buffer";
+				THROW(__FILE__ ":master: Unable to allocate bitmask buffer");
 			}
 
 			// Download the results from each worker. 
@@ -693,7 +715,7 @@ int master(int argc, char *argv[])
 				if(MPI_Recv(buffer, buffer_size, MPI_BYTE, worker, 
 					SIGNATURE_RESULTS, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-					throw __FILE__ ":master: Error receiving bitmask buffer";
+					THROW(__FILE__ ":master: Error receiving bitmask buffer");
 				}
 				
 				tmp_matches.mpi_unpack(buffer);
@@ -793,19 +815,19 @@ int master(int argc, char *argv[])
 				MPI_Get_count(&status, MPI_BYTE, &buffer_size);
 
 				if(buffer_size == 0){
-					throw __FILE__ ":master: Error buffer size is 0";
+					THROW(__FILE__ ":master: Error buffer size is 0");
 				}
 
 				unsigned char* buffer = new unsigned char [buffer_size];
 
 				if(buffer == NULL){
-					throw __FILE__ ":master: Error allocating receive buffer";
+					THROW(__FILE__ ":master: Error allocating receive buffer");
 				}
 
 				if(MPI_Recv(buffer, buffer_size, MPI_BYTE, status.MPI_SOURCE, 
 					SIGNATURE_RESULTS, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-					throw __FILE__ ":master: Error receiving buffer";
+					THROW(__FILE__ ":master: Error receiving buffer");
 				}
 
 				unsigned char *ptr = buffer;
@@ -870,7 +892,7 @@ int master(int argc, char *argv[])
 							if(!fout){
 
 								cerr << "Unable to open " << filename << endl;
-								throw ":master: I/O error";
+								THROW(":master: I/O error");
 							}
 						}
 
@@ -885,7 +907,7 @@ int master(int argc, char *argv[])
 							if(!fout_sif){
 
 								cerr << "Unable to open " << filename_sif << endl;
-								throw ":master: I/O error";
+								THROW(":master: I/O error");
 							}
 						}
 					}

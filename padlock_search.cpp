@@ -1,9 +1,10 @@
 #include "tntblast.h"
+#include "throw.h"
 
 using namespace std;
 
-// Search for binding and ligation sites for Padlock probes / MOL-PCR (both
-// have the same assay geometry).
+// Search for binding and ligation sites for Padlock probes / MOL-PCR / MIPS
+// (all have the same assay geometry).
 //
 // Here are all of the possible binding configurations for primers P1 and P2
 // against a target sequence (for now, we assume that all sequences have both a 5'-3'
@@ -68,6 +69,7 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	const float &m_min_probe_dg, const float &m_max_probe_dg,
 	const unsigned int &m_probe_clamp_5, const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap, const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_poly_degen,
 	const int &m_target_strand, const int &m_max_len,
 	const std::vector<std::string> &m_oligo_table,
 	std::unordered_map<std::string, size_t> &m_str_table)
@@ -101,9 +103,10 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, 	// Upstream primer has a 5' clamp,
-			0,			// but no 3' clamp
+			0,					// but no 3' clamp
 			m_max_gap,
-			m_max_mismatch); 	
+			m_max_mismatch, 
+			m_max_poly_degen);
 	}
 		
 	// Test primer 1 in the downstream position
@@ -120,10 +123,11 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_melt, m_minus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
-			0, 				// Downstream primer has a 3' clamp,
-			m_probe_clamp_3,
+			0, 					// Downstream primer does not have a 5' clamp,
+			m_probe_clamp_3,	// but does have a 3' clamp
 			m_max_gap,
-			m_max_mismatch); 	// but no 5' clamp
+			m_max_mismatch,
+			m_max_poly_degen);
 	}
 	
 	//   <---downstream                 upstream--->
@@ -151,12 +155,11 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 				// DEBUG
 				//cerr << "\t21-" << endl;
 				
-				// These primers are next to each other!
 				const int start = down_iter->loc_5;
 				const int stop = up_iter->loc_3;
 				
 				if(start > stop){
-					throw __FILE__ ":padlock: start > stop (4)";
+					THROW(__FILE__ ":padlock: start > stop (4)");
 				}
 				
 				const unsigned int len = stop - start + 1;
@@ -241,9 +244,10 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, 	// Upstream primer has a 5' clamp,
-			0,			// but no 3' clamp
+			0,					// but no 3' clamp
 			m_max_gap,
-			m_max_mismatch); 
+			m_max_mismatch,
+			m_max_poly_degen); 
 	}
 	
 	// Test primer 1 in the downstream position
@@ -260,10 +264,11 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_melt, m_plus_strand_melt_cache,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
-			0, 				// Downstream primer has a 3' clamp,
-			m_probe_clamp_3, 		// but no 5' clamp
+			0, 						// Downstream primer does not have a 5' clamp,
+			m_probe_clamp_3, 		// but does have a 5' clamp
 			m_max_gap,
-			m_max_mismatch); 
+			m_max_mismatch,
+			m_max_poly_degen); 
 	}
 	
 	//   <---upstream                 downstream--->
@@ -275,15 +280,19 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		
 		for(down_iter = downstream_bind.begin();down_iter != downstream_bind.end();down_iter++){
 			
+			const int len = down_iter->loc_5 - up_iter->loc_3 - 1;
+
 			// loc coordinates are measured in the target plus strand
-			if( (up_iter->loc_3 + 1) == down_iter->loc_5){
-				
-				// These primers are next to each other!
+			// Update Aug 13, 2024 (should have been updated earlier, but I missed this code block!):
+			//	- Padlock and MOL-PCR assays use m_max_len == 0
+			//	- MIPS assays allow a user-specified m_max_len >= 0
+			if( (len >= 0) && (len <= m_max_len) ){
+	
 				const int start = up_iter->loc_5;
 				const int stop = down_iter->loc_3;
 				
 				if(start > stop){
-					throw __FILE__ ":padlock: start > stop (6)";
+					THROW(__FILE__ ":padlock: start > stop (6)");
 				}
 				
 				const unsigned int len = stop - start + 1;
@@ -347,6 +356,6 @@ list<hybrid_sig> padlock(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			}
 		}
 	}
-		
+
 	return sig_list;
 }

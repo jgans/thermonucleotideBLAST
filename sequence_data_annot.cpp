@@ -1,4 +1,5 @@
 #include "sequence_data.h"
+#include "throw.h"
 
 // Needed for sort()
 #include <algorithm>
@@ -19,7 +20,7 @@ void sequence_data::load_gbk(const std::string &m_filename)
 	gzbuffer(fin, 32768);
 
 	if(fin == NULL){
-		throw __FILE__ ":sequence_data::load_gbk: Unable to open input file";
+		THROW(__FILE__ ":sequence_data::load_gbk: Unable to open input file");
 	}
 
 	while(true){
@@ -29,13 +30,13 @@ void sequence_data::load_gbk(const std::string &m_filename)
 		if(mol.back().load(fin, DNAMol::GBK, pos) == false){
 			break;
 		}
+
+		if(mol.back().empty() == true){
+			mol.pop_back();
+		}
 	}
 	
 	gzclose(fin);
-
-	if(mol.back().empty() == true){
-		mol.pop_back();
-	}
 		
 	list<DNAMol>::const_iterator iter = mol.begin();
 	const size_t num_seq = size();
@@ -65,7 +66,7 @@ void sequence_data::load_embl(const std::string &m_filename)
 	gzbuffer(fin, 32768);
 
 	if(fin == NULL){
-		throw __FILE__ ":sequence_data::load_embl: Unable to open input file";
+		THROW(__FILE__ ":sequence_data::load_embl: Unable to open input file");
 	}
 
 	while(true){

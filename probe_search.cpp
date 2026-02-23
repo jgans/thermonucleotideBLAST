@@ -1,4 +1,5 @@
 #include "tntblast.h"
+#include "throw.h"
 
 using namespace std;
 
@@ -72,6 +73,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 	const unsigned int &m_probe_clamp_3,
 	const unsigned int &m_max_gap,
 	const unsigned int &m_max_mismatch,
+	const unsigned int &m_max_poly_degen,
 	const int &m_target_strand,
 	const vector<string> &m_oligo_table,
 	unordered_map<string, size_t> &m_str_table)
@@ -100,7 +102,8 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
-			m_max_gap, m_max_mismatch);	
+			m_max_gap, m_max_mismatch,
+			m_max_poly_degen);
 	}
 	
 	for(iter = bind.begin();iter != bind.end();iter++){
@@ -112,7 +115,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		const int probe_stop = iter->loc_3;
 		
 		if(probe_start > probe_stop){			
-			throw __FILE__ ":hybrid: probe_start > probe_stop (0)";
+			THROW(__FILE__ ":hybrid: probe_start > probe_stop (0)");
 		}
 
 		const unsigned int probe_len = probe_stop - probe_start + 1;
@@ -169,7 +172,8 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 			m_min_probe_tm, m_max_probe_tm,
 			m_min_probe_dg, m_max_probe_dg,
 			m_probe_clamp_5, m_probe_clamp_3,
-			m_max_gap, m_max_mismatch);
+			m_max_gap, m_max_mismatch,
+			m_max_poly_degen);
 	}
 
 	for(iter = bind.begin();iter != bind.end();iter++){
@@ -181,7 +185,7 @@ list<hybrid_sig> hybrid(DNAHash &m_hash, const pair<string, SEQPTR> &m_seq,
 		const int probe_stop = iter->loc_3;
 		
 		if(probe_start > probe_stop){
-			throw __FILE__ ":hybrid: probe_start > probe_stop (1)";
+			THROW(__FILE__ ":hybrid: probe_start > probe_stop (1)");
 		}
 		
 		const unsigned int probe_len = probe_stop - probe_start + 1;

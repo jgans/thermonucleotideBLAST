@@ -1,4 +1,5 @@
 #include "nuc_cruc.h"
+#include "throw.h"
 
 using namespace std;
 using namespace BASE;
@@ -70,7 +71,7 @@ bool BASE::is_complemetary_base(const nucleic_acid &m_query, const nucleic_acid 
 			query_mask = MASK_A | MASK_T | MASK_G | MASK_C;
 			break;
 		default:
-			throw __FILE__ ":is_complemetary_base: Unknown query base";
+			THROW(__FILE__ ":is_complemetary_base: Unknown query base");
 	};
 
 	// Map the target base to its *complement*
@@ -130,7 +131,7 @@ bool BASE::is_complemetary_base(const nucleic_acid &m_query, const nucleic_acid 
 			target_mask = MASK_A | MASK_T | MASK_G | MASK_C;
 			break;
 		default:
-			throw __FILE__ ":is_complemetary_base: Unknown target base";
+			THROW(__FILE__ ":is_complemetary_base: Unknown target base");
 	};
 
 	// If any bits overlap then the two bases are complementary
@@ -185,7 +186,7 @@ unsigned int NucCruc::anchor5_query() const
 	}
 	
 	// We should never get here
-	throw "NucCruc::anchor5_query() logic error";
+	THROW("NucCruc::anchor5_query() logic error");
 	
 	return anchor;
 }
@@ -238,7 +239,7 @@ unsigned int NucCruc::anchor3_target() const
 	}
 	
 	// We should never get here
-	throw "NucCruc::anchor3_target() logic error";
+	THROW("NucCruc::anchor3_target() logic error");
 	
 	return anchor;
 }
@@ -291,7 +292,7 @@ unsigned int NucCruc::anchor3_query() const
 	}
 	
 	// We should never get here
-	throw "NucCruc::anchor3_query() logic error";
+	THROW("NucCruc::anchor3_query() logic error");
 	
 	return anchor;
 }
@@ -344,7 +345,7 @@ unsigned int NucCruc::anchor5_target() const
 	}
 	
 	// We should never get here
-	throw "NucCruc::anchor5_target() logic error";
+	THROW("NucCruc::anchor5_target() logic error");
 	
 	return anchor;
 }

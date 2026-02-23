@@ -1,5 +1,6 @@
 #include "tntblast.h"
 #include "sequence_data.h"
+#include "throw.h"
 
 #include <errno.h>
 
@@ -40,7 +41,7 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 		blast_db_ptr = new NCBI_NS_NCBI::CSeqDB(m_filename, NCBI_NS_NCBI::CSeqDB::eNucleotide);
 
 		if(blast_db_ptr == NULL){
-        	throw __FILE__ ":sequence_data::open: Unable to allocate CSeqDB";
+        	THROW(__FILE__ ":sequence_data::open: Unable to allocate CSeqDB");
         }
 
 		format = NCBI;
@@ -99,14 +100,14 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 			catch(...){
 
 				cerr << "Unable to find accession " << *i << " in BLAST database" << endl;
-				throw "Unable to find an included accession in BLAST database";
+				THROW("Unable to find an included accession in BLAST database");
 			}
 
 			for(vector<int>::const_iterator j = oid.begin();j != oid.end();++j){
 
 				// Make sure we can convert from int -> unsigned int
 				if(*j < 0){
-					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+					THROW(__FILE__ ":sequence_data::open: Invalid (negative) TaxID");
 				}
 
 				oid_include.push_back(*j);
@@ -129,14 +130,14 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 			catch(...){
 
 				cerr << "Unable to find accession " << *i << " in BLAST database" << endl;
-				throw "Unable to find an excluded accession in BLAST database";
+				THROW("Unable to find an excluded accession in BLAST database");
 			}
 
 			for(vector<int>::const_iterator j = oid.begin();j != oid.end();++j){
 
 				// Make sure we can convert from int -> unsigned int
 				if(*j < 0){
-					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+					THROW(__FILE__ ":sequence_data::open: Invalid (negative) TaxID");
 				}
 
 				oid_exclude.push_back(*j);
@@ -154,14 +155,14 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 			catch(exception &error){
 
 				cerr << error.what() << endl;
-				throw "Unable to find an included TaxID in BLAST database";
+				THROW("Unable to find an included TaxID in BLAST database");
 			}
 
 			for(vector< NCBI_NS_NCBI::blastdb::TOid >::const_iterator i = tmp.begin();i != tmp.end();++i){
 
 				// Make sure we can convert from int -> unsigned int
 				if(*i < 0){
-					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+					THROW(__FILE__ ":sequence_data::open: Invalid (negative) TaxID");
 				}
 
 				oid_include.push_back(*i);
@@ -179,14 +180,14 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 			catch(exception &error){
 
 				cerr << error.what() << endl;
-				throw "Unable to find an excluded TaxID in BLAST database";
+				THROW("Unable to find an excluded TaxID in BLAST database");
 			}
 
 			for(vector< NCBI_NS_NCBI::blastdb::TOid >::const_iterator i = tmp.begin();i != tmp.end();++i){
 
 				// Make sure we can convert from int -> unsigned int
 				if(*i < 0){
-					throw __FILE__ ":sequence_data::open: Invalid (negative) TaxID";
+					THROW(__FILE__ ":sequence_data::open: Invalid (negative) TaxID");
 				}
 
 				oid_exclude.push_back(*i);
@@ -261,7 +262,7 @@ void sequence_data::open(const string &m_filename, const vector<string> &m_blast
 			load_embl(m_filename);
 			return;
 		default:
-			throw "File not found, unrecognized file type, or error reading BLAST database";
+			THROW("File not found, unrecognized file type, or error reading BLAST database");
 	};
 }
 
@@ -292,7 +293,7 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 			seq_len = read_bio_seq_annot(m_seq, m_index);
 			break;
 		default:
-			throw __FILE__ ":sequence_data::read_bio_seq: Unknown database format";
+			THROW(__FILE__ ":sequence_data::read_bio_seq: Unknown database format");
 	};
 	
 	return seq_len;
@@ -326,7 +327,7 @@ unsigned int sequence_data::read_bio_seq(std::pair<std::string, SEQPTR> &m_seq,
 			seq_len = read_bio_seq_annot(m_seq, m_index, m_start, m_stop);
 			break;
 		default:
-			throw __FILE__ ":sequence_data::read_bio_seq: Unknown database format";
+			THROW(__FILE__ ":sequence_data::read_bio_seq: Unknown database format");
 	};
 	
 	return seq_len;
@@ -348,7 +349,7 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	if(MPI_Send( (unsigned int*)&m_index, 1, MPI_UNSIGNED, 0 /* master */, 
 	   SEQ_REQUEST, MPI_COMM_WORLD ) != MPI_SUCCESS){
 
-	   throw __FILE__ ":read_bio_seq_remote: Error sending SEQ_REQUEST";
+	   THROW(__FILE__ ":read_bio_seq_remote: Error sending SEQ_REQUEST");
 	}
 
 	int range[2];
@@ -359,7 +360,7 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	if(MPI_Send( range, 2, MPI_INT, 0 /* master */, 
 	   SEQ_REQUEST, MPI_COMM_WORLD ) != MPI_SUCCESS){
 
-	   throw __FILE__ ":read_bio_seq_remote: Error sending SEQ_REQUEST";
+	   THROW(__FILE__ ":read_bio_seq_remote: Error sending SEQ_REQUEST");
 	}
 	
 	MPI_Probe(0 /* master */, SEQ_REQUEST, MPI_COMM_WORLD, &status);
@@ -369,19 +370,19 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	MPI_Get_count(&status, MPI_BYTE, &local_buffer_size);
 
 	if(local_buffer_size == 0){
-		throw __FILE__ ":read_bio_seq_remote: Error buffer size is 0";
+		THROW(__FILE__ ":read_bio_seq_remote: Error buffer size is 0");
 	}
 
 	unsigned char* buffer = new unsigned char [local_buffer_size];
 
 	if(buffer == NULL){
-		throw __FILE__ ":read_bio_seq_remote: Error allocating receive buffer";
+		THROW(__FILE__ ":read_bio_seq_remote: Error allocating receive buffer");
 	}
 
 	if(MPI_Recv(buffer, local_buffer_size, MPI_BYTE, 0 /* master */, 
 		SEQ_REQUEST, MPI_COMM_WORLD, MPI_STATUS_IGNORE) != MPI_SUCCESS){
 
-		throw __FILE__ ":read_bio_seq_remote: Error receiving buffer";
+		THROW(__FILE__ ":read_bio_seq_remote: Error receiving buffer");
 	}
 
 	unsigned char *ptr = buffer;
@@ -398,7 +399,7 @@ unsigned int sequence_data::read_bio_seq_remote(pair<string, SEQPTR> &m_seq,
 	m_seq.second = new SEQBASE [seq_size];
 
 	if(m_seq.second == NULL){
-		throw __FILE__ ":read_bio_seq_remote: Error allocating SEQBASE buffer";
+		THROW(__FILE__ ":read_bio_seq_remote: Error allocating SEQBASE buffer");
 	}
 
 	memcpy(m_seq.second, ptr, seq_size);
@@ -426,7 +427,7 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 
 	// Map the sequence index to the OID of the BLAST database
 	if( m_index > seq_length.size() ){
-		throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Error looking up BLAST OID";
+		THROW(__FILE__ ":sequence_data::read_bio_seq_ncbi: Error looking up BLAST OID");
 	}
 
 	m_index = seq_length[m_index].second;
@@ -434,7 +435,7 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 	unsigned int seq_len = 0;
 	
 	if(blast_db_ptr == NULL){
-		throw __FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer";
+		THROW(__FILE__ ":sequence_data::read_bio_seq_ncbi: Invalid blast_db_ptr pointer");
 	}
 
 	// Read this sequence from the database file. The "omp critical" is needed to prevent multiple openMP threads 
@@ -522,7 +523,7 @@ unsigned int sequence_data::read_bio_seq_ncbi(pair<string, SEQPTR> &m_seq,
 			m_seq.second = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
 			
 			if(m_seq.second == NULL){
-				throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
+				THROW(__FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer");
 			}
 			
 			SEQPTR out_ptr = m_seq.second;
@@ -639,7 +640,7 @@ unsigned int sequence_data::read_bio_seq_annot(pair<string, SEQPTR> &m_seq,
 		const unsigned int &m_index, const int &m_start, const int &m_stop) const
 {
 	if( m_index >= mol.size() ){
-		throw __FILE__ ":read_bio_seq_annot: index out of bounds";
+		THROW(__FILE__ ":read_bio_seq_annot: index out of bounds");
 	}
 	
 	list<DNAMol>::const_iterator iter = mol.begin();
@@ -673,7 +674,7 @@ unsigned int sequence_data::read_bio_seq_annot(pair<string, SEQPTR> &m_seq,
 	m_seq.second = new SEQBASE [seq_len + SEQ_HEADER_SIZE];
 	
 	if(m_seq.second == NULL){
-		throw __FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer";
+		THROW(__FILE__ ":sequence_data::read_bio_seq_annot: Error allocating SEQBASE buffer");
 	}
 	
 	SEQPTR ptr = m_seq.second;
@@ -705,12 +706,12 @@ size_t sequence_data::size() const
 		case NCBI:
 			return seq_length.size();
 		case REMOTE:
-			throw __FILE__ ":sequence_data::size: size is not defined for remote databases";
+			THROW(__FILE__ ":sequence_data::size: size is not defined for remote databases");
 		case GBK:
 		case EMBL:
 			return mol.size();
 		default:
-			throw __FILE__ ":sequence_data::size: size is not defined for uninitialized databases";
+			THROW(__FILE__ ":sequence_data::size: size is not defined for uninitialized databases");
 	};
 }
 

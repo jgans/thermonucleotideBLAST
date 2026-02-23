@@ -1,6 +1,7 @@
 #include "sequence_data.h"
 
 #include "errno.h"
+#include "throw.h"
 
 // Needed for sort()
 #include <algorithm>
@@ -15,7 +16,7 @@ void sequence_data::load_fasta(const std::string &m_filename)
 	fasta_in = gzopen( m_filename.c_str(), "r");
 
 	if(fasta_in == NULL){
-		throw "Unable to open fasta sequence file for reading";
+		THROW("Unable to open fasta sequence file for reading");
 	}
 	
 	format = FASTA_SLOW;
@@ -83,7 +84,7 @@ void sequence_data::load_fastq(const std::string &m_filename)
 	fasta_in = gzopen( m_filename.c_str(), "r");
 
 	if(fasta_in == NULL){
-		throw "Unable to open fastq sequence file for reading";
+		THROW("Unable to open fastq sequence file for reading");
 	}
 	
 	format = FASTQ_SLOW;
@@ -193,11 +194,11 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	const unsigned int &m_index, const int &m_start, const int &m_stop) const
 {
 	if(format != FASTA_SLOW){
-		throw ":sequence_data::read_bio_seq_fasta_slow: Database is not in fasta format!";
+		THROW(":sequence_data::read_bio_seq_fasta_slow: Database is not in fasta format!");
 	}
 	
 	if( m_index >= seq_index.size() ){
-		throw ":sequence_data::read_bio_seq_fasta_slow: Index out of bounds";
+		THROW(":sequence_data::read_bio_seq_fasta_slow: Index out of bounds");
 	}
 
 	// Move to the start of the fasta defline (first base will be the '>' symbol)
@@ -215,7 +216,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	char *file_buffer = new char[file_buffer_size];
 	
 	if(file_buffer == NULL){
-		throw "Unable to allocate fasta file buffer";
+		THROW("Unable to allocate fasta file buffer");
 	}
 	
 	file_index total_bytes_read = 0;
@@ -236,7 +237,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	if(bytes_read == -1){
 	
 		delete [] file_buffer;
-		throw "Error while reading fasta file";
+		THROW("Error while reading fasta file");
 	}
 	
 	file_offset += bytes_read;
@@ -257,7 +258,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	if(ptr == last){
 	
 		delete [] file_buffer;
-		throw "Truncated fasta file detected!";
+		THROW("Truncated fasta file detected!");
 	}	
 	
 	char* defline_start = ptr;
@@ -269,7 +270,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	if(ptr == last){
 
 		delete [] file_buffer;
-		throw "Truncated fasta file detected!";
+		THROW("Truncated fasta file detected!");
 	}
 
 	m_seq.first = string(defline_start, ptr - defline_start);
@@ -305,7 +306,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 	if(m_seq.second == NULL){
 	
 		delete [] file_buffer;
-		throw __FILE__ ":sequence_data::read_bio_seq_fasta_slow: Unable to allocate memory for sequence";
+		THROW(__FILE__ ":sequence_data::read_bio_seq_fasta_slow: Unable to allocate memory for sequence");
 	}
 	
 	// A pointer to the num_base header that preceeds the sequence data
@@ -348,7 +349,7 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 				delete [] file_buffer;
 				delete [] m_seq.second;
 				
-				throw "Error while reading fasta file";
+				THROW("Error while reading fasta file");
 			}
 			
 			file_offset += bytes_read;
@@ -361,8 +362,8 @@ unsigned int sequence_data::read_bio_seq_fasta_slow(pair<string, SEQPTR> &m_seq,
 			ptr = file_buffer;
 		}
 		
-		// Ignore '*' and spaces when parsing sequences
-		if( !isspace(*ptr) && (*ptr != '*') && (*ptr != '\r') && (index++ >= start) ){
+		// Ignore '*', '-', and spaces when parsing sequences
+		if( !isspace(*ptr) && (*ptr != '*') && (*ptr != '-') && (*ptr != '\r') && (index++ >= start) ){
 
 			*(seq_ptr++) = ascii_to_hash_base(*ptr);
 			++(*num_base);
@@ -390,11 +391,11 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	const unsigned int &m_index, const int &m_start, const int &m_stop) const
 {
 	if(format != FASTQ_SLOW){
-		throw ":sequence_data::read_bio_seq_fastq_slow: Database is not in fastq format!";
+		THROW(":sequence_data::read_bio_seq_fastq_slow: Database is not in fastq format!");
 	}
 	
 	if( m_index >= seq_index.size() ){
-		throw ":sequence_data::read_bio_seq_fastq_slow: Index out of bounds";
+		THROW(":sequence_data::read_bio_seq_fastq_slow: Index out of bounds");
 	}
 
 	// Move to the start of the fasta defline (first base will be the '>' symbol)
@@ -412,7 +413,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	char *file_buffer = new char[file_buffer_size];
 	
 	if(file_buffer == NULL){
-		throw "Unable to allocate fastq file buffer";
+		THROW("Unable to allocate fastq file buffer");
 	}
 	
 	file_index total_bytes_read = 0;
@@ -433,7 +434,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	if(bytes_read == -1){
 	
 		delete [] file_buffer;
-		throw "Error while reading fastq file";
+		THROW("Error while reading fastq file");
 	}
 	
 	file_offset += bytes_read;
@@ -454,7 +455,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	if(ptr == last){
 	
 		delete [] file_buffer;
-		throw "Truncated fastq file detected!";
+		THROW("Truncated fastq file detected!");
 	}	
 	
 	char* defline_start = ptr;
@@ -466,7 +467,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	if(ptr == last){
 	
 		delete [] file_buffer;
-		throw "Truncated fastq file detected!";
+		THROW("Truncated fastq file detected!");
 	}
 
 	m_seq.first = string(defline_start, ptr - defline_start);
@@ -475,7 +476,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	ptr++;
 	
 	if(ptr == last){
-		throw "Truncated fastq file detected!";
+		THROW("Truncated fastq file detected!");
 	}
 	
 	///////////////////////////////////////////////////////////////////////////////////////////////
@@ -509,7 +510,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 	if(m_seq.second == NULL){
 	
 		delete [] file_buffer;
-		throw __FILE__ ":sequence_data::read_bio_seq_fastq_slow: Unable to allocate memory for sequence";
+		THROW(__FILE__ ":sequence_data::read_bio_seq_fastq_slow: Unable to allocate memory for sequence");
 	}
 	
 	unsigned int *num_base = (unsigned int*)(m_seq.second);
@@ -551,7 +552,7 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 				delete [] file_buffer;
 				delete [] m_seq.second;
 				
-				throw "Error while reading fastq file";
+				THROW("Error while reading fastq file");
 			}
 			
 			file_offset += bytes_read;
@@ -569,8 +570,8 @@ unsigned int sequence_data::read_bio_seq_fastq_slow(pair<string, SEQPTR> &m_seq,
 			break;
 		}
 		
-		// Ignore '*' and spaces when parsing sequences
-		if( !isspace(*ptr) && (*ptr != '*') && (index++ >= start) ){
+		// Ignore '*', '-', and spaces when parsing sequences
+		if( !isspace(*ptr) && (*ptr != '*') && (*ptr != '-') && (index++ >= start) ){
 
 			*(seq_ptr++) = ascii_to_hash_base(*ptr);
 			++(*num_base);

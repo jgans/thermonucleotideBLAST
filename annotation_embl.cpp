@@ -1,4 +1,5 @@
 #include "annotation.h"
+#include "throw.h"
 
 #include <sstream>
 #include <string.h>
@@ -74,13 +75,13 @@ bool DNAMol::loadEMBL(gzFile m_fin, size_t &m_pos)
 			case EMBL_NO_KEY:
 				// Read and throw away the line
 				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-					throw __FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_NO_KEY";
+					THROW(__FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_NO_KEY");
 				}
 				break;
 			case EMBL_UNKNOWN_KEY:
 				// Read and throw away the line
 				if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-					throw __FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_UNKNOWN_KEY";
+					THROW(__FILE__ ":DNAMol::loadEMBL: Unable to read EMBL_UNKNOWN_KEY");
 				}
 				break;
 			case EMBL_LOCUS:
@@ -120,7 +121,7 @@ bool DNAMol::loadEMBL(gzFile m_fin, size_t &m_pos)
 				// All done. Is there more data to read?
 				return (gzeof(m_fin) == 0);
 			default:
-				throw "loadEMBL: Unknown key encountered!";
+				THROW("loadEMBL: Unknown key encountered!");
 		};
 	}
 
@@ -136,7 +137,7 @@ void DNAMol::loadEMBLFeatures(gzFile m_fin)
 	size_t pos = gztell(m_fin);
 	
 	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-		throw __FILE__ ":DNAMol::loadEMBLFeatures: Error reading the first line";
+		THROW(__FILE__ ":DNAMol::loadEMBLFeatures: Error reading the first line");
 	}
 
 	
@@ -166,7 +167,7 @@ void DNAMol::loadEMBLFeatures(gzFile m_fin)
 				// Skip the source feature for now. We'll need to parse
 				// this feature to extract the taxon id).
 				if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-					throw __FILE__ ":DNAMol::loadEMBLFeatures: Error reading EMBL_ANNOT_SOURCE";
+					THROW(__FILE__ ":DNAMol::loadEMBLFeatures: Error reading EMBL_ANNOT_SOURCE");
 				}
 
 				annot_key = next_key_EMBL(m_fin);
@@ -705,7 +706,7 @@ int parse_field_EMBL(gzFile m_fin, pair<string, string> &m_field)
 	int paren_count = 0;
 
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":parse_field_EMBL: Error reading line (1)";
+		THROW(__FILE__ ":parse_field_EMBL: Error reading line (1)");
 	}
 	
 	// How many characters did we read?
@@ -715,7 +716,7 @@ int parse_field_EMBL(gzFile m_fin, pair<string, string> &m_field)
 	start_ptr = strchr(buffer, '/');
 
 	if(start_ptr == NULL){
-		throw ":parse_field_EMBL: Unable to find key start";
+		THROW(":parse_field_EMBL: Unable to find key start");
 	}
 	
 	// Skip the '/' character
@@ -866,14 +867,14 @@ int parse_field_EMBL(gzFile m_fin, pair<string, string> &m_field)
 		gzgetc(m_fin);
 
 		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-			throw __FILE__ ":parse_field_EMBL: Unable to read line (2)";
+			THROW(__FILE__ ":parse_field_EMBL: Unable to read line (2)");
 		}
 		
 		len = strlen(buffer);
 
 		// Empty lines are not allowed!
 		if(len == 0){
-			throw "Unexpected blank line or end of file encountered!";
+			THROW("Unexpected blank line or end of file encountered!");
 		}
 
 		start_ptr = buffer;
@@ -896,7 +897,7 @@ int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 
 	// First read the two letter code
 	if( gzread(m_fin, buffer, 2) ){
-		throw ":next_key_EMBL: Unable to read next annotation key";
+		THROW(":next_key_EMBL: Unable to read next annotation key");
 	}
 
 	// Check the two letter record code
@@ -904,7 +905,7 @@ int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 
 		// Throw away the rest of the line
 		if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-			throw ":next_key_EMBL: Unable to read remaining characters in line";
+			THROW(":next_key_EMBL: Unable to read remaining characters in line");
 		}
 
 		return EMBL_ANNOT_END;
@@ -923,7 +924,7 @@ int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 
 		// Throw away the rest of the line
 		if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-			throw __FILE__ ":next_key_EMBL: Unable to skip remaining characters in line";
+			THROW(__FILE__ ":next_key_EMBL: Unable to skip remaining characters in line");
 		}
 
 		return EMBL_ANNOT_NONE;
@@ -931,11 +932,11 @@ int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 	
 	// We had better have an "FT" !
 	if((buffer[0] != 'F') && (buffer[1] != 'T')){
-		throw __FILE__ ":next_key_EMBL: Premature end of file or blank line encountered";
+		THROW(__FILE__ ":next_key_EMBL: Premature end of file or blank line encountered");
 	}
 
 	if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-		throw __FILE__ ":next_key_EMBL: Unable to read next annotation key";
+		THROW(__FILE__ ":next_key_EMBL: Unable to read next annotation key");
 	}
 
 	// Find the start of the string
@@ -949,7 +950,7 @@ int next_key_EMBL(gzFile m_fin, const bool &m_clear_line /* = true */)
 		if(m_clear_line){
 			// Throw away the rest of the line
 			if( (gzgets(m_fin, buffer, MAX_LINE_LEN) == NULL) || !strip_eol(buffer, MAX_LINE_LEN) ){
-				throw __FILE__ ":next_key_EMBL: Unable to discard remaining characters in line";
+				THROW(__FILE__ ":next_key_EMBL: Unable to discard remaining characters in line");
 			}
 		}
 
@@ -1049,7 +1050,7 @@ bool read_locus_EMBL(gzFile m_fin)
 	char line[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-		throw __FILE__ ":read_locus_EMBL: Unable to read line";
+		THROW(__FILE__ ":read_locus_EMBL: Unable to read line");
 	}
 	
 	const int len = strlen(line);
@@ -1087,7 +1088,7 @@ string read_source_EMBL(gzFile m_fin)
 	char line[MAX_LINE_LEN];
 
 	if( (gzgets(m_fin, line, MAX_LINE_LEN) == NULL) || !strip_eol(line, MAX_LINE_LEN) ){
-		throw __FILE__ ":read_source_EMBL: Unable to read line";
+		THROW(__FILE__ ":read_source_EMBL: Unable to read line");
 	}
 
 	buffer = line;
@@ -1119,7 +1120,7 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 	// First, read the base counts from the Sequence line, i.e.:
 	// Sequence 70159 BP; 19675 A; 15631 C; 15833 G; 19020 T; 0 other;
 	if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-		throw __FILE__ ":read_sequence_EMBL: Unable to read line (1)";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to read line (1)");
 	}
 	
 	// Track the current position
@@ -1178,23 +1179,23 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 	}
 
 	if(a_count < 0){
-		throw __FILE__ ":read_sequence_EMBL: Unable to count number of A's";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to count number of A's");
 	}
 
 	if(t_count < 0){
-		throw __FILE__ ":read_sequence_EMBL: Unable to count number of T's";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to count number of T's");
 	}
 
 	if(g_count < 0){
-		throw __FILE__ ":read_sequence_EMBL: Unable to count number of G's";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to count number of G's");
 	}
 
 	if(c_count < 0){
-		throw __FILE__ ":read_sequence_EMBL: Unable to count number of C's";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to count number of C's");
 	}
 
 	if(other_count < 0){
-		throw __FILE__ ":read_sequence_EMBL: Unable to count number of \"others\"'s";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to count number of \"others\"'s");
 	}
 	
 	// Set the sequence size
@@ -1204,7 +1205,7 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 	SEQPTR seq = new SEQBASE [m_seq_len + SEQ_HEADER_SIZE];
 	
 	if(!seq){
-		throw __FILE__ ":read_sequence_EMBL: Unable to allocate memory for sequence data";
+		THROW(__FILE__ ":read_sequence_EMBL: Unable to allocate memory for sequence data");
 	}
 
 	unsigned int base_count = 0;
@@ -1218,7 +1219,7 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 	while( gzeof(m_fin) == 0 ){
 	
 		if( (gzgets(m_fin, buffer, buffer_size) == NULL) || !strip_eol(buffer, buffer_size) ){
-			throw __FILE__ ":read_sequence_EMBL: Unable to read line (2)";
+			THROW(__FILE__ ":read_sequence_EMBL: Unable to read line (2)");
 		}
 
 		ptr = buffer;
@@ -1231,7 +1232,7 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 			
 				// all done!
 				if(base_count != m_seq_len){
-					throw "Did not read enough bases!";
+					THROW("Did not read enough bases!");
 				}
 				
 				pos += i;
@@ -1258,7 +1259,7 @@ SEQPTR read_sequence_EMBL(gzFile m_fin, unsigned int &m_seq_len)
 		pos += len;
 	}
 
-	throw __FILE__ ":read_sequence_EMBL: Could not find end-of-sequence terminator!";
+	THROW(__FILE__ ":read_sequence_EMBL: Could not find end-of-sequence terminator!");
 	
 	return NULL;
 }

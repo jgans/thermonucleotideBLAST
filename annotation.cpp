@@ -1,4 +1,5 @@
 #include "annotation.h"
+#include "throw.h"
 
 #include <fstream>
 #include <iostream>
@@ -25,7 +26,7 @@ void GeneAnnotation::range(const string &m_range)
 	}
 	
 	if(i == len){
-		throw "Range: Empty range string";
+		THROW("Range: Empty range string");
 	}
 	
 	while(i < len){
@@ -35,7 +36,7 @@ void GeneAnnotation::range(const string &m_range)
 		if( !isdigit(m_range[i]) ){
 			
 			seg_list.clear();
-			throw "Range: Could not read start";
+			THROW("Range: Could not read start");
 		}
 		
 		while( (i < len) && isdigit(m_range[i]) ){
@@ -53,7 +54,7 @@ void GeneAnnotation::range(const string &m_range)
 		if( (i == len) || (m_range[i] != '.') ){
 		
 			seg_list.clear();
-			throw "Range: Could not read \"..\"";
+			THROW("Range: Could not read \"..\"");
 		}
 		
 		i++;
@@ -61,7 +62,7 @@ void GeneAnnotation::range(const string &m_range)
 		if( (i == len) || (m_range[i] != '.') ){
 		
 			seg_list.clear();
-			throw "Range: Could not read \"..\"";
+			THROW("Range: Could not read \"..\"");
 		}
 		
 		i++;
@@ -73,14 +74,14 @@ void GeneAnnotation::range(const string &m_range)
 		if(i == len){
 		
 			seg_list.clear();
-			throw "Range: Could not read stop";
+			THROW("Range: Could not read stop");
 		}
 		
 		
 		if( !isdigit(m_range[i]) ){
 		
 			seg_list.clear();
-			throw "Range: Could not read stop";
+			THROW("Range: Could not read stop");
 		}
 		
 		while( (i < len) && isdigit(m_range[i]) ){
@@ -148,7 +149,7 @@ bool DNAMol::load(gzFile m_fin, const unsigned int &m_type, size_t &m_pos)
 			ret = loadEMBL(m_fin, m_pos);
 			break;
 		default:
-			throw "Unknown file format!";
+			THROW("Unknown file format!");
 	};
 
 	return ret;

@@ -36,6 +36,7 @@
 #include <string>
 #include <sstream>
 #include "primer.h"
+#include "throw.h"
 
 using namespace std;
 using namespace ASSY_HEURISTIC;
@@ -46,7 +47,7 @@ int PCRPrimer::operator() (const CircleBuffer<unsigned char, MAX_PCR_LENGTH> &m_
 	int status = PCR_VALID;
 	
 	if( m_primer.empty() ){
-		throw "PCRPrimer::operator(): Empty primer buffer";
+		THROW("PCRPrimer::operator(): Empty primer buffer");
 	}
 
 	// Is this the last base?
@@ -602,7 +603,7 @@ unsigned int parse_pcr_filter_options(const vector<string> &m_opt)
 		// If we get here, we've encountered an unknown option
 		cerr << "Unknown PCR filter option \"" << *iter << "\"" << endl;
 		
-		throw "Unknown PCR filter option";
+		THROW("Unknown PCR filter option");
 	}
 	
 	return ret;

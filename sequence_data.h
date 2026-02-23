@@ -14,6 +14,7 @@
 #include "seq_hash.h"
 
 #include "annotation.h"
+#include "throw.h"
 
 #ifdef USE_BLAST_DB
 #include <objtools/blast/seqdb_reader/seqdb.hpp>
@@ -198,7 +199,7 @@ class sequence_data
 	const DNAMol& annot(const size_t &m_index) const
 	{
 		if( m_index > mol.size() ){
-			throw "annot: m_index > mol.size()";
+			THROW("annot: m_index > mol.size()");
 		}
 		
 		std::list<DNAMol>::const_iterator iter = mol.begin();
