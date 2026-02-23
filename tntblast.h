@@ -92,7 +92,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 // Version control
-#define		TNTBLAST_VERSION		"2.76 (February 2, 2026)"
+#define		TNTBLAST_VERSION		"2.77 (February 19, 2026)"
 
 // Email address for send complaints, questions, kudos, rants, etc.
 #define		EMAIL_ADDRESS			"jgans@lanl.gov"
